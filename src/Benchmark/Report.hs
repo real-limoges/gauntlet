@@ -1,0 +1,109 @@
+{- |
+Module      : Benchmark.Report
+Description : Terminal output formatting for benchmark results
+Stability   : experimental
+
+Formats and prints benchmark statistics, Bayesian comparisons,
+and verification results to the terminal.
+-}
+module Benchmark.Report (
+    printMultipleBenchmarkReport,
+    printSingleBenchmarkReport,
+    printVerifyReport,
+)
+where
+
+import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), Endpoint (..), PercentileComparison (..), VerificationResult (..))
+import Control.Monad (forM_)
+import Data.Aeson (encode)
+import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.Text (Text)
+import Data.Text qualified as T
+import Text.Printf (printf)
+
+printMultipleBenchmarkReport :: Text -> Text -> BenchmarkStats -> BenchmarkStats -> BayesianComparison -> IO ()
+printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
+    putStrLn ""
+    printHeader "Benchmark Report:"
+
+    printf "(%s):" (T.unpack nameA)
+    putStrLn ""
+    printStats statsA
+
+    putStrLn ""
+
+    printf "(%s):" (T.unpack nameB)
+    putStrLn ""
+    printStats statsB
+
+    putStrLn ""
+    printHeader "Bayesian Analysis"
+
+    printf "Probability Candidate is Faster: %.2f%%\n" (probBFasterThanA bayes * 100.0)
+    printf "Mean Difference: %.2f ms\n" (meanDifference bayes)
+    printf "95%% Credible Interval: [%.2f ms, %.2f ms]\n" (credibleIntervalLower bayes) (credibleIntervalUpper bayes)
+    printf "Effect Size (Cohen's d): %.3f\n" (effectSize bayes)
+    printf "Relative Effect: %.2f%%\n" (relativeEffect bayes)
+
+    putStrLn ""
+    printHeader "Tail Analysis"
+
+    let p95 = p95Comparison bayes
+    printf "P95 Difference: %.2f ms [%.2f, %.2f]\n" (pctDifference p95) (pctCredibleLower p95) (pctCredibleUpper p95)
+    printf "P95 Regression Probability: %.2f%%\n" (probPctRegression p95 * 100.0)
+
+    let p99 = p99Comparison bayes
+    printf "P99 Difference: %.2f ms [%.2f, %.2f]\n" (pctDifference p99) (pctCredibleLower p99) (pctCredibleUpper p99)
+    printf "P99 Regression Probability: %.2f%%\n" (probPctRegression p99 * 100.0)
+
+printVerifyReport :: [(Endpoint, VerificationResult)] -> IO ()
+printVerifyReport results = do
+    printHeader "Verification Report:"
+
+    let total = length results
+    let failures = filter ((/= Match) . snd) results
+    let successes = total - length failures
+
+    putStrLn $ printf "Total Tests: %d" total
+    printf "Passed:      %d\n" successes
+
+    if null failures
+        then printf "VERIFICATION TESTS PASSED.\n"
+        else do
+            printf "Failed:      %d\n" (length failures)
+            putStrLn ""
+            printHeader "FAILURE DETAILS"
+            forM_ failures printFailure
+
+printSingleBenchmarkReport :: Text -> BenchmarkStats -> IO ()
+printSingleBenchmarkReport name stats = do
+    putStrLn ""
+
+    printf "(%s):" (T.unpack name)
+    printStats stats
+
+printFailure :: (Endpoint, VerificationResult) -> IO ()
+printFailure (ep, res) = do
+    printf "[%s] %s\n" (T.unpack $ method ep) (T.unpack $ url ep)
+    case res of
+        Match -> return ()
+        StatusMismatch a b -> printf "  Status Mismatch: Expected %d, Got %d\n" a b
+        InvalidJSON err -> printf "  JSON Error: %s\n" err
+        BodyMismatch p -> do
+            putStrLn "Body Mismatch (JSON Patch):"
+            LBS8.putStrLn (encode p)
+    putStrLn ""
+
+printStats :: BenchmarkStats -> IO ()
+printStats stats = do
+    printf "  Mean:    %.2f ms\n" (meanMs stats)
+    printf "  StdDev:  %.2f ms\n" (stdDevMs stats)
+    printf "  p50:     %.2f ms\n" (p50Ms stats)
+    printf "  p95:     %.2f ms\n" (p95Ms stats)
+    printf "  p99:     %.2f ms\n" (p99Ms stats)
+    printf "  Min:     %.2f ms\n" (minMs stats)
+    printf "  Max:     %.2f ms\n" (maxMs stats)
+    printf "  Success: %d / %d\n" (countSuccess stats) (totalRequests stats)
+
+printHeader :: String -> IO ()
+printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"

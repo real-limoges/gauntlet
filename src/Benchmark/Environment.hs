@@ -1,0 +1,77 @@
+{- |
+Module      : Benchmark.Environment
+Description : Git and Docker environment setup
+Stability   : experimental
+
+Switches git branches and starts Docker containers for benchmark targets.
+-}
+module Benchmark.Environment (
+    setupEnvironment,
+    waitForHealth,
+) where
+
+import Benchmark.Types (PerfTestError (..))
+import Control.Concurrent (threadDelay)
+import Control.Exception (SomeException, try)
+import Data.ByteString.Lazy qualified as LBS
+import Data.Text (Text)
+import Data.Text qualified as T
+import Network.HTTP.Client (Manager, Response, httpLbs, newManager, parseRequest, responseStatus)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
+import Network.HTTP.Types.Status qualified as Status
+import System.Exit (ExitCode (..))
+import System.Process (proc, readCreateProcessWithExitCode)
+
+{- | Switch git branch and start Docker containers for the target service.
+
+Uses 'proc' instead of shell strings to prevent shell injection attacks
+from malicious branch names containing metacharacters.
+-}
+setupEnvironment :: Text -> Text -> IO (Either PerfTestError ())
+setupEnvironment branch serviceName = do
+    putStrLn $ "Running setup: " ++ T.unpack branch
+
+    -- Step 1: Switch git branch (using proc to avoid shell injection)
+    (gitExit, _, gitStderr) <-
+        readCreateProcessWithExitCode
+            (proc "git" ["switch", T.unpack branch])
+            ""
+
+    case gitExit of
+        ExitFailure _ ->
+            return $ Left $ EnvironmentSetupError $ "Git switch failed: " ++ gitStderr
+        ExitSuccess -> do
+            -- Step 2: Start Docker containers
+            (dockerExit, _, dockerStderr) <-
+                readCreateProcessWithExitCode
+                    (proc "docker-compose" ["up", "-d", "--build"])
+                    ""
+
+            case dockerExit of
+                ExitFailure _ ->
+                    return $ Left $ EnvironmentSetupError $ "Docker compose failed: " ++ dockerStderr
+                ExitSuccess -> do
+                    mgr <- newManager tlsManagerSettings
+                    waitForHealth mgr (serviceName <> "/health") 60
+
+-- | Poll health endpoint until successful or max retries reached.
+waitForHealth :: Manager -> Text -> Int -> IO (Either PerfTestError ())
+waitForHealth mgr url maxRetries = loop 0
+  where
+    loop count
+        | count >= maxRetries =
+            return $ Left (HealthCheckTimeout url maxRetries)
+        | otherwise = do
+            putStr "."
+            result <-
+                try (parseRequest (T.unpack url) >>= \req -> httpLbs req mgr) ::
+                    IO (Either SomeException (Response LBS.ByteString))
+
+            case result of
+                Right resp
+                    | Status.statusCode (responseStatus resp) == 200 -> do
+                        putStrLn "\nService is Up ..."
+                        return $ Right ()
+                _ -> do
+                    threadDelay 1_000_000
+                    loop (count + 1)

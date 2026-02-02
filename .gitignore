@@ -1,0 +1,11 @@
+dist-newstyle/build/**/*
+dist-newstyle/
+src/.DS_Store
+.idea/
+docker-compose-dev.yml
+*.json
+secrets.txt
+perf-testing-exe
+.DS_Store
+*.log
+*.csv

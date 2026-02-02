@@ -1,0 +1,19 @@
+cradle:
+  multi:
+    - path: "./src"
+      config:
+        cradle:
+          cabal:
+            component: "lib:perf-testing"
+
+    - path: "./app/Main.hs"
+      config:
+        cradle:
+          cabal:
+            component: "exe:perf-testing-exe"
+
+    - path: "./test"
+      config:
+        cradle:
+          cabal:
+            component: "test:perf-testing-test"

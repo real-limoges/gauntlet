@@ -1,0 +1,134 @@
+cabal-version: 3.12
+name:               perf-testing
+version:            0.1.0.0
+license:            NONE
+author:             Real Limoges
+maintainer:         real.limoges@truefootage.tech
+build-type:         Simple
+
+
+-- Define runtime options specifically for executables and tests
+common rts-properties
+    ghc-options:
+        -threaded
+        -rtsopts
+        -with-rtsopts=-N
+        -O2
+
+library
+  hs-source-dirs:         src
+  exposed-modules:        Lib
+                          Log
+                          Runner
+                          VerifyRunner
+                          Stats.Common
+                          Stats.Benchmark
+                          Benchmark.Baseline
+                          Benchmark.CI
+                          Benchmark.CLI
+                          Benchmark.Config
+                          Benchmark.Environment
+                          Benchmark.Network
+                          Benchmark.Output
+                          Benchmark.Plotting
+                          Benchmark.Report
+                          Benchmark.Types
+                          Benchmark.Verify
+                          Benchmark.TUI
+                          Benchmark.TUI.State
+                          Benchmark.TUI.Widgets
+                          Tracing.Analysis
+                          Tracing.Client
+                          Tracing.Query
+                          Tracing.Report
+                          Tracing.Types
+
+  default-extensions:     OverloadedStrings
+                        , NumericUnderscores
+                        , RecordWildCards
+                        , DeriveAnyClass
+                        , StrictData
+
+  default-language:       GHC2024
+
+  build-depends:          base >=4.20.0.0 && <5,
+                          aeson,
+                          aeson-diff,
+                          async,
+                          brick,
+                          bytestring,
+                          case-insensitive,
+                          Chart,
+                          Chart-cairo,
+                          clock,
+                          colour,
+                          containers,
+                          directory,
+                          dotenv,
+                          filepath,
+                          http-client,
+                          http-client-tls,
+                          http-types,
+                          http-conduit,
+                          http-date,
+                          math-functions,
+                          microlens,
+                          microlens-th,
+                          optparse-applicative,
+                          process,
+                          statistics,
+                          stm,
+                          text,
+                          time,
+                          vector,
+                          vector-algorithms,
+                          vty,
+                          vty-crossplatform
+
+common warnings
+    ghc-options: -Wall -O2
+
+executable            perf-testing-exe
+  import:             warnings
+  default-language:   GHC2024
+  main-is:            Main.hs
+  hs-source-dirs:     app
+  build-depends:      base >= 4.20.0.0,
+                      perf-testing
+
+
+test-suite            perf-testing-test
+  import:             warnings, rts-properties
+  type:               exitcode-stdio-1.0
+  default-language:   GHC2024
+  main-is:            Spec.hs
+  hs-source-dirs:     test
+  other-modules:      BaselineSpec
+                    , BayesianSpec
+                    , ConfigSpec
+                    , Integration
+                    , MockServer
+                    , PropertySpec
+                    , StatsSpec
+                    , TestHelpers
+                    , TracingSpec
+                    , TUISpec
+                    , VerifySpec
+  default-extensions: OverloadedStrings
+                    , NumericUnderscores
+  build-depends:      base >= 4.20.0.0,
+                      aeson,
+                      async,
+                      bytestring,
+                      containers,
+                      directory,
+                      hspec,
+                      http-client,
+                      http-types,
+                      network,
+                      QuickCheck,
+                      perf-testing,
+                      text,
+                      time,
+                      wai,
+                      warp
