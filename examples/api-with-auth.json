@@ -1,0 +1,49 @@
+{
+  "targets": {
+    "primary": "https://api.production.com",
+    "candidate": "https://api.staging.com"
+  },
+  "settings": {
+    "iterations": 2000,
+    "concurrency": 25,
+    "secrets": ".secrets/api-token.txt",
+    "maxConnections": 50,
+    "requestTimeout": 45,
+    "logLevel": "info",
+    "warmup": {
+      "warmupIterations": 5
+    },
+    "retry": {
+      "retryMaxAttempts": 5,
+      "retryInitialDelayMs": 500,
+      "retryBackoffMultiplier": 1.5
+    }
+  },
+  "payloads": [
+    {
+      "name": "authenticated-api-call",
+      "method": "GET",
+      "path": "/api/v2/user/profile",
+      "headers": {
+        "X-API-Key": "your-api-key-here",
+        "X-Request-ID": "benchmark-test-001",
+        "Accept": "application/json"
+      }
+    },
+    {
+      "name": "post-with-custom-content-type",
+      "method": "POST",
+      "path": "/api/v2/data/upload",
+      "headers": {
+        "Content-Type": "application/x-custom-format",
+        "X-Client-Version": "2.0.0"
+      },
+      "body": {
+        "timestamp": "2026-02-16T10:00:00Z",
+        "data": {
+          "metrics": [1, 2, 3, 4, 5]
+        }
+      }
+    }
+  ]
+}

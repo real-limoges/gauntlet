@@ -1,0 +1,18 @@
+{
+  "targets": {
+    "primary": "http://api.example.com",
+    "candidate": "http://api-new.example.com"
+  },
+  "settings": {
+    "iterations": 100,
+    "concurrency": 10,
+    "secrets": ".secrets/token.txt"
+  },
+  "payloads": [
+    {
+      "name": "health-check",
+      "method": "GET",
+      "path": "/health"
+    }
+  ]
+}

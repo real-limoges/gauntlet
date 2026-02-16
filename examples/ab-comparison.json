@@ -1,0 +1,42 @@
+{
+  "targets": {
+    "primary": "http://api-v1.example.com",
+    "candidate": "http://api-v2.example.com"
+  },
+  "settings": {
+    "iterations": 5000,
+    "concurrency": 50,
+    "secrets": ".secrets/token.txt",
+    "requestTimeout": 60,
+    "logLevel": "info",
+    "warmup": {
+      "warmupIterations": 10
+    },
+    "retry": {
+      "retryMaxAttempts": 3,
+      "retryInitialDelayMs": 1000,
+      "retryBackoffMultiplier": 2.0
+    }
+  },
+  "payloads": [
+    {
+      "name": "search-products",
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "query": "laptop",
+        "filters": {
+          "priceMin": 500,
+          "priceMax": 2000,
+          "category": "electronics"
+        },
+        "limit": 50
+      }
+    },
+    {
+      "name": "get-recommendations",
+      "method": "GET",
+      "path": "/api/recommendations?userId=12345&limit=10"
+    }
+  ]
+}

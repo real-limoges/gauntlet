@@ -1,0 +1,35 @@
+{
+  "targets": {
+    "primary": "http://localhost:8080",
+    "candidate": "http://localhost:8080"
+  },
+  "settings": {
+    "iterations": 1000,
+    "concurrency": 20,
+    "secrets": ".secrets/token.txt",
+    "requestTimeout": 30,
+    "logLevel": "info"
+  },
+  "payloads": [
+    {
+      "name": "get-users",
+      "method": "GET",
+      "path": "/api/v1/users"
+    },
+    {
+      "name": "get-user-by-id",
+      "method": "GET",
+      "path": "/api/v1/users/123"
+    },
+    {
+      "name": "create-user",
+      "method": "POST",
+      "path": "/api/v1/users",
+      "body": {
+        "name": "John Doe",
+        "email": "john.doe@example.com",
+        "role": "user"
+      }
+    }
+  ]
+}

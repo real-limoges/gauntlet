@@ -1,5 +1,5 @@
 cabal-version: 3.12
-name:               perf-testing
+name:               laughing-waffle
 version:            0.1.0.0
 license:            NONE
 author:             Real Limoges
@@ -61,16 +61,13 @@ library
                           Chart,
                           Chart-cairo,
                           clock,
-                          colour,
+                          co-log-core,
                           containers,
                           directory,
-                          dotenv,
                           filepath,
                           http-client,
                           http-client-tls,
                           http-types,
-                          http-conduit,
-                          http-date,
                           math-functions,
                           microlens,
                           microlens-th,
@@ -88,16 +85,16 @@ library
 common warnings
     ghc-options: -Wall -O2
 
-executable            perf-testing-exe
+executable            laughing-waffle-exe
   import:             warnings
   default-language:   GHC2024
   main-is:            Main.hs
   hs-source-dirs:     app
   build-depends:      base >= 4.20.0.0,
-                      perf-testing
+                      laughing-waffle
 
 
-test-suite            perf-testing-test
+test-suite            laughing-waffle-test
   import:             warnings, rts-properties
   type:               exitcode-stdio-1.0
   default-language:   GHC2024
@@ -127,7 +124,7 @@ test-suite            perf-testing-test
                       http-types,
                       network,
                       QuickCheck,
-                      perf-testing,
+                      laughing-waffle,
                       text,
                       time,
                       wai,

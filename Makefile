@@ -1,7 +1,7 @@
-EXE = $(shell cabal list-bin perf-testing-exe)
+EXE = $(shell cabal list-bin laughing-waffle-exe)
 
 build:
-	cabal build --enable-optimization=2 perf-testing-exe
+	cabal build --enable-optimization=2 laughing-waffle-exe
 
 benchmark-multiple: build
 	$(EXE) benchmark-multiple --config config.json

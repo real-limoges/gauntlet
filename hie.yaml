@@ -4,16 +4,16 @@ cradle:
       config:
         cradle:
           cabal:
-            component: "lib:perf-testing"
+            component: "lib:laughing-waffle"
 
     - path: "./app/Main.hs"
       config:
         cradle:
           cabal:
-            component: "exe:perf-testing-exe"
+            component: "exe:laughing-waffle-exe"
 
     - path: "./test"
       config:
         cradle:
           cabal:
-            component: "test:perf-testing-test"
+            component: "test:laughing-waffle-test"

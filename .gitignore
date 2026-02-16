@@ -4,8 +4,11 @@ src/.DS_Store
 .idea/
 docker-compose-dev.yml
 *.json
+!examples/*.json
 secrets.txt
-perf-testing-exe
+.secrets/
+laughing-waffle-exe
 .DS_Store
 *.log
 *.csv
+docs/*.md

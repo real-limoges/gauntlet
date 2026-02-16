@@ -1,0 +1,73 @@
+{
+  "targets": {
+    "primary": "http://primary-service.internal:8080",
+    "candidate": "http://candidate-service.internal:8080"
+  },
+  "settings": {
+    "iterations": 10000,
+    "concurrency": 100,
+    "secrets": ".secrets/service-token.txt",
+    "maxConnections": 200,
+    "connIdleTimeout": 30,
+    "requestTimeout": 120,
+    "logLevel": "debug",
+    "warmup": {
+      "warmupIterations": 20
+    },
+    "retry": {
+      "retryMaxAttempts": 10,
+      "retryInitialDelayMs": 2000,
+      "retryBackoffMultiplier": 2.5
+    },
+    "tempo": {
+      "tempoUrl": "http://tempo:3200",
+      "tempoServiceName": "my-service",
+      "tempoEnabled": true,
+      "tempoAuthToken": "optional-tempo-bearer-token"
+    }
+  },
+  "payloads": [
+    {
+      "name": "complex-query",
+      "method": "POST",
+      "path": "/api/v3/analytics/query",
+      "headers": {
+        "X-Trace-ID": "benchmark-trace",
+        "X-Priority": "high",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      "body": {
+        "timeRange": {
+          "start": "2026-02-01T00:00:00Z",
+          "end": "2026-02-16T23:59:59Z"
+        },
+        "aggregations": [
+          {"field": "revenue", "function": "sum"},
+          {"field": "orders", "function": "count"}
+        ],
+        "groupBy": ["region", "category"],
+        "filters": {
+          "status": "completed",
+          "paymentMethod": ["credit_card", "paypal"]
+        }
+      }
+    },
+    {
+      "name": "batch-operation",
+      "method": "PUT",
+      "path": "/api/v3/batch/update",
+      "headers": {
+        "X-Batch-Size": "1000",
+        "X-Idempotency-Key": "benchmark-batch-001"
+      },
+      "body": {
+        "operations": [
+          {"id": 1, "action": "update", "data": {"status": "processed"}},
+          {"id": 2, "action": "update", "data": {"status": "processed"}},
+          {"id": 3, "action": "delete"}
+        ]
+      }
+    }
+  ]
+}

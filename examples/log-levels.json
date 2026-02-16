@@ -1,0 +1,19 @@
+{
+  "targets": {
+    "primary": "http://api.example.com",
+    "candidate": "http://api.example.com"
+  },
+  "settings": {
+    "iterations": 500,
+    "concurrency": 10,
+    "secrets": ".secrets/token.txt",
+    "logLevel": "info"
+  },
+  "payloads": [
+    {
+      "name": "test-endpoint",
+      "method": "GET",
+      "path": "/api/test"
+    }
+  ]
+}
