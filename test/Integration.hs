@@ -10,6 +10,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import MockServer
 import Network.HTTP.Client (Manager, defaultManagerSettings, newManager)
+import Benchmark.Network (NetworkHandle (H1))
 import Network.HTTP.Types (status200, status404, status500)
 import System.Directory (removeFile)
 import System.IO.Error (catchIOError)
@@ -35,14 +36,14 @@ integrationSpec = describe "Integration Tests" $ beforeAll setupManager $ do
     it "runs multiple iterations successfully" $ \mgr ->
       mockJson "{}" $ \port -> do
         sem <- newQSem 4
-        results <- runBenchmark testSettings sem mgr 5 1 (endpoint port)
+        results <- runBenchmark testSettings sem (H1 mgr) 5 1 (endpoint port)
         length results `shouldBe` 5
         all ((== 200) . statusCode) results `shouldBe` True
 
   describe "runComparison" $ do
     it "compares two endpoints concurrently" $ \mgr ->
       mockJson "{}" $ \port -> do
-        (a, b) <- runComparison testSettings mgr (endpoint port) (endpoint port)
+        (a, b) <- runComparison testSettings (H1 mgr) (endpoint port) (endpoint port)
         statusCode a `shouldBe` 200
         statusCode b `shouldBe` 200
 
@@ -107,7 +108,7 @@ integrationSpec = describe "Integration Tests" $ beforeAll setupManager $ do
         let setts = testSettings {warmup = Just warmupSettings}
         -- This test just verifies warmup doesn't crash
         -- In real Runner, warmup is called before benchmark
-        results <- runBenchmark setts sem mgr 5 1 (endpoint port)
+        results <- runBenchmark setts sem (H1 mgr) 5 1 (endpoint port)
         length results `shouldBe` 5
 
     it "skips warmup when iterations = 0" $ \mgr ->
@@ -115,7 +116,7 @@ integrationSpec = describe "Integration Tests" $ beforeAll setupManager $ do
         sem <- newQSem 1
         let warmupSettings = WarmupSettings 0
         let setts = testSettings {warmup = Just warmupSettings}
-        results <- runBenchmark setts sem mgr 3 1 (endpoint port)
+        results <- runBenchmark setts sem (H1 mgr) 3 1 (endpoint port)
         length results `shouldBe` 3
 
   describe "custom headers in HTTP requests" $ do
@@ -171,10 +172,10 @@ setupManager :: IO Manager
 setupManager = newManager defaultManagerSettings
 
 testSettings :: Settings
-testSettings = Settings 10 4 "" (Just 10) (Just 5) (Just 30) Nothing Nothing Nothing Nothing
+testSettings = Settings 10 4 "" (Just 10) (Just 5) (Just 30) Nothing Nothing Nothing Nothing Nothing
 
 endpoint :: Int -> Endpoint
-endpoint port = Endpoint "GET" ("http://127.0.0.1:" <> T.pack (show port)) Nothing []
+endpoint port = Endpoint "GET" ("http://127.0.0.1:" <> T.pack (show port)) Nothing [] Nothing
 
 testBenchmarkStats :: BenchmarkStats
 testBenchmarkStats =

@@ -45,7 +45,8 @@ toEndpoint baseUrl spec =
         { method = specMethod spec,
           url = baseUrl <> specPath spec,
           body = specBody spec,
-          headers = defaultHeaders ++ customHeaders
+          headers = defaultHeaders ++ customHeaders,
+          validate = specValidate spec
         }
 
 validateConfig :: TestConfig -> Either PerfTestError TestConfig

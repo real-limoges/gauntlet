@@ -6,7 +6,9 @@
 -- Provides connection pooling, request preparation, and timed HTTP execution
 -- with automatic retry logic for failed requests.
 module Benchmark.Network
-  ( initNetwork,
+  ( NetworkHandle (..),
+    initNetworkHandle,
+    initNetwork,
     runBenchmark,
     runBenchmarkWithEvents,
     runComparison,
@@ -17,6 +19,7 @@ module Benchmark.Network
   )
 where
 
+import Benchmark.HTTP2 (Http2Connection, initH2Connection, timedRequestH2)
 import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types (Endpoint (..), LogLevel (..), Nanoseconds (..), PerfTestError (..), Settings (..), TestingResponse (..), defaultLogLevel, defaultRetrySettings)
 import Benchmark.Types qualified as Types
@@ -43,6 +46,14 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types.Status qualified as Status
 import System.Clock (Clock (Monotonic), getTime, toNanoSecs)
 
+-- | Discriminated union over the two supported HTTP transports.
+-- Use 'initNetworkHandle' to select the right one based on config.
+data NetworkHandle
+  = -- | HTTP\/1.1 with a connection-pooling 'Manager'
+    H1 Manager
+  | -- | HTTP\/2 with a persistent multiplexed connection
+    H2 Http2Connection
+
 -- | Create an HTTP manager with connection pooling configured from settings.
 initNetwork :: Settings -> IO Manager
 initNetwork settings =
@@ -52,6 +63,15 @@ initNetwork settings =
         managerIdleConnectionCount = fromMaybe 10 (maxConnections settings),
         managerResponseTimeout = responseTimeoutMicro (fromMaybe 30 (Types.requestTimeout settings) * 1_000_000)
       }
+
+-- | Create the appropriate 'NetworkHandle' based on the @httpVersion@ setting.
+-- @"2"@ → persistent HTTP\/2 connection to @targetUrl@.
+-- Any other value (or omitted) → HTTP\/1.1 'Manager'.
+initNetworkHandle :: Settings -> Text -> IO NetworkHandle
+initNetworkHandle settings targetUrl =
+  case fromMaybe "1.1" (Types.httpVersion settings) of
+    "2" -> H2 <$> initH2Connection settings targetUrl
+    _ -> H1 <$> initNetwork settings
 
 readToken :: FilePath -> IO (Either PerfTestError Text)
 readToken path = do
@@ -137,66 +157,77 @@ timedRequest settings mgr endpoint = do
   timedRequestPrepared settings mgr req
 
 -- | Run concurrent benchmark iterations with rate limiting via semaphore.
--- Prepares the request once and reuses it for all iterations.
-runBenchmark :: Settings -> QSem -> Manager -> Int -> Int -> Endpoint -> IO [TestingResponse]
-runBenchmark settings sem mgr iters pIdx endpoint = do
+-- Prepares the request once (H1) or dispatches over the H2 connection.
+runBenchmark :: Settings -> QSem -> NetworkHandle -> Int -> Int -> Endpoint -> IO [TestingResponse]
+runBenchmark settings sem network iters pIdx endpoint = do
   let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
-  preparedReq <- prepareRequest settings endpoint
   countRef <- newIORef 0
 
-  replicateConcurrently iters $ do
-    bracket_ (waitQSem sem) (signalQSem sem) $ do
-      res <- timedRequestPrepared settings mgr preparedReq
-
-      current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
-      printProgressBar logger pIdx current iters
-
-      return res
+  case network of
+    H1 mgr -> do
+      preparedReq <- prepareRequest settings endpoint
+      replicateConcurrently iters $
+        bracket_ (waitQSem sem) (signalQSem sem) $ do
+          res <- timedRequestPrepared settings mgr preparedReq
+          current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
+          printProgressBar logger pIdx current iters
+          return res
+    H2 conn ->
+      replicateConcurrently iters $
+        bracket_ (waitQSem sem) (signalQSem sem) $ do
+          res <- timedRequestH2 conn endpoint
+          current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
+          printProgressBar logger pIdx current iters
+          return res
   where
     printProgressBar logger idx c total = do
       let numUpdates = min total 10
           step = max 1 (total `div` numUpdates)
           shouldPrint = c > 0 && (c `mod` step == 0 || c == total)
-
       when shouldPrint $ do
         let percent = (c * 100) `div` total
         logInfo logger $ T.pack $ "[Ep " ++ show idx ++ "] Progress: " ++ show percent ++ "% (" ++ show c ++ "/" ++ show total ++ ")"
 
 -- | Run benchmark with event emission for TUI updates.
 -- Emits RequestCompleted/RequestFailed after each request.
-runBenchmarkWithEvents :: Settings -> QSem -> Manager -> Int -> Int -> Endpoint -> TChan BenchmarkEvent -> IO [TestingResponse]
-runBenchmarkWithEvents settings sem mgr iters pIdx endpoint eventChan = do
+runBenchmarkWithEvents :: Settings -> QSem -> NetworkHandle -> Int -> Int -> Endpoint -> TChan BenchmarkEvent -> IO [TestingResponse]
+runBenchmarkWithEvents settings sem network iters pIdx endpoint eventChan = do
   let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
-  preparedReq <- prepareRequest settings endpoint
   countRef <- newIORef 0
 
-  replicateConcurrently iters $ do
-    bracket_ (waitQSem sem) (signalQSem sem) $ do
-      res <- timedRequestPrepared settings mgr preparedReq
+  let emitAndProgress res = do
+        let event = case errorMessage res of
+              Nothing -> RequestCompleted (durationNs res) (statusCode res)
+              Just err -> RequestFailed (T.pack err)
+        atomically $ writeTChan eventChan event
+        current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
+        printProgressBar logger pIdx current iters
+        return res
 
-      -- Emit event for TUI
-      let event = case errorMessage res of
-            Nothing -> RequestCompleted (durationNs res) (statusCode res)
-            Just err -> RequestFailed (T.pack err)
-      atomically $ writeTChan eventChan event
-
-      current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
-      printProgressBar logger pIdx current iters
-
-      return res
+  case network of
+    H1 mgr -> do
+      preparedReq <- prepareRequest settings endpoint
+      replicateConcurrently iters $
+        bracket_ (waitQSem sem) (signalQSem sem) $
+          timedRequestPrepared settings mgr preparedReq >>= emitAndProgress
+    H2 conn ->
+      replicateConcurrently iters $
+        bracket_ (waitQSem sem) (signalQSem sem) $
+          timedRequestH2 conn endpoint >>= emitAndProgress
   where
     printProgressBar logger idx c total = do
       let numUpdates = min total 10
           step = max 1 (total `div` numUpdates)
           shouldPrint = c > 0 && (c `mod` step == 0 || c == total)
-
       when shouldPrint $ do
         let percent = (c * 100) `div` total
         logInfo logger $ T.pack $ "[Ep " ++ show idx ++ "] Progress: " ++ show percent ++ "% (" ++ show c ++ "/" ++ show total ++ ")"
 
 -- | Execute two endpoints concurrently for A/B comparison.
-runComparison :: Settings -> Manager -> Endpoint -> Endpoint -> IO (TestingResponse, TestingResponse)
-runComparison settings mgr endpointA endpointB = do
+runComparison :: Settings -> NetworkHandle -> Endpoint -> Endpoint -> IO (TestingResponse, TestingResponse)
+runComparison settings (H1 mgr) endpointA endpointB = do
   reqA <- prepareRequest settings endpointA
   reqB <- prepareRequest settings endpointB
   concurrently (timedRequestPrepared settings mgr reqA) (timedRequestPrepared settings mgr reqB)
+runComparison _settings (H2 conn) endpointA endpointB =
+  concurrently (timedRequestH2 conn endpointA) (timedRequestH2 conn endpointB)

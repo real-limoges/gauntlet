@@ -28,11 +28,13 @@ library
                           Benchmark.CLI
                           Benchmark.Config
                           Benchmark.Environment
+                          Benchmark.HTTP2
                           Benchmark.Network
                           Benchmark.Output
                           Benchmark.Plotting
                           Benchmark.Report
                           Benchmark.Types
+                          Benchmark.Validation
                           Benchmark.Verify
                           Benchmark.TUI
                           Benchmark.TUI.State
@@ -68,15 +70,18 @@ library
                           http-client,
                           http-client-tls,
                           http-types,
+                          http2,
                           math-functions,
                           microlens,
                           microlens-th,
+                          network,
                           optparse-applicative,
                           process,
                           statistics,
                           stm,
                           text,
                           time,
+                          tls,
                           vector,
                           vector-algorithms,
                           vty,
@@ -110,6 +115,7 @@ test-suite            laughing-waffle-test
                     , TestHelpers
                     , TracingSpec
                     , TUISpec
+                    , ValidationSpec
                     , VerifySpec
   default-extensions: OverloadedStrings
                     , NumericUnderscores

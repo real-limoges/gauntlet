@@ -10,13 +10,15 @@ module Benchmark.Report (
     printMultipleBenchmarkReport,
     printSingleBenchmarkReport,
     printVerifyReport,
+    printValidationSummary,
 )
 where
 
-import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), Endpoint (..), PercentileComparison (..), VerificationResult (..))
-import Control.Monad (forM_)
-import Data.Aeson (encode)
+import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), Endpoint (..), PercentileComparison (..), ValidationError (..), ValidationSummary (..), VerificationResult (..))
+import Control.Monad (forM_, when)
+import Data.Aeson (Value, encode)
 import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.List (nub)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Text.Printf (printf)
@@ -107,3 +109,42 @@ printStats stats = do
 
 printHeader :: String -> IO ()
 printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
+
+-- | Print validation results. Silently no-ops when the list is empty
+-- (i.e., no endpoints had a 'validate' block in their config).
+printValidationSummary :: [ValidationSummary] -> IO ()
+printValidationSummary [] = return ()
+printValidationSummary summaries = do
+  putStrLn ""
+  printHeader "Response Validation"
+
+  let totalChecked = sum (map totalValidated summaries)
+      totalFailed' = sum (map totalFailed summaries)
+      totalPassed = totalChecked - totalFailed'
+
+  printf "Checked:  %d responses\n" totalChecked
+  printf "Passed:   %d\n" totalPassed
+
+  when (totalFailed' > 0) $ do
+    printf "Failed:   %d\n" totalFailed'
+    putStrLn ""
+    let allErrors = nub (concatMap validationErrors summaries)
+        displayErrors = take 10 allErrors
+    forM_ displayErrors printValidationError
+    when (length allErrors > 10) $
+      printf "  ... and %d more unique error(s)\n" (length allErrors - 10)
+
+printValidationError :: ValidationError -> IO ()
+printValidationError (StatusCodeMismatch expected actual) =
+  printf "  [status]  expected %d, got %d\n" expected actual
+printValidationError (FieldNotFound path) =
+  printf "  [missing] %s\n" (T.unpack path)
+printValidationError (FieldValueMismatch path expected actual) = do
+  printf "  [value]   %s\n" (T.unpack path)
+  printf "    expected: %s\n" (renderValue expected)
+  printf "    actual:   %s\n" (renderValue actual)
+printValidationError BodyNotJSON =
+  putStrLn "  [body]    response body absent or not valid JSON"
+
+renderValue :: Value -> String
+renderValue = LBS8.unpack . encode

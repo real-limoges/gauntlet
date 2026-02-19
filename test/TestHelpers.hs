@@ -82,7 +82,8 @@ makeValidConfig =
             retry = Nothing,
             warmup = Nothing,
             logLevel = Nothing,
-            tempo = Nothing
+            tempo = Nothing,
+            httpVersion = Nothing
           },
       payloads =
         [ PayloadSpec
@@ -90,7 +91,8 @@ makeValidConfig =
               specMethod = "POST",
               specPath = "/api/test",
               specBody = Nothing,
-              specHeaders = Nothing
+              specHeaders = Nothing,
+              specValidate = Nothing
             }
         ]
     }

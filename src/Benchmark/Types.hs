@@ -23,6 +23,12 @@ module Benchmark.Types
     -- * Verification
     VerificationResult (..),
 
+    -- * Validation
+    FieldAssertion (..),
+    ValidationSpec (..),
+    ValidationError (..),
+    ValidationSummary (..),
+
     -- * Configuration
     TestConfig (..),
     Targets (..),
@@ -58,7 +64,7 @@ module Benchmark.Types
   )
 where
 
-import Data.Aeson (FromJSON (..), ToJSON (..), Value, defaultOptions, fieldLabelModifier, genericParseJSON, object, (.=))
+import Data.Aeson (FromJSON (..), ToJSON (..), Value, defaultOptions, fieldLabelModifier, genericParseJSON, object, withObject, (.:?), (.=))
 import Data.Aeson.Diff (Patch)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict (Map)
@@ -70,11 +76,81 @@ import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 import Text.Printf (PrintfArg (..))
 
+-- | Per-field assertion in a validation spec.
+data FieldAssertion
+  = -- | Assert the key exists (any value)
+    FieldPresent
+  | -- | Assert exact value match
+    FieldEq Value
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON FieldAssertion where
+  parseJSON = withObject "FieldAssertion" $ \o -> do
+    mpresent <- o .:? "present"
+    meq <- o .:? "eq"
+    case (mpresent :: Maybe Bool, meq :: Maybe Value) of
+      (Just True, _) -> pure FieldPresent
+      (_, Just v) -> pure (FieldEq v)
+      _ -> fail "FieldAssertion must have 'present: true' or 'eq: <value>'"
+
+instance ToJSON FieldAssertion where
+  toJSON FieldPresent = object ["present" .= True]
+  toJSON (FieldEq v) = object ["eq" .= v]
+
+-- | Declarative validation rules applied to every response for an endpoint.
+data ValidationSpec = ValidationSpec
+  { -- | Expected HTTP status code
+    validateStatus :: Maybe Int,
+    -- | Map from dot-path (e.g. "$.user.id") to assertion
+    validateFields :: Maybe (Map Text FieldAssertion)
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON ValidationSpec where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { fieldLabelModifier = \x -> case x of
+            "validateStatus" -> "status"
+            "validateFields" -> "fields"
+            _ -> x
+        }
+
+instance ToJSON ValidationSpec where
+  toJSON spec =
+    object $
+      maybe [] (\s -> ["status" .= s]) (validateStatus spec)
+        ++ maybe [] (\f -> ["fields" .= f]) (validateFields spec)
+
+-- | A single validation failure on a response.
+data ValidationError
+  = -- | Status code did not match: expected, actual
+    StatusCodeMismatch Int Int
+  | -- | Field path was not found in the response body
+    FieldNotFound Text
+  | -- | Field path found but value differed: path, expected, actual
+    FieldValueMismatch Text Value Value
+  | -- | Response body was absent or not valid JSON
+    BodyNotJSON
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (ToJSON)
+
+-- | Aggregate validation results for all responses from one endpoint.
+data ValidationSummary = ValidationSummary
+  { totalValidated :: Int,
+    totalFailed :: Int,
+    validationErrors :: [ValidationError]
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (ToJSON)
+
 data Endpoint = Endpoint
   { method :: Text,
     url :: Text,
     body :: Maybe Value,
-    headers :: [(Text, Text)]
+    headers :: [(Text, Text)],
+    -- | Optional per-response validation rules
+    validate :: Maybe ValidationSpec
   }
   deriving stock (Show, Eq)
 
@@ -267,7 +343,9 @@ data Settings = Settings
     warmup :: Maybe WarmupSettings,
     -- | Logging verbosity (default: Info)
     logLevel :: Maybe LogLevel,
-    tempo :: Maybe TempoSettings
+    tempo :: Maybe TempoSettings,
+    -- | HTTP version: "1.1" (default) or "2" (HTTP/2 over TLS)
+    httpVersion :: Maybe Text
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
@@ -291,7 +369,9 @@ data PayloadSpec = PayloadSpec
     specMethod :: Text,
     specPath :: Text,
     specBody :: Maybe Value,
-    specHeaders :: Maybe (Map Text Text)
+    specHeaders :: Maybe (Map Text Text),
+    -- | Optional validation rules for responses from this endpoint
+    specValidate :: Maybe ValidationSpec
   }
   deriving stock (Show, Eq, Generic)
 
@@ -305,6 +385,7 @@ instance FromJSON PayloadSpec where
             "specPath" -> "path"
             "specBody" -> "body"
             "specHeaders" -> "headers"
+            "specValidate" -> "validate"
             _ -> x
         }
 

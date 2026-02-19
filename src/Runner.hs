@@ -14,13 +14,14 @@ import Benchmark.CI (CIMode (..), detectCIMode, formatForCI, writeArtifactReport
 import Benchmark.CLI (BaselineMode (..))
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Environment (setupEnvironment)
-import Benchmark.Network (addAuth, initNetwork, readToken, runBenchmark, runBenchmarkWithEvents)
+import Benchmark.Network (NetworkHandle, addAuth, initNetwork, initNetworkHandle, readToken, runBenchmark, runBenchmarkWithEvents)
 import Benchmark.Output (initOutputFiles, resultsDir, writeLatencies)
 import Benchmark.Plotting (plotDistributions)
-import Benchmark.Report (printMultipleBenchmarkReport, printSingleBenchmarkReport)
+import Benchmark.Report (printMultipleBenchmarkReport, printSingleBenchmarkReport, printValidationSummary)
+import Benchmark.Validation (validateResponses)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState)
-import Benchmark.Types (BenchmarkOutput (..), BenchmarkStats (..), Endpoint (..), MetricRegression (..), Nanoseconds (..), OutputConfig (..), OutputFormat (..), PayloadResult (..), PerfTestError (..), RegressionResult (..), RunResult (..), Settings (..), Targets (..), TempoSettings, TestConfig (..), TestingResponse (..), TraceOutput (..), defaultThresholds, defaultWarmupSettings, exitWithError)
+import Benchmark.Types (BenchmarkOutput (..), BenchmarkStats (..), Endpoint (..), MetricRegression (..), Nanoseconds (..), OutputConfig (..), OutputFormat (..), PayloadResult (..), PerfTestError (..), RegressionResult (..), RunResult (..), Settings (..), Targets (..), TempoSettings, TestConfig (..), TestingResponse (..), TraceOutput (..), ValidationSummary (..), defaultThresholds, defaultWarmupSettings, exitWithError)
 import Benchmark.Types qualified as PT
 import Control.Concurrent (forkIO, newQSem)
 import Control.Concurrent.Async (mapConcurrently)
@@ -47,7 +48,10 @@ import Tracing.Types qualified as TT
 
 data RunContext = RunContext
   { rcSettings :: Settings,
+    -- | HTTP manager used for Tempo trace fetching (always HTTP/1.1)
     rcManager :: Manager,
+    -- | Network transport for benchmark requests (H1 or H2)
+    rcNetwork :: NetworkHandle,
     rcToken :: Text,
     rcCsvFile :: FilePath,
     rcTimestamp :: String,
@@ -70,7 +74,7 @@ setupOrFail :: Text -> Text -> IO ()
 setupOrFail branch target =
   setupEnvironment branch target >>= either exitWithError return
 
-benchmarkEndpoints :: OutputFormat -> RunContext -> String -> [Endpoint] -> IO [TestingResponse]
+benchmarkEndpoints :: OutputFormat -> RunContext -> String -> [Endpoint] -> IO ([TestingResponse], [ValidationSummary])
 benchmarkEndpoints outFmt ctx label eps = case eps of
   [] -> exitWithError $ NoEndpointsError label
   (firstEp : _) -> do
@@ -82,12 +86,23 @@ logMsg :: Logger -> OutputFormat -> Text -> IO ()
 logMsg logger OutputTerminal msg = logInfo logger msg
 logMsg _ OutputJSON _ = return ()
 
-initContext :: Settings -> FilePath -> String -> Maybe (TChan BenchmarkEvent) -> IO RunContext
-initContext setts csvFile timestamp eventChan = do
+initContext :: Settings -> FilePath -> String -> Maybe (TChan BenchmarkEvent) -> Text -> IO RunContext
+initContext setts csvFile timestamp eventChan targetUrl = do
   token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
   mgr <- initNetwork setts
+  network <- initNetworkHandle setts targetUrl
   let logger = makeLogger (fromMaybe PT.defaultLogLevel (PT.logLevel setts))
-  return RunContext {rcSettings = setts, rcManager = mgr, rcToken = token, rcCsvFile = csvFile, rcTimestamp = timestamp, rcEventChan = eventChan, rcLogger = logger}
+  return
+    RunContext
+      { rcSettings = setts,
+        rcManager = mgr,
+        rcNetwork = network,
+        rcToken = token,
+        rcCsvFile = csvFile,
+        rcTimestamp = timestamp,
+        rcEventChan = eventChan,
+        rcLogger = logger
+      }
 
 -- | Run A/B benchmark comparing candidate against primary target.
 runMultiple :: OutputFormat -> BaselineMode -> TestConfig -> IO RunResult
@@ -116,7 +131,7 @@ runMultipleWithTUI baselineMode cfg csvFile timestamp epsCandidate epsPrimary se
       targetUrl = candidate (targets cfg) <> " vs " <> primary (targets cfg)
       tuiState = initialState targetUrl totalRequests numEndpoints
 
-  ctx <- initContext setts csvFile timestamp (Just eventChan)
+  ctx <- initContext setts csvFile timestamp (Just eventChan) (candidate (targets cfg))
 
   resultVar <- newEmptyMVar
 
@@ -124,25 +139,26 @@ runMultipleWithTUI baselineMode cfg csvFile timestamp epsCandidate epsPrimary se
     startNs <- getNowNs
 
     setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
-    resultsCandidate <- benchmarkEndpoints OutputTerminal ctx "candidate" epsCandidate
+    (resultsCandidate, validCandidate) <- benchmarkEndpoints OutputTerminal ctx "candidate" epsCandidate
 
     setupOrFail (primary $ git cfg) (primary $ targets cfg)
-    resultsPrimary <- benchmarkEndpoints OutputTerminal ctx "primary" epsPrimary
+    (resultsPrimary, validPrimary) <- benchmarkEndpoints OutputTerminal ctx "primary" epsPrimary
 
     endNs <- getNowNs
 
     emitEvent (Just eventChan) BenchmarkFinished
-    putMVar resultVar (resultsCandidate, resultsPrimary, startNs, endNs)
+    putMVar resultVar (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs)
 
   _ <- runTUI eventChan tuiState
 
-  (resultsCandidate, resultsPrimary, startNs, endNs) <- takeMVar resultVar
+  (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs) <- takeMVar resultVar
 
   let statsCandidate = calculateStats resultsCandidate
       statsPrimary = calculateStats resultsPrimary
       bayes = compareBayesian statsPrimary statsCandidate
 
   printMultipleBenchmarkReport "primary" "candidate" statsPrimary statsCandidate bayes
+  printValidationSummary (validPrimary ++ validCandidate)
   let timesPrimary = map (fromIntegral . unNanoseconds . durationNs) resultsPrimary
       timesCandidate = map (fromIntegral . unNanoseconds . durationNs) resultsCandidate
       plotFile = resultsDir ++ "/kde_plot-" ++ timestamp ++ ".png"
@@ -154,17 +170,17 @@ runMultipleWithTUI baselineMode cfg csvFile timestamp epsCandidate epsPrimary se
 -- | Run A/B benchmark with JSON output (CI mode)
 runMultipleJSON :: BaselineMode -> TestConfig -> FilePath -> String -> [Endpoint] -> [Endpoint] -> Settings -> IO RunResult
 runMultipleJSON baselineMode cfg csvFile timestamp epsCandidate epsPrimary setts = do
-  ctx <- initContext setts csvFile timestamp Nothing
+  ctx <- initContext setts csvFile timestamp Nothing (candidate (targets cfg))
 
   startNs <- getNowNs
 
   logMsg (rcLogger ctx) OutputJSON "Starting with Candidate ..."
   setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
-  resultsCandidate <- benchmarkEndpoints OutputJSON ctx "candidate" epsCandidate
+  (resultsCandidate, _validCandidate) <- benchmarkEndpoints OutputJSON ctx "candidate" epsCandidate
 
   logMsg (rcLogger ctx) OutputJSON "Starting with Primary"
   setupOrFail (primary $ git cfg) (primary $ targets cfg)
-  resultsPrimary <- benchmarkEndpoints OutputJSON ctx "primary" epsPrimary
+  (resultsPrimary, _validPrimary) <- benchmarkEndpoints OutputJSON ctx "primary" epsPrimary
 
   endNs <- getNowNs
 
@@ -215,7 +231,7 @@ runSingleWithTUI baselineMode cfg csvFile timestamp eps setts targetUrl = do
       numEndpoints = length eps
       tuiState = initialState targetUrl totalRequests numEndpoints
 
-  ctx <- initContext setts csvFile timestamp (Just eventChan)
+  ctx <- initContext setts csvFile timestamp (Just eventChan) targetUrl
 
   -- MVar to collect results from benchmark thread
   resultVar <- newEmptyMVar
@@ -224,25 +240,26 @@ runSingleWithTUI baselineMode cfg csvFile timestamp eps setts targetUrl = do
   _ <- forkIO $ do
     startNs <- getNowNs
     setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
-    results <- benchmarkEndpoints OutputTerminal ctx "endpoints" eps
+    (results, validSummaries) <- benchmarkEndpoints OutputTerminal ctx "endpoints" eps
     endNs <- getNowNs
 
     -- Signal TUI that benchmark is done
     emitEvent (Just eventChan) BenchmarkFinished
 
     -- Store results for main thread
-    putMVar resultVar (results, startNs, endNs)
+    putMVar resultVar (results, validSummaries, startNs, endNs)
 
   -- Run TUI on main thread (blocks until quit or benchmark finished)
   _ <- runTUI eventChan tuiState
 
   -- Collect results from benchmark thread
-  (results, startNs, endNs) <- takeMVar resultVar
+  (results, validSummaries, startNs, endNs) <- takeMVar resultVar
 
   let stats = calculateStats results
 
   -- Print final report after TUI exits
   printSingleBenchmarkReport targetUrl stats
+  printValidationSummary validSummaries
   runTraceAnalysis (rcLogger ctx) OutputTerminal (rcManager ctx) setts timestamp startNs endNs
 
   handleBaseline (rcLogger ctx) OutputTerminal baselineMode (T.pack timestamp) stats
@@ -250,11 +267,11 @@ runSingleWithTUI baselineMode cfg csvFile timestamp eps setts targetUrl = do
 -- | Run single benchmark with JSON output (CI mode)
 runSingleJSON :: BaselineMode -> TestConfig -> FilePath -> String -> [Endpoint] -> Settings -> Text -> IO RunResult
 runSingleJSON baselineMode cfg csvFile timestamp eps setts targetUrl = do
-  ctx <- initContext setts csvFile timestamp Nothing
+  ctx <- initContext setts csvFile timestamp Nothing targetUrl
 
   startNs <- getNowNs
   setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
-  results <- benchmarkEndpoints OutputJSON ctx "endpoints" eps
+  (results, _validSummaries) <- benchmarkEndpoints OutputJSON ctx "endpoints" eps
   endNs <- getNowNs
 
   let stats = calculateStats results
@@ -278,7 +295,7 @@ runSingleJSON baselineMode cfg csvFile timestamp eps setts targetUrl = do
 
   handleBaseline (rcLogger ctx) OutputJSON baselineMode (T.pack timestamp) stats
 
-runEndpointLoop :: OutputFormat -> RunContext -> [Endpoint] -> IO [TestingResponse]
+runEndpointLoop :: OutputFormat -> RunContext -> [Endpoint] -> IO ([TestingResponse], [ValidationSummary])
 runEndpointLoop outFmt RunContext {..} endpoints = do
   let iters = iterations rcSettings
       conc = concurrency rcSettings
@@ -297,15 +314,25 @@ runEndpointLoop outFmt RunContext {..} endpoints = do
 
           let authorizedEp = addAuth rcToken ep
           responses <- case rcEventChan of
-            Just chan -> runBenchmarkWithEvents rcSettings sem rcManager iters idx authorizedEp chan
-            Nothing -> runBenchmark rcSettings sem rcManager iters idx authorizedEp
+            Just chan -> runBenchmarkWithEvents rcSettings sem rcNetwork iters idx authorizedEp chan
+            Nothing -> runBenchmark rcSettings sem rcNetwork iters idx authorizedEp
           return (idx, ep, responses)
       )
       indexedEndpoints
 
   writeLatencies rcCsvFile results
 
-  return (concatMap (\(_, _, rs) -> rs) results)
+  let allResponses = concatMap (\(_, _, rs) -> rs) results
+      summaries =
+        concatMap
+          ( \(_, ep, rs) ->
+              case validate ep of
+                Nothing -> []
+                Just spec -> [validateResponses spec rs]
+          )
+          results
+
+  return (allResponses, summaries)
 
 -- | Emit event to TUI channel if present
 emitEvent :: Maybe (TChan BenchmarkEvent) -> BenchmarkEvent -> IO ()
@@ -320,7 +347,7 @@ runWarmup outFmt RunContext {..} ep = do
     logMsg rcLogger outFmt $ T.pack $ "Warming up (" ++ show warmupIters ++ " iteration" ++ (if warmupIters == 1 then "" else "s") ++ ")..."
     sem <- newQSem 1
     let authorizedEp = addAuth rcToken ep
-    _ <- runBenchmark rcSettings sem rcManager warmupIters 1 authorizedEp
+    _ <- runBenchmark rcSettings sem rcNetwork warmupIters 1 authorizedEp
     return ()
 
 getNowNs :: IO TT.Nanoseconds

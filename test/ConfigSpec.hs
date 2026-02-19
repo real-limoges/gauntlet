@@ -41,7 +41,7 @@ configSpec = describe "Benchmark.Config" $ do
         _ -> expectationFailure "Expected ConfigValidationError"
 
     it "rejects invalid HTTP methods" $ do
-      let badPayload = PayloadSpec "test" "INVALID" "/path" Nothing Nothing
+      let badPayload = PayloadSpec "test" "INVALID" "/path" Nothing Nothing Nothing
       let cfg = makeValidConfig {payloads = [badPayload]}
       case validateConfig cfg of
         Left (ConfigValidationError msg) ->
@@ -50,7 +50,7 @@ configSpec = describe "Benchmark.Config" $ do
 
     it "accepts all valid HTTP methods" $ do
       let methods = ["GET", "POST", "PUT", "DELETE", "PATCH"]
-      let mkPayload m = PayloadSpec "test" m "/path" Nothing Nothing
+      let mkPayload m = PayloadSpec "test" m "/path" Nothing Nothing Nothing
       let cfg = makeValidConfig {payloads = map mkPayload methods}
       validateConfig cfg `shouldBe` Right cfg
 
@@ -85,7 +85,7 @@ configSpec = describe "Benchmark.Config" $ do
 
     it "includes custom headers from PayloadSpec" $ do
       let customHeaders = Map.fromList [("X-API-Key", "secret"), ("X-Request-ID", "123")]
-      let payload = PayloadSpec "test" "GET" "/api" Nothing (Just customHeaders)
+      let payload = PayloadSpec "test" "GET" "/api" Nothing (Just customHeaders) Nothing
       let cfg = makeValidConfig {payloads = [payload]}
       case buildEndpoints cfg False of
         [ep] -> do
@@ -95,7 +95,7 @@ configSpec = describe "Benchmark.Config" $ do
 
     it "merges custom headers with default Content-Type" $ do
       let customHeaders = Map.fromList [("X-Custom", "value")]
-      let payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders)
+      let payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders) Nothing
       let cfg = makeValidConfig {payloads = [payload]}
       case buildEndpoints cfg False of
         [ep] -> do
@@ -106,7 +106,7 @@ configSpec = describe "Benchmark.Config" $ do
 
     it "overrides Content-Type with custom value" $ do
       let customHeaders = Map.fromList [("Content-Type", "text/xml")]
-      let payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders)
+      let payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders) Nothing
       let cfg = makeValidConfig {payloads = [payload]}
       case buildEndpoints cfg False of
         [ep] -> do
@@ -116,7 +116,7 @@ configSpec = describe "Benchmark.Config" $ do
         _ -> expectationFailure "Expected exactly one endpoint"
 
     it "handles empty custom headers" $ do
-      let payload = PayloadSpec "test" "GET" "/api" Nothing (Just Map.empty)
+      let payload = PayloadSpec "test" "GET" "/api" Nothing (Just Map.empty) Nothing
       let cfg = makeValidConfig {payloads = [payload]}
       case buildEndpoints cfg False of
         [ep] -> headers ep `shouldBe` [("Content-Type", "application/json")]

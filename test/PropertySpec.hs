@@ -263,7 +263,7 @@ propertySpec = describe "Property-Based Tests" $ do
   describe "Custom headers properties" $ do
     prop "empty headers map results in only default Content-Type" $
       \() ->
-        let payload = PayloadSpec "test" "GET" "/api" Nothing (Just Map.empty)
+        let payload = PayloadSpec "test" "GET" "/api" Nothing (Just Map.empty) Nothing
             endpoint = toEndpoint "http://test" payload
          in headers endpoint == [("Content-Type", "application/json")]
 
@@ -271,7 +271,7 @@ propertySpec = describe "Property-Based Tests" $ do
       \customType ->
         not (null customType) ==>
           let customHeaders = Map.fromList [("Content-Type", T.pack customType)]
-              payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders)
+              payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders) Nothing
               endpoint = toEndpoint "http://test" payload
               contentTypes = filter (\(k, _) -> k == "Content-Type") (headers endpoint)
            in length contentTypes == 1 && contentTypes == [("Content-Type", T.pack customType)]
@@ -280,6 +280,6 @@ propertySpec = describe "Property-Based Tests" $ do
       \key value ->
         not (null key) && not (null value) && key /= "Content-Type" ==>
           let customHeaders = Map.fromList [(T.pack key, T.pack value)]
-              payload = PayloadSpec "test" "GET" "/api" Nothing (Just customHeaders)
+              payload = PayloadSpec "test" "GET" "/api" Nothing (Just customHeaders) Nothing
               endpoint = toEndpoint "http://test" payload
            in (T.pack key, T.pack value) `elem` headers endpoint
