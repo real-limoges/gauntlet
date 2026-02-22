@@ -88,7 +88,10 @@ compareBayesian statsA statsB =
         ciLower = muDiff - (1.96 * sigmaDiff)
         ciUpper = muDiff + (1.96 * sigmaDiff)
 
-        pooledVar = ((countA - 1) * varA + (countB - 1) * varB) / (countA + countB - 2)
+        pooledVar =
+            if countA + countB > 2
+                then ((countA - 1) * varA + (countB - 1) * varB) / (countA + countB - 2)
+                else (varA + varB) / 2
         pooledSd = sqrt pooledVar
         cohenD = if pooledSd > 0 then muDiff / pooledSd else 0
 

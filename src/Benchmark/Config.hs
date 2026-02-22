@@ -13,6 +13,7 @@ module Benchmark.Config
 where
 
 import Benchmark.Types
+import Control.Exception (IOException, try)
 import Data.Aeson (eitherDecode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
@@ -20,8 +21,10 @@ import Data.Text (Text)
 
 loadConfig :: FilePath -> IO (Either String TestConfig)
 loadConfig path = do
-  content <- LBS.readFile path
-  return $ eitherDecode content
+  result <- try (LBS.readFile path) :: IO (Either IOException LBS.ByteString)
+  case result of
+    Left err -> return $ Left (show err)
+    Right content -> return $ eitherDecode content
 
 -- | Build endpoint list from config, selecting primary or candidate target.
 -- When useCandidate is True, uses candidate target; otherwise uses primary.

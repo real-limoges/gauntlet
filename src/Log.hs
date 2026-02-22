@@ -23,7 +23,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Time (UTCTime, defaultTimeLocale, formatTime, getCurrentTime)
-import System.IO (stderr, stdout)
+import System.IO (stderr)
 
 -- | Logger type that carries configuration
 data Logger = Logger
@@ -50,9 +50,8 @@ makeLogger minLevel =
       logAction =
         LogAction $ \(level, time, msg) ->
           when (level >= minLevel) $ do
-            let formatted = formatMessage level time msg
-                handle = if level >= Warning then stderr else stdout
-            TIO.hPutStrLn handle formatted
+            let formatted = "     " <> formatMessage level time msg
+            TIO.hPutStrLn stderr formatted
     }
   where
     when True action = action

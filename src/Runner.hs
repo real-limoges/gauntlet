@@ -13,7 +13,7 @@ import Benchmark.Output (initOutputFiles, resultsDir)
 import Benchmark.Plotting (plotDistributions)
 import Benchmark.Report (printMultipleBenchmarkReport, printSingleBenchmarkReport, printValidationSummary)
 import Benchmark.TUI (runTUI)
-import Benchmark.TUI.State (BenchmarkEvent (..), initialState)
+import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsFinished)
 import Benchmark.Types
   ( Nanoseconds (..),
     PerfTestError (..),
@@ -24,9 +24,10 @@ import Benchmark.Types
     Targets (..),
     exitWithError,
   )
-import Control.Concurrent (forkIO)
+import Control.Concurrent.Async (async, cancel, wait)
+import Control.Exception (onException)
+import Lens.Micro ((^.))
 import Data.Text qualified as T
-import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM (newTChanIO)
 import Runner.Baseline (handleBaseline)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
@@ -39,8 +40,8 @@ runMultiple :: BaselineMode -> TestConfig -> IO RunResult
 runMultiple baselineMode cfg = do
   (csvFile, timestamp) <- initOutputFiles
 
-  let epsCandidate = buildEndpoints cfg False
-      epsPrimary = buildEndpoints cfg True
+  let epsCandidate = buildEndpoints cfg True
+      epsPrimary = buildEndpoints cfg False
       setts = settings cfg
 
   case (epsCandidate, epsPrimary) of
@@ -56,47 +57,55 @@ runMultiple baselineMode cfg = do
 
       ctx <- initContext setts csvFile timestamp (Just eventChan) (candidate (targets cfg))
 
-      resultVar <- newEmptyMVar
+      benchmarkWork <- async $
+        (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
+          startNs <- getNowNs
 
-      _ <- forkIO $ do
-        startNs <- getNowNs
+          emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
+          setupOrFail setts (candidate $ git cfg) (candidate $ targets cfg)
+          emitEvent (Just eventChan) (StatusMessage $ "Running " <> candidate (targets cfg) <> " (" <> candidate (git cfg) <> ")")
+          (resultsCandidate, validCandidate) <- benchmarkEndpoints ctx "candidate" epsCandidate
 
-        setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
-        (resultsCandidate, validCandidate) <- benchmarkEndpoints ctx "candidate" epsCandidate
+          emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> primary (git cfg) <> "...")
+          setupOrFail setts (primary $ git cfg) (primary $ targets cfg)
+          emitEvent (Just eventChan) (StatusMessage $ "Running " <> primary (targets cfg) <> " (" <> primary (git cfg) <> ")")
+          (resultsPrimary, validPrimary) <- benchmarkEndpoints ctx "primary" epsPrimary
 
-        setupOrFail (primary $ git cfg) (primary $ targets cfg)
-        (resultsPrimary, validPrimary) <- benchmarkEndpoints ctx "primary" epsPrimary
+          endNs <- getNowNs
 
-        endNs <- getNowNs
+          emitEvent (Just eventChan) BenchmarkFinished
+          return (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs)
 
-        emitEvent (Just eventChan) BenchmarkFinished
-        putMVar resultVar (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs)
+      finalState <- runTUI eventChan tuiState
 
-      _ <- runTUI eventChan tuiState
+      if not (finalState ^. tsFinished)
+        then do
+          cancel benchmarkWork
+          exitWithError $ EnvironmentSetupError "Benchmark cancelled by user"
+        else do
+          (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs) <- wait benchmarkWork
 
-      (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs) <- takeMVar resultVar
+          let statsCandidate = calculateStats resultsCandidate
+              statsPrimary = calculateStats resultsPrimary
+              bayes = compareBayesian statsPrimary statsCandidate
 
-      let statsCandidate = calculateStats resultsCandidate
-          statsPrimary = calculateStats resultsPrimary
-          bayes = compareBayesian statsPrimary statsCandidate
+          printMultipleBenchmarkReport "primary" "candidate" statsPrimary statsCandidate bayes
+          printValidationSummary (validPrimary ++ validCandidate)
 
-      printMultipleBenchmarkReport "primary" "candidate" statsPrimary statsCandidate bayes
-      printValidationSummary (validPrimary ++ validCandidate)
+          let timesPrimary = map (fromIntegral . unNanoseconds . durationNs) resultsPrimary
+              timesCandidate = map (fromIntegral . unNanoseconds . durationNs) resultsCandidate
+              plotFile = resultsDir ++ "/kde_plot-" ++ timestamp ++ ".png"
+          plotDistributions timesPrimary timesCandidate plotFile
+          runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
 
-      let timesPrimary = map (fromIntegral . unNanoseconds . durationNs) resultsPrimary
-          timesCandidate = map (fromIntegral . unNanoseconds . durationNs) resultsCandidate
-          plotFile = resultsDir ++ "/kde_plot-" ++ timestamp ++ ".png"
-      plotDistributions timesPrimary timesCandidate plotFile
-      runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
-
-      handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) statsCandidate
+          handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) statsCandidate
 
 -- | Run single-target benchmark without comparison.
 runSingle :: BaselineMode -> TestConfig -> IO RunResult
 runSingle baselineMode cfg = do
   (csvFile, timestamp) <- initOutputFiles
 
-  let eps = buildEndpoints cfg False
+  let eps = buildEndpoints cfg True
       setts = settings cfg
       targetUrl = candidate $ targets cfg
 
@@ -108,25 +117,31 @@ runSingle baselineMode cfg = do
 
   ctx <- initContext setts csvFile timestamp (Just eventChan) targetUrl
 
-  resultVar <- newEmptyMVar
+  benchmarkWork <- async $
+    (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
+      startNs <- getNowNs
+      emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
+      setupOrFail setts (candidate $ git cfg) (candidate $ targets cfg)
+      emitEvent (Just eventChan) (StatusMessage $ "Running " <> targetUrl <> " (" <> candidate (git cfg) <> ")")
+      (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
+      endNs <- getNowNs
 
-  _ <- forkIO $ do
-    startNs <- getNowNs
-    setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
-    (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
-    endNs <- getNowNs
+      emitEvent (Just eventChan) BenchmarkFinished
+      return (results, validSummaries, startNs, endNs)
 
-    emitEvent (Just eventChan) BenchmarkFinished
-    putMVar resultVar (results, validSummaries, startNs, endNs)
+  finalState <- runTUI eventChan tuiState
 
-  _ <- runTUI eventChan tuiState
+  if not (finalState ^. tsFinished)
+    then do
+      cancel benchmarkWork
+      exitWithError $ EnvironmentSetupError "Benchmark cancelled by user"
+    else do
+      (results, validSummaries, startNs, endNs) <- wait benchmarkWork
 
-  (results, validSummaries, startNs, endNs) <- takeMVar resultVar
+      let stats = calculateStats results
 
-  let stats = calculateStats results
+      printSingleBenchmarkReport targetUrl stats
+      printValidationSummary validSummaries
+      runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
 
-  printSingleBenchmarkReport targetUrl stats
-  printValidationSummary validSummaries
-  runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
-
-  handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) stats
+      handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) stats

@@ -158,7 +158,7 @@ timedRequestH2 Http2Connection {h2Requester, h2Authority} ep = do
 
   endTime <- getTime Monotonic
 
-  let duration = Nanoseconds $ fromIntegral (toNanoSecs endTime - toNanoSecs startTime)
+  let duration = Nanoseconds $ fromIntegral (max 0 (toNanoSecs endTime - toNanoSecs startTime))
 
   return $ case result of
     Left err ->
@@ -215,36 +215,33 @@ runTLSConnection host sock srMVar closeMVar = do
   mySockAddr <- Socket.getSocketName sock
   peerSockAddr <- Socket.getPeerName sock
 
-  buf <- mallocBytes 4096
+  bracket (mallocBytes 4096) free $ \buf -> do
+    bufRef <- newIORef BS.empty
+    let conf =
+          defaultConfig
+            { confWriteBuffer = buf,
+              confBufferSize = 4096,
+              confSendAll = \bs -> TLS.sendData ctx (LBS.fromStrict bs),
+              confReadN = tlsReadN ctx bufRef,
+              confMySockAddr = mySockAddr,
+              confPeerSockAddr = peerSockAddr
+            }
 
-  bufRef <- newIORef BS.empty
-  let conf =
-        defaultConfig
-          { confWriteBuffer = buf,
-            confBufferSize = 4096,
-            confSendAll = \bs -> TLS.sendData ctx (LBS.fromStrict bs),
-            confReadN = tlsReadN ctx bufRef,
-            confMySockAddr = mySockAddr,
-            confPeerSockAddr = peerSockAddr
-          }
+    let cliConf = defaultClientConfig {H2.scheme = "https", H2.authority = hostStr}
 
-  let cliConf = defaultClientConfig {H2.scheme = "https", H2.authority = hostStr}
-
-  result <-
-    try
-      ( do
-          run cliConf conf $ \sendRequest _aux -> do
+    result <-
+      try
+        ( run cliConf conf $ \sendRequest _aux -> do
             putMVar srMVar (Requester sendRequest)
             takeMVar closeMVar
-      ) ::
-      IO (Either SomeException ())
+        ) ::
+        IO (Either SomeException ())
 
-  free buf
-  TLS.bye ctx
+    TLS.bye ctx
 
-  case result of
-    Left err -> ioError (userError ("HTTP/2 TLS connection failed: " ++ show err))
-    Right () -> return ()
+    case result of
+      Left err -> ioError (userError ("HTTP/2 TLS connection failed: " ++ show err))
+      Right () -> return ()
 
 -- | Read exactly @n@ bytes from a TLS context, buffering partial records.
 tlsReadN :: TLS.Context -> IORef ByteString -> Int -> IO ByteString

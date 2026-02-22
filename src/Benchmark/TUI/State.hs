@@ -26,6 +26,8 @@ module Benchmark.TUI.State (
     tsRollingStats,
     tsBuckets,
     tsFinished,
+    tsStatus,
+    tsElapsedSecs,
 
     -- * RollingStats lenses
     rsMeanMs,
@@ -55,6 +57,7 @@ data BenchmarkEvent
     = RequestCompleted Nanoseconds Int
     | RequestFailed Text
     | EndpointStarted Text Int Int
+    | StatusMessage Text
     | BenchmarkFinished
     deriving (Show, Eq)
 
@@ -85,6 +88,8 @@ data TUIState = TUIState
     , _tsRollingStats :: Maybe RollingStats
     , _tsBuckets :: [Int]
     , _tsFinished :: Bool
+    , _tsStatus :: Text
+    , _tsElapsedSecs :: Double
     }
     deriving (Show, Eq)
 
@@ -107,12 +112,13 @@ initialState target total endpoints =
         , _tsRollingStats = Nothing
         , _tsBuckets = [0, 0, 0, 0, 0, 0]
         , _tsFinished = False
+        , _tsStatus = ""
+        , _tsElapsedSecs = 0
         }
 
 updateState :: UTCTime -> BenchmarkEvent -> TUIState -> TUIState
 updateState now event state = case event of
     RequestCompleted durationNs statusCode ->
-        -- this decomposition makes ms a double
         let ms = unMilliseconds $ nsToMs durationNs
             newDurations = addToRolling ms (_tsRecentDurations state)
             newStats = computeRollingStats newDurations
@@ -127,8 +133,8 @@ updateState now event state = case event of
                 , _tsBuckets = newBuckets
                 , _tsStartTime = _tsStartTime state <|> Just now
                 }
-    RequestFailed error ->
-        let newErrors = addToRolling (now, error) (_tsRecentErrors state)
+    RequestFailed err ->
+        let newErrors = addToRolling (now, err) (_tsRecentErrors state)
          in state
                 { _tsCompleted = _tsCompleted state + 1
                 , _tsErrorCount = _tsErrorCount state + 1
@@ -140,6 +146,8 @@ updateState now event state = case event of
             , _tsEndpointIndex = index
             , _tsTotalEndpoints = total
             }
+    StatusMessage msg ->
+        state{_tsStatus = msg}
     BenchmarkFinished ->
         state{_tsFinished = True}
   where
@@ -157,9 +165,9 @@ computeRollingStats durations
         let sorted = toList (Seq.sort durations)
             n = length sorted
             avg = sum sorted / fromIntegral n
-            (mn, mx) = case (sorted, reverse sorted) of
-                (h : _, l : _) -> (h, l)
-                _ -> (0, 0)
+            (mn, mx) = case sorted of
+                [] -> (0, 0)
+                _ -> (head sorted, last sorted)
          in RollingStats
                 { _rsMeanMs = avg
                 , _rsP50Ms = percentileList 0.50 sorted
@@ -177,4 +185,4 @@ updateBuckets ms [b0, b1, b2, b3, b4, b5]
     | ms < 12_500 = [b0, b1, b2, b3 + 1, b4, b5]
     | ms < 15_000 = [b0, b1, b2, b3, b4 + 1, b5]
     | otherwise = [b0, b1, b2, b3, b4, b5 + 1]
-
+updateBuckets _ bs = bs

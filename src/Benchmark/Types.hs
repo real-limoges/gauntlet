@@ -58,7 +58,6 @@ module Benchmark.Types
 where
 
 import Data.Aeson (FromJSON (..), ToJSON (..), Value, defaultOptions, fieldLabelModifier, genericParseJSON, object, withObject, (.:?), (.=))
-import Data.Aeson.Diff (Patch)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict (Map)
 import Data.Text (Text)
@@ -218,7 +217,7 @@ data BayesianComparison = BayesianComparison
 data VerificationResult
   = Match
   | StatusMismatch Int Int
-  | BodyMismatch Patch
+  | BodyMismatch Text
   | InvalidJSON String
   deriving stock (Show, Eq, Generic)
 
@@ -338,7 +337,11 @@ data Settings = Settings
     logLevel :: Maybe LogLevel,
     tempo :: Maybe TempoSettings,
     -- | HTTP version: "1.1" (default) or "2" (HTTP/2 over TLS)
-    httpVersion :: Maybe Text
+    httpVersion :: Maybe Text,
+    -- | Health check path appended to service URL (default: "/health")
+    healthCheckPath :: Maybe Text,
+    -- | Health check poll timeout in seconds (default: 60)
+    healthCheckTimeout :: Maybe Int
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
@@ -352,7 +355,9 @@ data TempoSettings = TempoSettings
     -- | Defaults to True if tempo section present
     tempoEnabled :: Maybe Bool,
     -- | Optional Bearer token
-    tempoAuthToken :: Maybe Text
+    tempoAuthToken :: Maybe Text,
+    -- | Maximum number of traces to fetch (default: 100)
+    tempoQueryLimit :: Maybe Int
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)

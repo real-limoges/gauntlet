@@ -8,21 +8,17 @@ on:
 
 jobs:
   build-and-test:
-    name: Build & Test (GHC ${{ matrix.ghc }})
+    name: Build & Test (GHC 9.12.2)
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        ghc: ["9.12.2"]
-        cabal: ["3.14"]
+    container: haskell:9.12.2
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt-get update
+          apt-get install -y \
             libcairo2-dev \
             libpango1.0-dev \
             libglib2.0-dev \
@@ -30,21 +26,15 @@ jobs:
             libncurses-dev \
             zlib1g-dev
 
-      - name: Set up GHC ${{ matrix.ghc }}
-        uses: haskell-actions/setup@v2
-        with:
-          ghc-version: ${{ matrix.ghc }}
-          cabal-version: ${{ matrix.cabal }}
-
       - name: Cache cabal store
         uses: actions/cache@v4
         with:
           path: |
             ~/.cabal/store
             dist-newstyle
-          key: ${{ runner.os }}-ghc-${{ matrix.ghc }}-cabal-${{ hashFiles('cabal.project.freeze') }}
+          key: ${{ runner.os }}-ghc-9.12.2-cabal-${{ hashFiles('gauntlet.cabal') }}
           restore-keys: |
-            ${{ runner.os }}-ghc-${{ matrix.ghc }}-cabal-
+            ${{ runner.os }}-ghc-9.12.2-cabal-
 
       - name: Update cabal index
         run: cabal update

@@ -82,7 +82,7 @@ timedRequestPrepared settings mgr req = do
           logWarning logger $ T.pack $ "FINAL FAILURE: " ++ show err
           return $
             TestingResponse
-              { durationNs = Nanoseconds $ fromIntegral (toNanoSecs endTime - toNanoSecs startTime),
+              { durationNs = Nanoseconds $ fromIntegral (max 0 (toNanoSecs endTime - toNanoSecs startTime)),
                 statusCode = 0,
                 respBody = Nothing,
                 errorMessage = Just (show err)
@@ -95,7 +95,7 @@ timedRequestPrepared settings mgr req = do
       endTime <- getTime Monotonic
       return $
         TestingResponse
-          { durationNs = Nanoseconds $ fromIntegral (toNanoSecs endTime - toNanoSecs startTime),
+          { durationNs = Nanoseconds $ fromIntegral (max 0 (toNanoSecs endTime - toNanoSecs startTime)),
             statusCode = code,
             respBody = Just body,
             errorMessage = Nothing
