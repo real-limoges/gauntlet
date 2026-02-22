@@ -58,5 +58,5 @@ tracingSpec = describe "Tracing.Analysis" $ do
                     , makeSpan "test" 30_000_000
                     ]
             case aggregateBySpanName spans of
-                [agg] -> aggStdDevMs agg `shouldSatisfy` (\x -> x > 8.0 && x < 9.0)
+                [agg] -> aggStdDevMs agg `shouldSatisfy` (\x -> x > 9.5 && x < 10.5)
                 _ -> expectationFailure "Expected exactly one aggregation"

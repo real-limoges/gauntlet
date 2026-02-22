@@ -10,8 +10,8 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import MockServer
 import Network.HTTP.Client (Manager, defaultManagerSettings, newManager)
-import Benchmark.Network (NetworkHandle (H1))
 import Network.HTTP.Types (status200, status404, status500)
+import Network.Socket qualified as Socket
 import System.Directory (removeFile)
 import System.IO.Error (catchIOError)
 import Test.Hspec
@@ -70,12 +70,24 @@ integrationSpec = describe "Integration Tests" $ beforeAll setupManager $ do
         statusCode resp `shouldBe` 500
 
   describe "retry logic" $ do
-    it "does not retry on HTTP 500 (only connection failures)" $ \mgr ->
-      mockStatus status500 $ \port -> do
-        -- HTTP 500 is a valid response, not retried
+    it "does not retry on HTTP 500 (server receives exactly 1 request)" $ \mgr ->
+      mockCountedRequests status500 "{}" $ \port readCount -> do
         resp <- timedRequest testSettings mgr (endpoint port)
+        count <- readCount
         statusCode resp `shouldBe` 500
-        errorMessage resp `shouldBe` Nothing -- Not an error, just a 500 response
+        errorMessage resp `shouldBe` Nothing
+        count `shouldBe` 1
+
+    it "returns error result on connection failure" $ \mgr -> do
+      -- Bind to a free port then close without listening so the port is unreachable
+      sock <- Socket.socket Socket.AF_INET Socket.Stream Socket.defaultProtocol
+      Socket.bind sock (Socket.SockAddrInet 0 (Socket.tupleToHostAddress (127, 0, 0, 1)))
+      port <- fromIntegral <$> Socket.socketPort sock
+      Socket.close sock
+      let noRetry = testSettings{retry = Just (RetrySettings 0 0 1.0)}
+      resp <- timedRequest noRetry mgr (endpoint port)
+      errorMessage resp `shouldSatisfy` (/= Nothing)
+
     it "accepts custom retry settings" $ \mgr ->
       mockJson "{}" $ \port -> do
         -- Test that custom retry settings are accepted and used

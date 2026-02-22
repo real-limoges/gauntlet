@@ -11,4 +11,4 @@ laughing-waffle-exe
 .DS_Store
 *.log
 *.csv
-docs/*.md
+docs/

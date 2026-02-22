@@ -25,6 +25,7 @@ import Data.Vector.Algorithms.Intro qualified as VA
 import Data.Vector.Unboxed qualified as V
 import Numeric.SpecFunctions (erfc)
 import Statistics.Sample (mean, stdDev)
+import Stats.Common (percentileSorted)
 import Stats.Common qualified as Stats
 
 {- | Compute descriptive statistics from benchmark responses.
@@ -47,9 +48,9 @@ calculateStats results =
                 , stdDev vector
                 , V.minimum vector
                 , V.maximum vector
-                , Stats.percentile 0.50 sorted
-                , Stats.percentile 0.95 sorted
-                , Stats.percentile 0.99 sorted
+                , percentileSorted 0.50 sorted
+                , percentileSorted 0.95 sorted
+                , percentileSorted 0.99 sorted
                 )
      in BenchmarkStats
             { totalRequests = total
@@ -83,8 +84,7 @@ compareBayesian statsA statsB =
 
         muDiff = muA - muB
         sigmaDiff = sqrt ((varA / countA) + (varB / countB))
-        z = muDiff / sigmaDiff
-        probBIsFaster = standardNormalCDF z
+        probBIsFaster = if sigmaDiff > 0 then standardNormalCDF (muDiff / sigmaDiff) else 0.5
         ciLower = muDiff - (1.96 * sigmaDiff)
         ciUpper = muDiff + (1.96 * sigmaDiff)
 

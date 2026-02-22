@@ -37,11 +37,14 @@ module Benchmark.TUI.State (
 ) where
 
 import Benchmark.Types (BenchmarkStats (..), Milliseconds (..), Nanoseconds, nsToMs)
+import Control.Applicative ((<|>))
+import Data.Foldable (toList)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Text (Text)
-import Data.Time (NominalDiffTime, UTCTime, diffUTCTime)
+import Data.Time (UTCTime)
 import Lens.Micro.TH (makeLenses)
+import Stats.Common (percentileList)
 
 -- | Size of rolling window
 rollingWindow :: Int
@@ -151,17 +154,19 @@ computeRollingStats :: Seq Double -> RollingStats
 computeRollingStats durations
     | Seq.null durations = RollingStats 0 0 0 0 0 0
     | otherwise =
-        let sorted = Seq.sort durations
-            n = Seq.length sorted
-            mean = sum durations / fromIntegral n
-            percentile p = Seq.index sorted (min (n - 1) (floor (p * fromIntegral n)))
+        let sorted = toList (Seq.sort durations)
+            n = length sorted
+            avg = sum sorted / fromIntegral n
+            (mn, mx) = case (sorted, reverse sorted) of
+                (h : _, l : _) -> (h, l)
+                _ -> (0, 0)
          in RollingStats
-                { _rsMeanMs = mean
-                , _rsP50Ms = percentile 0.50
-                , _rsP95Ms = percentile 0.95
-                , _rsP99Ms = percentile 0.99
-                , _rsMinMs = Seq.index sorted 0
-                , _rsMaxMs = Seq.index sorted (n - 1)
+                { _rsMeanMs = avg
+                , _rsP50Ms = percentileList 0.50 sorted
+                , _rsP95Ms = percentileList 0.95 sorted
+                , _rsP99Ms = percentileList 0.99 sorted
+                , _rsMinMs = mn
+                , _rsMaxMs = mx
                 }
 
 updateBuckets :: Double -> [Int] -> [Int]
@@ -173,6 +178,3 @@ updateBuckets ms [b0, b1, b2, b3, b4, b5]
     | ms < 15_000 = [b0, b1, b2, b3, b4 + 1, b5]
     | otherwise = [b0, b1, b2, b3, b4, b5 + 1]
 
-(<|>) :: Maybe a -> Maybe a -> Maybe a
-Nothing <|> x = x
-x <|> _ = x
