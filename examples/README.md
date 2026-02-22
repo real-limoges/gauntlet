@@ -1,6 +1,6 @@
 # Example Configurations
 
-This directory contains sample configuration files demonstrating various features of laughing-waffle.
+This directory contains sample configuration files demonstrating various features of gauntlet.
 
 ## Quick Start
 
@@ -10,7 +10,7 @@ mkdir -p .secrets
 echo "your-bearer-token-here" > .secrets/token.txt
 
 # Run a simple benchmark
-cabal run laughing-waffle-exe -- benchmark-multiple --config examples/simple-benchmark.json
+cabal run gauntlet-exe -- benchmark-multiple --config examples/simple-benchmark.json
 ```
 
 ## Example Files
@@ -175,14 +175,14 @@ Integrates with Grafana Tempo for distributed trace analysis.
 Test one endpoint at a time:
 
 ```bash
-cabal run laughing-waffle-exe -- benchmark-multiple --config examples/minimal.json
+cabal run gauntlet-exe -- benchmark-multiple --config examples/minimal.json
 ```
 
 ### A/B Comparison
 Compare primary vs. candidate:
 
 ```bash
-cabal run laughing-waffle-exe -- benchmark-multiple --config examples/ab-comparison.json
+cabal run gauntlet-exe -- benchmark-multiple --config examples/ab-comparison.json
 ```
 
 ### With Baseline Comparison
@@ -190,12 +190,12 @@ Save a baseline for regression detection:
 
 ```bash
 # Save baseline
-cabal run laughing-waffle-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/simple-benchmark.json \
   --save-baseline my-baseline
 
 # Compare against baseline
-cabal run laughing-waffle-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/simple-benchmark.json \
   --compare-baseline my-baseline
 ```
@@ -204,7 +204,7 @@ cabal run laughing-waffle-exe -- benchmark-multiple \
 Output results as JSON instead of terminal format:
 
 ```bash
-cabal run laughing-waffle-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/simple-benchmark.json \
   -o json
 ```

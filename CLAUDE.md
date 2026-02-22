@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**laughing-waffle** is a Haskell-based HTTP performance benchmarking tool with statistical rigor, regression detection, and CI/CD integration. It performs A/B comparisons between endpoints using Bayesian analysis, supports distributed tracing via Grafana Tempo, and provides real-time TUI feedback.
+**gauntlet** is a Haskell-based HTTP performance benchmarking tool with statistical rigor, regression detection, and CI/CD integration. It performs A/B comparisons between endpoints using Bayesian analysis, supports distributed tracing via Grafana Tempo, and provides real-time TUI feedback.
 
 ## Build & Development Commands
 
@@ -21,7 +21,7 @@ make benchmark-single   # Run single benchmark (requires config.json)
 make verify            # Verify test configuration
 
 # Direct execution
-cabal run laughing-waffle-exe -- benchmark-multiple --config config.json
+cabal run gauntlet-exe -- benchmark-multiple --config config.json
 ```
 
 ### Testing

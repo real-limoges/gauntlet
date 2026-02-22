@@ -7,7 +7,7 @@ docker-compose-dev.yml
 !examples/*.json
 secrets.txt
 .secrets/
-laughing-waffle-exe
+gauntlet-exe
 .DS_Store
 *.log
 *.csv

@@ -4,16 +4,16 @@ cradle:
       config:
         cradle:
           cabal:
-            component: "lib:laughing-waffle"
+            component: "lib:gauntlet"
 
     - path: "./app/Main.hs"
       config:
         cradle:
           cabal:
-            component: "exe:laughing-waffle-exe"
+            component: "exe:gauntlet-exe"
 
     - path: "./test"
       config:
         cradle:
           cabal:
-            component: "test:laughing-waffle-test"
+            component: "test:gauntlet-test"
