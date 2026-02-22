@@ -13,14 +13,18 @@ import Brick.Widgets.Border (border, borderWithLabel, hBorder)
 import Brick.Widgets.Center (hCenter)
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.STM
-import Control.Monad (forever)
+import Control.Exception (SomeException, bracket, try)
+import Control.Monad (forever, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.Sequence qualified as Seq
 import Data.Text qualified as T
 import Data.Time (diffUTCTime, getCurrentTime)
+import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Graphics.Vty qualified as V
 import Graphics.Vty.CrossPlatform (mkVty)
 import Lens.Micro ((^.))
+import System.Directory (getTemporaryDirectory, removeFile)
+import System.IO (hClose, hFlush, hPutStr, openTempFile, stderr)
 
 data CustomEvent
     = Tick
@@ -193,6 +197,32 @@ tuiApp =
 
 -- ── Runner ────────────────────────────────────────────────────────────────────
 
+{- | Redirect stderr to a temp file for the duration of 'action', then replay
+any captured output to the real stderr afterwards. Prevents log/error lines
+from corrupting the Brick terminal while the TUI is active.
+-}
+withStderrBuffered :: IO a -> IO a
+withStderrBuffered action =
+    bracket acquire release (const action)
+  where
+    acquire = do
+        stderrSaved <- hDuplicate stderr
+        tmpDir <- getTemporaryDirectory
+        (tmpPath, tmpHandle) <- openTempFile tmpDir "gauntlet-stderr.tmp"
+        hDuplicateTo tmpHandle stderr
+        hClose tmpHandle
+        return (stderrSaved, tmpPath)
+    release (stderrSaved, tmpPath) = do
+        hFlush stderr
+        hDuplicateTo stderrSaved stderr
+        hClose stderrSaved
+        content <- try (readFile tmpPath) :: IO (Either SomeException String)
+        case content of
+            Right s -> unless (null s) $ hPutStr stderr s
+            Left _ -> return ()
+        _ <- try (removeFile tmpPath) :: IO (Either SomeException ())
+        return ()
+
 runTUI :: TChan BenchmarkEvent -> TUIState -> IO TUIState
 runTUI eventChan initialSt = do
     brickChan <- newBChan 1000
@@ -207,7 +237,9 @@ runTUI eventChan initialSt = do
 
     let buildVty = mkVty V.defaultConfig
     initialVty <- buildVty
-    result <- customMain initialVty buildVty (Just brickChan) tuiApp initialSt
+    result <-
+        withStderrBuffered $
+            customMain initialVty buildVty (Just brickChan) tuiApp initialSt
     killThread tid1
     killThread tid2
     return result

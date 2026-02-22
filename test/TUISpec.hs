@@ -36,14 +36,14 @@ tuiStateSpec = describe "Benchmark.TUI.State" $ do
             _tsCompleted newState `shouldBe` 1
 
         forM_ [(200, 1, 0), (301, 1, 0), (404, 0, 1), (500, 0, 1)] $
-          \(code, expSuccess, expError) ->
-            it ("categorizes status " ++ show (code :: Int) ++ " correctly") $ do
-                now <- getCurrentTime
-                let state = initialState "http://test.com" 100 5
-                    event = RequestCompleted (Nanoseconds 50_000_000) code
-                    newState = updateState now event state
-                _tsSuccessCount newState `shouldBe` expSuccess
-                _tsErrorCount newState `shouldBe` expError
+            \(code, expSuccess, expError) ->
+                it ("categorizes status " ++ show (code :: Int) ++ " correctly") $ do
+                    now <- getCurrentTime
+                    let state = initialState "http://test.com" 100 5
+                        event = RequestCompleted (Nanoseconds 50_000_000) code
+                        newState = updateState now event state
+                    _tsSuccessCount newState `shouldBe` expSuccess
+                    _tsErrorCount newState `shouldBe` expError
 
         it "updates rolling stats" $ do
             now <- getCurrentTime

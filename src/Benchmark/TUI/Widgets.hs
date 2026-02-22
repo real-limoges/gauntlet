@@ -17,8 +17,9 @@ import Brick (Widget, hBox, txt, vBox)
 import Data.Text (Text)
 import Data.Text qualified as T
 
--- | Custom progress bar widget
--- Usage: progressBar 0.35 "Progress"
+{- | Custom progress bar widget
+Usage: progressBar 0.35 "Progress"
+-}
 progressBar :: Float -> Text -> Widget n
 progressBar progress label =
     let pct = max 0 (min 1 progress)
@@ -35,8 +36,9 @@ progressBar progress label =
             , txt pctText
             ]
 
--- | Histogram widget
--- Takes list of (label, count) pairs
+{- | Histogram widget
+Takes list of (label, count) pairs
+-}
 histogram :: [(Text, Int)] -> Widget n
 histogram buckets =
     let total = sum (map snd buckets)
