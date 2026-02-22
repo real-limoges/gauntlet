@@ -18,6 +18,7 @@ import Control.Monad (forM_)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import System.Environment (lookupEnv)
 import Text.Printf (printf)
 
@@ -39,8 +40,9 @@ In GitLab, section markers and colored output help visibility.
 formatForCI :: CIMode -> RegressionResult -> IO ()
 formatForCI None _ = return ()
 formatForCI GitLab result = do
+    epoch <- (round <$> getPOSIXTime) :: IO Int
     putStrLn ""
-    putStrLn "\x1b[0Ksection_start:$(date +%s):benchmark_results[collapsed=false]"
+    putStrLn $ "\x1b[0Ksection_start:" ++ show epoch ++ ":benchmark_results[collapsed=false]"
     putStrLn "\x1b[0K\x1b[1;34m========== Benchmark Regression Check ==========\x1b[0m"
     putStrLn ""
 
@@ -60,7 +62,7 @@ formatForCI GitLab result = do
         else putStrLn "\x1b[1;31m[FAIL] Benchmark FAILED - regression detected\x1b[0m"
 
     putStrLn ""
-    putStrLn "\x1b[0Ksection_end:$(date +%s):benchmark_results"
+    putStrLn $ "\x1b[0Ksection_end:" ++ show epoch ++ ":benchmark_results"
 
 -- | Write a markdown report for GitLab artifacts/MR comments.
 writeArtifactReport :: FilePath -> RegressionResult -> IO ()

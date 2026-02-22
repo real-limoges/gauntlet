@@ -12,7 +12,6 @@ where
 
 import Benchmark.Types
 import Data.Aeson (Value, decode)
-import Data.Aeson.Diff (diff)
 import Data.ByteString.Lazy (ByteString)
 
 -- | Compare two responses for semantic equality.
@@ -33,4 +32,4 @@ compareBodies (Just bodyA) (Just bodyB) =
         (Just jsonA, Just jsonB) ->
             if jsonA == jsonB
                 then Match
-                else BodyMismatch (diff jsonA jsonB)
+                else BodyMismatch "JSON bodies differ"

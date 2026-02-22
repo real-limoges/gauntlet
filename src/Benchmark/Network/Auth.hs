@@ -18,7 +18,10 @@ readToken path = do
     Right raw -> Right (T.strip raw)
 
 -- | Prepend an @Authorization: Bearer <token>@ header to an endpoint.
+-- No-ops when the token is empty (no auth file configured).
 addAuth :: Text -> Endpoint -> Endpoint
-addAuth token ep =
-  let authHeader = ("Authorization", "Bearer " <> token)
-   in ep {headers = authHeader : headers ep}
+addAuth token ep
+  | T.null token = ep
+  | otherwise =
+      let authHeader = ("Authorization", "Bearer " <> token)
+       in ep {headers = authHeader : headers ep}

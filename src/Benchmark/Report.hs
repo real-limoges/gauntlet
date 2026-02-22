@@ -91,9 +91,8 @@ printFailure (ep, res) = do
         Match -> return ()
         StatusMismatch a b -> printf "  Status Mismatch: Expected %d, Got %d\n" a b
         InvalidJSON err -> printf "  JSON Error: %s\n" err
-        BodyMismatch p -> do
-            putStrLn "Body Mismatch (JSON Patch):"
-            LBS8.putStrLn (encode p)
+        BodyMismatch msg ->
+            printf "  Body Mismatch: %s\n" (T.unpack msg)
     putStrLn ""
 
 printStats :: BenchmarkStats -> IO ()

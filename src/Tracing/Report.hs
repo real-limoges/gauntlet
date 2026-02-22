@@ -47,10 +47,7 @@ printSpanTable aggs = do
             ("P95" :: String)
             ("P99" :: String)
     putStrLn $ replicate 120 '-'
-    case sorted_aggs of
-        (_ : xs) ->
-            mapM_ (putStrLn . formatSpanRow) (take 20 xs)
-        [] -> return ()
+    mapM_ (putStrLn . formatSpanRow) (take 20 sorted_aggs)
 
 formatSpanRow :: SpanAggregation -> String
 formatSpanRow SpanAggregation{..} =

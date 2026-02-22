@@ -38,8 +38,8 @@ computeAggregation (name, spanList) =
             , aggP50Ms = Milliseconds $ Stats.percentileList 0.50 sorted
             , aggP95Ms = Milliseconds $ Stats.percentileList 0.95 sorted
             , aggP99Ms = Milliseconds $ Stats.percentileList 0.99 sorted
-            , aggMinMs = Milliseconds $ minimum sorted
-            , aggMaxMs = Milliseconds $ maximum sorted
+            , aggMinMs = Milliseconds $ head sorted
+            , aggMaxMs = Milliseconds $ last sorted
             }
   where
     unMs (Milliseconds x) = x

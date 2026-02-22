@@ -47,7 +47,9 @@ percentiles samples =
 
 -- | Generate KDE plot comparing two distributions.
 plotDistributions :: [Double] -> [Double] -> FilePath -> IO ()
-plotDistributions primary candidate outFile = do
+plotDistributions primary candidate outFile
+  | null primary || null candidate = return ()
+  | otherwise = do
   let primaryVec = V.fromList primary
   let candidateVec = V.fromList candidate
   let primaryKDE = kde primaryVec 200

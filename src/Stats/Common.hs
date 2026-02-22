@@ -50,17 +50,7 @@ percentileSorted p sorted
 Assumes the input list is already sorted.
 -}
 percentileList :: Double -> [Double] -> Double
-percentileList _ [] = 0
-percentileList _ [x] = x
-percentileList p sorted =
-    let n = length sorted
-        idx = p * fromIntegral (n - 1)
-        lower = floor idx
-        upper = ceiling idx
-        frac = idx - fromIntegral lower
-     in if lower == upper
-            then sorted !! lower
-            else (sorted !! lower) * (1 - frac) + (sorted !! upper) * frac
+percentileList p sorted = percentileSorted p (V.fromList sorted)
 
 -- | Sample standard deviation for a vector.
 stdDev :: V.Vector Double -> Double

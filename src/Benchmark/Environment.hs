@@ -10,8 +10,9 @@ module Benchmark.Environment (
     waitForHealth,
 ) where
 
-import Benchmark.Types (PerfTestError (..))
+import Benchmark.Types (PerfTestError (..), Settings (..))
 import Control.Concurrent (threadDelay)
+import Data.Maybe (fromMaybe)
 import Control.Exception (IOException, SomeException, try)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Text (Text)
@@ -27,11 +28,11 @@ import System.Process (proc, readCreateProcessWithExitCode)
 Uses 'proc' instead of shell strings to prevent shell injection attacks
 from malicious branch names containing metacharacters.
 -}
-setupEnvironment :: Text -> Text -> IO (Either PerfTestError ())
-setupEnvironment branch serviceName = do
-    putStrLn $ "Running setup: " ++ T.unpack branch
+setupEnvironment :: Settings -> Text -> Text -> IO (Either PerfTestError ())
+setupEnvironment setts branch serviceName = do
+    let hcPath = fromMaybe "/health" (healthCheckPath setts)
+        hcTimeout = fromMaybe 60 (healthCheckTimeout setts)
 
-    -- Step 1: Switch git branch (using proc to avoid shell injection)
     gitResult <-
         try (readCreateProcessWithExitCode (proc "git" ["switch", T.unpack branch]) "") ::
             IO (Either IOException (ExitCode, String, String))
@@ -42,7 +43,6 @@ setupEnvironment branch serviceName = do
         Right (ExitFailure _, _, gitStderr) ->
             return $ Left $ EnvironmentSetupError $ "git switch " ++ T.unpack branch ++ " failed: " ++ trim gitStderr
         Right (ExitSuccess, _, _) -> do
-            -- Step 2: Start Docker containers
             dockerResult <-
                 try (readCreateProcessWithExitCode (proc "docker-compose" ["up", "-d", "--build"]) "") ::
                     IO (Either IOException (ExitCode, String, String))
@@ -54,11 +54,7 @@ setupEnvironment branch serviceName = do
                     return $ Left $ EnvironmentSetupError $ "docker-compose up failed: " ++ trim dockerStderr
                 Right (ExitSuccess, _, _) -> do
                     mgr <- newManager tlsManagerSettings
-                    waitForHealth mgr (serviceName <> "/health") 60
-
--- | Strip leading/trailing whitespace from a string.
-trim :: String -> String
-trim = reverse . dropWhile (== '\n') . reverse . dropWhile (== '\n')
+                    waitForHealth mgr (serviceName <> hcPath) hcTimeout
 
 -- | Poll health endpoint until successful or max retries reached.
 waitForHealth :: Manager -> Text -> Int -> IO (Either PerfTestError ())
@@ -68,16 +64,19 @@ waitForHealth mgr url maxRetries = loop 0
         | count >= maxRetries =
             return $ Left (HealthCheckTimeout url maxRetries)
         | otherwise = do
-            putStr "."
             result <-
                 try (parseRequest (T.unpack url) >>= \req -> httpLbs req mgr) ::
                     IO (Either SomeException (Response LBS.ByteString))
 
             case result of
                 Right resp
-                    | Status.statusCode (responseStatus resp) == 200 -> do
-                        putStrLn "\nService is Up ..."
+                    | Status.statusCode (responseStatus resp) == 200 ->
                         return $ Right ()
                 _ -> do
                     threadDelay 1_000_000
                     loop (count + 1)
+
+trim :: String -> String
+trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
+  where
+    isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'

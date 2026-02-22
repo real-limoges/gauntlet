@@ -39,8 +39,8 @@ runMultiple :: BaselineMode -> TestConfig -> IO RunResult
 runMultiple baselineMode cfg = do
   (csvFile, timestamp) <- initOutputFiles
 
-  let epsCandidate = buildEndpoints cfg False
-      epsPrimary = buildEndpoints cfg True
+  let epsCandidate = buildEndpoints cfg True
+      epsPrimary = buildEndpoints cfg False
       setts = settings cfg
 
   case (epsCandidate, epsPrimary) of
@@ -60,10 +60,14 @@ runMultiple baselineMode cfg = do
         (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
           startNs <- getNowNs
 
-          setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
+          emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
+          setupOrFail setts (candidate $ git cfg) (candidate $ targets cfg)
+          emitEvent (Just eventChan) (StatusMessage $ "Running candidate: " <> candidate (targets cfg))
           (resultsCandidate, validCandidate) <- benchmarkEndpoints ctx "candidate" epsCandidate
 
-          setupOrFail (primary $ git cfg) (primary $ targets cfg)
+          emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> primary (git cfg) <> "...")
+          setupOrFail setts (primary $ git cfg) (primary $ targets cfg)
+          emitEvent (Just eventChan) (StatusMessage $ "Running primary: " <> primary (targets cfg))
           (resultsPrimary, validPrimary) <- benchmarkEndpoints ctx "primary" epsPrimary
 
           endNs <- getNowNs
@@ -95,7 +99,7 @@ runSingle :: BaselineMode -> TestConfig -> IO RunResult
 runSingle baselineMode cfg = do
   (csvFile, timestamp) <- initOutputFiles
 
-  let eps = buildEndpoints cfg False
+  let eps = buildEndpoints cfg True
       setts = settings cfg
       targetUrl = candidate $ targets cfg
 
@@ -110,7 +114,9 @@ runSingle baselineMode cfg = do
   benchmarkWork <- async $
     (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
       startNs <- getNowNs
-      setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
+      emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
+      setupOrFail setts (candidate $ git cfg) (candidate $ targets cfg)
+      emitEvent (Just eventChan) (StatusMessage $ "Running: " <> targetUrl)
       (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
       endNs <- getNowNs
 
