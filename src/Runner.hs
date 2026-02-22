@@ -51,10 +51,11 @@ runMultiple baselineMode cfg = do
         _ -> do
             eventChan <- newTChanIO
 
-            let totalRequests = iterations setts * (length epsCandidate + length epsPrimary)
+            let candidateTotal = iterations setts * length epsCandidate
+                primaryTotal = iterations setts * length epsPrimary
                 numEndpoints = length epsCandidate + length epsPrimary
                 targetUrl = candidate (targets cfg) <> " vs " <> primary (targets cfg)
-                tuiState = initialState targetUrl totalRequests numEndpoints
+                tuiState = initialState targetUrl candidateTotal numEndpoints
 
             ctx <- initContext setts csvFile timestamp (Just eventChan) (candidate (targets cfg))
 
@@ -69,6 +70,7 @@ runMultiple baselineMode cfg = do
 
                     emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> primary (git cfg) <> "...")
                     setupOrFail setts (primary $ git cfg) (primary $ targets cfg)
+                    emitEvent (Just eventChan) (PhaseStarted primaryTotal)
                     emitEvent (Just eventChan) (StatusMessage $ "Running " <> primary (targets cfg) <> " (" <> primary (git cfg) <> ")")
                     (resultsPrimary, validPrimary) <- benchmarkEndpoints ctx "primary" epsPrimary
 

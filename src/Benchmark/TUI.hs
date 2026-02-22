@@ -5,7 +5,8 @@ module Benchmark.TUI (
     initialState,
 ) where
 
-import Benchmark.TUI.State
+import Benchmark.TUI.State (RollingStats (..))
+import Benchmark.TUI.State hiding (RollingStats (..))
 import Benchmark.TUI.Widgets
 import Brick
 import Brick.BChan (BChan, newBChan, writeBChan)
@@ -16,6 +17,7 @@ import Control.Concurrent.STM
 import Control.Exception (SomeException, bracket, try)
 import Control.Monad (forever, unless)
 import Control.Monad.IO.Class (liftIO)
+import Data.Foldable (toList)
 import Data.Sequence qualified as Seq
 import Data.Text qualified as T
 import Data.Time (diffUTCTime, getCurrentTime)
@@ -45,7 +47,7 @@ drawUI state = [borderWithLabel title (vBox sections)]
         , hBorder
         , statsSection state
         , hBorder
-        , histogramSection state
+        , hBox [histogramSection state, latencyChartSection state]
         , hBorder
         , errorsSection state
         , hBorder
@@ -125,6 +127,35 @@ histogramSection state =
         histogram (zip labels (state ^. tsBuckets))
   where
     labels = ["<5s", "<7.5s", "<10s", "<12.5s", "<15s", ">15s"]
+
+latencyChartSection :: TUIState -> Widget Name
+latencyChartSection state =
+    borderWithLabel (withAttr (attrName "label") $ txt " Latency Trend ") $
+        padLeftRight 1 $
+            if Seq.null (state ^. tsLatencyHistory)
+                then withAttr (attrName "dim") $ txt "Waiting for data..."
+                else
+                    let history = reverse $ toList (state ^. tsLatencyHistory)
+                        p99s = map _rsP99Ms history
+                        p50s = map _rsP50Ms history
+                        maxVal = maximum (p99s ++ p50s)
+                     in vBox
+                            [ sparkRow "P99 " (attrName "err") maxVal p99s
+                            , sparkRow "P50 " (attrName "hi") maxVal p50s
+                            ]
+  where
+    sparkRow label attr maxVal values =
+        hBox
+            [ withAttr (attrName "label") $ txt (label <> " ")
+            , withAttr attr $ txt (mkSparkline maxVal values)
+            ]
+    mkSparkline maxVal values =
+        let blocks = "▁▂▃▄▅▆▇█"
+            nLevels = 7
+            toChar v
+                | maxVal <= 0 = '▁'
+                | otherwise = T.index blocks $ min nLevels $ round (v / maxVal * fromIntegral nLevels)
+         in T.pack $ map toChar values
 
 errorsSection :: TUIState -> Widget Name
 errorsSection state =
