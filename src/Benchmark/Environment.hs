@@ -12,7 +12,7 @@ module Benchmark.Environment (
 
 import Benchmark.Types (PerfTestError (..))
 import Control.Concurrent (threadDelay)
-import Control.Exception (SomeException, try)
+import Control.Exception (IOException, SomeException, try)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -32,27 +32,33 @@ setupEnvironment branch serviceName = do
     putStrLn $ "Running setup: " ++ T.unpack branch
 
     -- Step 1: Switch git branch (using proc to avoid shell injection)
-    (gitExit, _, gitStderr) <-
-        readCreateProcessWithExitCode
-            (proc "git" ["switch", T.unpack branch])
-            ""
+    gitResult <-
+        try (readCreateProcessWithExitCode (proc "git" ["switch", T.unpack branch]) "") ::
+            IO (Either IOException (ExitCode, String, String))
 
-    case gitExit of
-        ExitFailure _ ->
-            return $ Left $ EnvironmentSetupError $ "Git switch failed: " ++ gitStderr
-        ExitSuccess -> do
+    case gitResult of
+        Left ex ->
+            return $ Left $ EnvironmentSetupError $ "Could not run git: " ++ show ex
+        Right (ExitFailure _, _, gitStderr) ->
+            return $ Left $ EnvironmentSetupError $ "git switch " ++ T.unpack branch ++ " failed: " ++ trim gitStderr
+        Right (ExitSuccess, _, _) -> do
             -- Step 2: Start Docker containers
-            (dockerExit, _, dockerStderr) <-
-                readCreateProcessWithExitCode
-                    (proc "docker-compose" ["up", "-d", "--build"])
-                    ""
+            dockerResult <-
+                try (readCreateProcessWithExitCode (proc "docker-compose" ["up", "-d", "--build"]) "") ::
+                    IO (Either IOException (ExitCode, String, String))
 
-            case dockerExit of
-                ExitFailure _ ->
-                    return $ Left $ EnvironmentSetupError $ "Docker compose failed: " ++ dockerStderr
-                ExitSuccess -> do
+            case dockerResult of
+                Left ex ->
+                    return $ Left $ EnvironmentSetupError $ "Could not run docker-compose: " ++ show ex ++ "\nIs docker-compose installed and in your PATH?"
+                Right (ExitFailure _, _, dockerStderr) ->
+                    return $ Left $ EnvironmentSetupError $ "docker-compose up failed: " ++ trim dockerStderr
+                Right (ExitSuccess, _, _) -> do
                     mgr <- newManager tlsManagerSettings
                     waitForHealth mgr (serviceName <> "/health") 60
+
+-- | Strip leading/trailing whitespace from a string.
+trim :: String -> String
+trim = reverse . dropWhile (== '\n') . reverse . dropWhile (== '\n')
 
 -- | Poll health endpoint until successful or max retries reached.
 waitForHealth :: Manager -> Text -> Int -> IO (Either PerfTestError ())

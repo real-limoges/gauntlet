@@ -24,9 +24,9 @@ import Benchmark.Types
     Targets (..),
     exitWithError,
   )
-import Control.Concurrent (forkIO)
+import Control.Concurrent.Async (async, wait)
+import Control.Exception (onException)
 import Data.Text qualified as T
-import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM (newTChanIO)
 import Runner.Baseline (handleBaseline)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
@@ -56,25 +56,24 @@ runMultiple baselineMode cfg = do
 
       ctx <- initContext setts csvFile timestamp (Just eventChan) (candidate (targets cfg))
 
-      resultVar <- newEmptyMVar
+      benchmarkWork <- async $
+        (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
+          startNs <- getNowNs
 
-      _ <- forkIO $ do
-        startNs <- getNowNs
+          setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
+          (resultsCandidate, validCandidate) <- benchmarkEndpoints ctx "candidate" epsCandidate
 
-        setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
-        (resultsCandidate, validCandidate) <- benchmarkEndpoints ctx "candidate" epsCandidate
+          setupOrFail (primary $ git cfg) (primary $ targets cfg)
+          (resultsPrimary, validPrimary) <- benchmarkEndpoints ctx "primary" epsPrimary
 
-        setupOrFail (primary $ git cfg) (primary $ targets cfg)
-        (resultsPrimary, validPrimary) <- benchmarkEndpoints ctx "primary" epsPrimary
+          endNs <- getNowNs
 
-        endNs <- getNowNs
-
-        emitEvent (Just eventChan) BenchmarkFinished
-        putMVar resultVar (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs)
+          emitEvent (Just eventChan) BenchmarkFinished
+          return (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs)
 
       _ <- runTUI eventChan tuiState
 
-      (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs) <- takeMVar resultVar
+      (resultsCandidate, validCandidate, resultsPrimary, validPrimary, startNs, endNs) <- wait benchmarkWork
 
       let statsCandidate = calculateStats resultsCandidate
           statsPrimary = calculateStats resultsPrimary
@@ -108,20 +107,19 @@ runSingle baselineMode cfg = do
 
   ctx <- initContext setts csvFile timestamp (Just eventChan) targetUrl
 
-  resultVar <- newEmptyMVar
+  benchmarkWork <- async $
+    (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
+      startNs <- getNowNs
+      setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
+      (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
+      endNs <- getNowNs
 
-  _ <- forkIO $ do
-    startNs <- getNowNs
-    setupOrFail (candidate $ git cfg) (candidate $ targets cfg)
-    (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
-    endNs <- getNowNs
-
-    emitEvent (Just eventChan) BenchmarkFinished
-    putMVar resultVar (results, validSummaries, startNs, endNs)
+      emitEvent (Just eventChan) BenchmarkFinished
+      return (results, validSummaries, startNs, endNs)
 
   _ <- runTUI eventChan tuiState
 
-  (results, validSummaries, startNs, endNs) <- takeMVar resultVar
+  (results, validSummaries, startNs, endNs) <- wait benchmarkWork
 
   let stats = calculateStats results
 
