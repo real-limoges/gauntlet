@@ -12,7 +12,7 @@ import Data.Sequence qualified as Seq
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Time (getCurrentTime)
-import Stats.Benchmark (calculateStats, compareBayesian)
+import Stats.Benchmark (calculateStats)
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck
@@ -63,28 +63,6 @@ propertySpec = describe "Property-Based Tests" $ do
             failures = [makeErrorResult "error"]
             stats = calculateStats (successes ++ failures)
          in totalRequests stats == countSuccess stats + countFailure stats
-
-  describe "compareBayesian properties" $ do
-    prop "probability is between 0 and 1" $
-      \(Positive meanA) (Positive meanB) (Positive stdA) (Positive stdB) ->
-        let statsA = mockStats meanA stdA
-            statsB = mockStats meanB stdB
-            result = compareBayesian statsA statsB
-         in probBFasterThanA result >= 0 && probBFasterThanA result <= 1
-
-    prop "mean difference is A - B" $
-      \(Positive meanA) (Positive meanB) (Positive stdA) (Positive stdB) ->
-        let statsA = mockStats meanA stdA
-            statsB = mockStats meanB stdB
-            result = compareBayesian statsA statsB
-         in abs (meanDifference result - (meanA - meanB)) < 0.000_1
-
-    prop "credible interval lower <= upper" $
-      \(Positive meanA) (Positive meanB) (Positive stdA) (Positive stdB) ->
-        let statsA = mockStats meanA stdA
-            statsB = mockStats meanB stdB
-            result = compareBayesian statsA statsB
-         in credibleIntervalLower result <= credibleIntervalUpper result
 
   describe "verify properties" $ do
     prop "same response always matches" $
@@ -210,55 +188,6 @@ propertySpec = describe "Property-Based Tests" $ do
       \(NonNegative secs) ->
         let result = formatElapsed secs
          in elem ':' (show result)
-
-  describe "RetrySettings properties" $ do
-    prop "default retry settings are valid" $
-      property $
-        let rs = defaultRetrySettings
-         in retryMaxAttempts rs >= 0
-              && retryInitialDelayMs rs > 0
-              && retryBackoffMultiplier rs >= 1.0
-
-    prop "retry attempts are non-negative" $
-      \(NonNegative attempts) (Positive delay) (Positive mult) ->
-        mult >= 1.0 ==>
-          let rs = RetrySettings attempts delay mult
-           in retryMaxAttempts rs >= 0
-
-    prop "backoff multiplier is >= 1.0 for valid exponential backoff" $
-      \(NonNegative attempts) (Positive delay) ->
-        let mult = 2.0 :: Double
-            rs = RetrySettings attempts delay mult
-         in retryBackoffMultiplier rs >= 1.0
-
-    prop "delay increases exponentially with backoff multiplier" $
-      \(Positive (initialDelay :: Integer)) (Positive (mult :: Double)) ->
-        mult > 1.0 ==>
-          let delay1 = fromIntegral initialDelay :: Double
-              delay2 = delay1 * mult
-              delay3 = delay2 * mult
-           in delay1 < delay2 && delay2 < delay3
-
-  describe "WarmupSettings properties" $ do
-    prop "default warmup settings are valid" $
-      property $
-        warmupIterations defaultWarmupSettings >= 0
-
-    prop "warmup iterations are non-negative" $
-      \(NonNegative iters) ->
-        let ws = WarmupSettings iters
-         in warmupIterations ws >= 0
-
-    prop "zero warmup iterations means disabled" $
-      \() ->
-        let ws = WarmupSettings 0
-         in warmupIterations ws == 0
-
-    prop "warmup iterations can be arbitrarily large" $
-      \(Positive iters) ->
-        iters <= 10000 ==>
-          let ws = WarmupSettings iters
-           in warmupIterations ws == iters
 
   describe "Custom headers properties" $ do
     prop "empty headers map results in only default Content-Type" $

@@ -1,6 +1,6 @@
 module BayesianSpec (bayesianSpec) where
 
-import Benchmark.Types (BayesianComparison (..))
+import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..))
 import Stats.Benchmark (compareBayesian)
 import Test.Hspec
 import TestHelpers
@@ -57,3 +57,17 @@ bayesianSpec = describe "Bayesian Comparison" $ do
             let statsB = mockStats 80.0 5.0
             let result = compareBayesian statsA statsB
             relativeEffect result `shouldBe` 20.0
+
+        it "returns finite results when both sides have zero successful requests" $ do
+            let zeroCount = (mockStats 100.0 10.0){countSuccess = 0}
+            let result = compareBayesian zeroCount zeroCount
+            probBFasterThanA result `shouldSatisfy` (\p -> not (isNaN p) && not (isInfinite p))
+            probBFasterThanA result `shouldBe` 0.5
+
+        it "returns finite results when one side has zero successful requests" $ do
+            let statsA = mockStats 100.0 10.0
+            let zeroCount = (mockStats 50.0 5.0){countSuccess = 0}
+            let result = compareBayesian statsA zeroCount
+            probBFasterThanA result `shouldSatisfy` (\p -> not (isNaN p) && not (isInfinite p))
+            credibleIntervalLower result `shouldSatisfy` (not . isNaN)
+            credibleIntervalUpper result `shouldSatisfy` (not . isNaN)

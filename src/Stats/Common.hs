@@ -8,6 +8,7 @@ Common statistical functions used by both benchmark analysis and trace analysis.
 module Stats.Common (
     -- * Descriptive Statistics
     percentile,
+    percentileSorted,
     percentileList,
     stdDev,
     stdDevList,
@@ -25,9 +26,18 @@ percentile :: Double -> V.Vector Double -> Double
 percentile p vec
     | V.null vec = 0
     | V.length vec == 1 = V.head vec
+    | otherwise = percentileSorted p (V.modify VA.sort vec)
+
+{- | Like 'percentile' but assumes the input vector is already sorted.
+Skips the sort step — use this when computing multiple percentiles from
+the same pre-sorted vector.
+-}
+percentileSorted :: Double -> V.Vector Double -> Double
+percentileSorted p sorted
+    | V.null sorted = 0
+    | V.length sorted == 1 = V.head sorted
     | otherwise =
-        let sorted = V.modify VA.sort vec
-            n = V.length sorted
+        let n = V.length sorted
             idx = p * fromIntegral (n - 1)
             lower = floor idx
             upper = ceiling idx
@@ -70,11 +80,11 @@ variance vec
             sumSq = V.sum $ V.map (\x -> (x - avg) ** 2) vec
          in sumSq / fromIntegral (n - 1) -- Sample variance (n-1)
 
--- | Population variance for a list, given the precomputed mean.
+-- | Sample variance for a list, given the precomputed mean.
 varianceList :: Double -> [Double] -> Double
 varianceList _ [] = 0
 varianceList _ [_] = 0
 varianceList avg xs =
     let n = length xs
         sumSq = sum $ map (\x -> (x - avg) ** 2) xs
-     in sumSq / fromIntegral n -- Population variance (n) for consistency with original
+     in sumSq / fromIntegral (n - 1) -- Sample variance (n-1)

@@ -42,13 +42,6 @@ module Benchmark.Types
     LogLevel (..),
     defaultLogLevel,
 
-    -- * Output Format
-    OutputFormat (..),
-    BenchmarkOutput (..),
-    OutputConfig (..),
-    PayloadResult (..),
-    TraceOutput (..),
-
     -- * Baseline / CI
     Baseline (..),
     RegressionThresholds (..),
@@ -388,61 +381,6 @@ instance FromJSON PayloadSpec where
             "specValidate" -> "validate"
             _ -> x
         }
-
--- | Output format for benchmark results.
-data OutputFormat
-  = OutputTerminal
-  | OutputJSON
-  deriving stock (Show, Eq)
-
--- | Complete benchmark output for JSON serialization.
-data BenchmarkOutput = BenchmarkOutput
-  { outputTimestamp :: Text,
-    outputConfig :: OutputConfig,
-    outputResults :: [PayloadResult],
-    outputTracing :: Maybe TraceOutput
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (ToJSON)
-
--- | Simplified config info for output.
-data OutputConfig = OutputConfig
-  { outIterations :: Int,
-    outConcurrency :: Int
-  }
-  deriving stock (Show, Eq, Generic)
-
-instance ToJSON OutputConfig where
-  toJSON cfg =
-    object
-      [ "iterations" .= outIterations cfg,
-        "concurrency" .= outConcurrency cfg
-      ]
-
--- | Result for a single payload (or A/B comparison).
-data PayloadResult = PayloadResult
-  { prPayload :: Text,
-    prPrimary :: Maybe BenchmarkStats,
-    prCandidate :: Maybe BenchmarkStats,
-    prComparison :: Maybe BayesianComparison
-  }
-  deriving stock (Show, Eq, Generic)
-
-instance ToJSON PayloadResult where
-  toJSON pr =
-    object $
-      ["payload" .= prPayload pr]
-        ++ maybe [] (\s -> ["primary" .= s]) (prPrimary pr)
-        ++ maybe [] (\s -> ["candidate" .= s]) (prCandidate pr)
-        ++ maybe [] (\c -> ["comparison" .= c]) (prComparison pr)
-
--- | Trace analysis output.
-data TraceOutput = TraceOutput
-  { traceCount :: Int,
-    traceSpanAggregations :: Value
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (ToJSON)
 
 -- | Saved baseline for regression comparison.
 data Baseline = Baseline

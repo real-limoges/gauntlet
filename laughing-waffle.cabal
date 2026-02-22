@@ -20,6 +20,11 @@ library
   exposed-modules:        Lib
                           Log
                           Runner
+                          Runner.Baseline
+                          Runner.Context
+                          Runner.Loop
+                          Runner.Tracing
+                          Runner.Warmup
                           VerifyRunner
                           Stats.Common
                           Stats.Benchmark
@@ -30,6 +35,10 @@ library
                           Benchmark.Environment
                           Benchmark.HTTP2
                           Benchmark.Network
+                          Benchmark.Network.Auth
+                          Benchmark.Network.Exec
+                          Benchmark.Network.Pool
+                          Benchmark.Network.Request
                           Benchmark.Output
                           Benchmark.Plotting
                           Benchmark.Report
@@ -110,6 +119,7 @@ test-suite            laughing-waffle-test
                     , ConfigSpec
                     , Integration
                     , MockServer
+                    , NetworkSpec
                     , PropertySpec
                     , StatsSpec
                     , TestHelpers
@@ -133,5 +143,6 @@ test-suite            laughing-waffle-test
                       laughing-waffle,
                       text,
                       time,
+                      vector,
                       wai,
                       warp

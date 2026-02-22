@@ -6,6 +6,7 @@ import BaselineSpec (baselineSpec)
 import BayesianSpec (bayesianSpec)
 import ConfigSpec (configSpec)
 import Integration (integrationSpec)
+import NetworkSpec (networkSpec)
 import PropertySpec (propertySpec)
 import StatsSpec (statsSpec)
 import TracingSpec (tracingSpec)
@@ -17,6 +18,7 @@ main :: IO ()
 main = hspec $ do
     statsSpec
     bayesianSpec
+    networkSpec
     verifySpec
     validationSpec
     configSpec

@@ -175,7 +175,7 @@ tuiApp =
 -- | Run the TUI with events from a TChan
 runTUI :: TChan BenchmarkEvent -> TUIState -> IO TUIState
 runTUI eventChan initialSt = do
-    brickChan <- newBChan 100
+    brickChan <- newBChan 1000
 
     -- Fork a thread to forward events from TChan to Brick
     void $ forkIO $ forever $ do

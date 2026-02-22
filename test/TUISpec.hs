@@ -3,6 +3,7 @@ module TUISpec (tuiStateSpec, tuiWidgetsSpec) where
 import Benchmark.TUI.State
 import Benchmark.TUI.Widgets
 import Benchmark.Types (Nanoseconds (..))
+import Control.Monad (forM_)
 import Data.Sequence qualified as Seq
 import Data.Time (addUTCTime, getCurrentTime)
 import Test.Hspec
@@ -10,33 +11,21 @@ import Test.Hspec
 tuiStateSpec :: Spec
 tuiStateSpec = describe "Benchmark.TUI.State" $ do
     describe "initialState" $ do
-        it "creates state with correct target" $ do
+        it "creates state with correct target, totals, and zeroed counters" $ do
             let state = initialState "http://test.com" 100 5
             _tsTarget state `shouldBe` "http://test.com"
-
-        it "creates state with correct totals" $ do
-            let state = initialState "http://test.com" 100 5
             _tsIsTotal state `shouldBe` 100
             _tsTotalEndpoints state `shouldBe` 5
-
-        it "starts with zero completed" $ do
-            let state = initialState "http://test.com" 100 5
             _tsCompleted state `shouldBe` 0
             _tsSuccessCount state `shouldBe` 0
             _tsErrorCount state `shouldBe` 0
+            _tsBuckets state `shouldBe` [0, 0, 0, 0, 0, 0]
+            _tsFinished state `shouldBe` False
 
-        it "starts with empty rolling stats" $ do
+        it "starts with empty rolling stats and durations" $ do
             let state = initialState "http://test.com" 100 5
             _tsRollingStats state `shouldBe` Nothing
             Seq.null (_tsRecentDurations state) `shouldBe` True
-
-        it "starts with zeroed buckets" $ do
-            let state = initialState "http://test.com" 100 5
-            _tsBuckets state `shouldBe` [0, 0, 0, 0, 0, 0]
-
-        it "starts not finished" $ do
-            let state = initialState "http://test.com" 100 5
-            _tsFinished state `shouldBe` False
 
     describe "updateState with RequestCompleted" $ do
         it "increments completed count" $ do
@@ -46,37 +35,15 @@ tuiStateSpec = describe "Benchmark.TUI.State" $ do
                 newState = updateState now event state
             _tsCompleted newState `shouldBe` 1
 
-        it "increments success count for 2xx" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 50_000_000) 200
-                newState = updateState now event state
-            _tsSuccessCount newState `shouldBe` 1
-            _tsErrorCount newState `shouldBe` 0
-
-        it "increments success count for 3xx" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 50_000_000) 301
-                newState = updateState now event state
-            _tsSuccessCount newState `shouldBe` 1
-            _tsErrorCount newState `shouldBe` 0
-
-        it "increments error count for 4xx" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 50_000_000) 404
-                newState = updateState now event state
-            _tsSuccessCount newState `shouldBe` 0
-            _tsErrorCount newState `shouldBe` 1
-
-        it "increments error count for 5xx" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 50_000_000) 500
-                newState = updateState now event state
-            _tsSuccessCount newState `shouldBe` 0
-            _tsErrorCount newState `shouldBe` 1
+        forM_ [(200, 1, 0), (301, 1, 0), (404, 0, 1), (500, 0, 1)] $
+          \(code, expSuccess, expError) ->
+            it ("categorizes status " ++ show (code :: Int) ++ " correctly") $ do
+                now <- getCurrentTime
+                let state = initialState "http://test.com" 100 5
+                    event = RequestCompleted (Nanoseconds 50_000_000) code
+                    newState = updateState now event state
+                _tsSuccessCount newState `shouldBe` expSuccess
+                _tsErrorCount newState `shouldBe` expError
 
         it "updates rolling stats" $ do
             now <- getCurrentTime

@@ -8,6 +8,7 @@
 module Log
   ( Logger,
     makeLogger,
+    logAt,
     logDebug,
     logInfo,
     logWarning,
@@ -63,26 +64,14 @@ withTimestamp level msg = do
   time <- getCurrentTime
   return (level, time, msg)
 
--- | Log at debug level
-logDebug :: Logger -> Text -> IO ()
-logDebug logger msg = do
-  entry <- withTimestamp Debug msg
+-- | Log at a given level
+logAt :: LogLevel -> Logger -> Text -> IO ()
+logAt level logger msg = do
+  entry <- withTimestamp level msg
   unLogAction (logAction logger) entry
 
--- | Log at info level
-logInfo :: Logger -> Text -> IO ()
-logInfo logger msg = do
-  entry <- withTimestamp Info msg
-  unLogAction (logAction logger) entry
-
--- | Log at warning level
-logWarning :: Logger -> Text -> IO ()
-logWarning logger msg = do
-  entry <- withTimestamp Warning msg
-  unLogAction (logAction logger) entry
-
--- | Log at error level
-logError :: Logger -> Text -> IO ()
-logError logger msg = do
-  entry <- withTimestamp Error msg
-  unLogAction (logAction logger) entry
+logDebug, logInfo, logWarning, logError :: Logger -> Text -> IO ()
+logDebug = logAt Debug
+logInfo = logAt Info
+logWarning = logAt Warning
+logError = logAt Error

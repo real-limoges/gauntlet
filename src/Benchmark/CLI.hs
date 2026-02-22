@@ -12,7 +12,6 @@ module Benchmark.CLI (
 )
 where
 
-import Benchmark.Types (OutputFormat (..))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Options.Applicative
@@ -29,12 +28,10 @@ data BaselineMode
 data Command
     = BenchmarkMultiple
         { configPath :: FilePath
-        , outputFormat :: OutputFormat
         , baselineMode :: BaselineMode
         }
     | BenchmarkSingle
         { configPath :: FilePath
-        , outputFormat :: OutputFormat
         , baselineMode :: BaselineMode
         }
     | Verify {configPath :: FilePath}
@@ -68,23 +65,6 @@ configOption =
             <> help "Path to the configuration file"
         )
 
-outputFormatOption :: Parser OutputFormat
-outputFormatOption =
-    option
-        readOutputFormat
-        ( long "output-format"
-            <> short 'o'
-            <> metavar "FORMAT"
-            <> value OutputTerminal
-            <> help "Output format: terminal (default) or json"
-        )
-
-readOutputFormat :: ReadM OutputFormat
-readOutputFormat = eitherReader $ \s -> case s of
-    "terminal" -> Right OutputTerminal
-    "json" -> Right OutputJSON
-    _ -> Left $ "Unknown output format: " ++ s ++ ". Use 'terminal' or 'json'."
-
 saveBaselineOption :: Parser (Maybe Text)
 saveBaselineOption =
     optional $
@@ -115,11 +95,11 @@ baselineModeParser = combineBaseline <$> saveBaselineOption <*> compareBaselineO
 
 benchmarkMultipleOptions :: Parser Command
 benchmarkMultipleOptions =
-    BenchmarkMultiple <$> configOption <*> outputFormatOption <*> baselineModeParser
+    BenchmarkMultiple <$> configOption <*> baselineModeParser
 
 benchmarkSingleOptions :: Parser Command
 benchmarkSingleOptions =
-    BenchmarkSingle <$> configOption <*> outputFormatOption <*> baselineModeParser
+    BenchmarkSingle <$> configOption <*> baselineModeParser
 
 verifyOptions :: Parser Command
 verifyOptions = Verify <$> configOption

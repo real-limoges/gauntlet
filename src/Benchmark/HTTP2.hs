@@ -24,6 +24,7 @@ module Benchmark.HTTP2
     initH2Connection,
     closeH2Connection,
     timedRequestH2,
+    parseHostPort,
   )
 where
 
@@ -46,6 +47,7 @@ import Data.CaseInsensitive (mk)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Text.Read (readMaybe)
 import Data.Text.Encoding (encodeUtf8)
 import Foreign.Marshal.Alloc (mallocBytes, free)
 import Network.HTTP.Types (RequestHeaders, Status)
@@ -296,7 +298,7 @@ parseHostPort rawUrl =
       (host, portPart) = T.breakOn ":" hostPort
    in if T.null portPart
         then (host, defaultPort rawUrl)
-        else (host, read (T.unpack (T.drop 1 portPart)))
+        else (host, maybe (defaultPort rawUrl) id (readMaybe (T.unpack (T.drop 1 portPart))))
 
 defaultPort :: Text -> Int
 defaultPort url
