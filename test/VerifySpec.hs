@@ -1,6 +1,6 @@
 module VerifySpec (verifySpec) where
 
-import Benchmark.Types (TestingResponse (..), Nanoseconds (..), VerificationResult (..))
+import Benchmark.Types (Nanoseconds (..), TestingResponse (..), VerificationResult (..))
 import Benchmark.Verify (verify)
 import Data.Aeson (encode)
 import Data.Map.Strict qualified as Map

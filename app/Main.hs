@@ -6,8 +6,9 @@ import Lib (run)
 import System.Exit (ExitCode (..))
 import System.IO (hFlush, hPutStrLn, stderr, stdout)
 
--- | Bypass GHC's normal shutdown which waits for finalizers and lingering
--- threads (e.g. http-client Manager reaper, HTTP/2 connection teardown).
+{- | Bypass GHC's normal shutdown which waits for finalizers and lingering
+threads (e.g. http-client Manager reaper, HTTP/2 connection teardown).
+-}
 foreign import ccall "exit" c_exit :: CInt -> IO ()
 
 main :: IO ()

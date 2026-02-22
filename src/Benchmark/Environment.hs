@@ -12,9 +12,9 @@ module Benchmark.Environment (
 
 import Benchmark.Types (PerfTestError (..), Settings (..))
 import Control.Concurrent (threadDelay)
-import Data.Maybe (fromMaybe)
 import Control.Exception (IOException, SomeException, try)
 import Data.ByteString.Lazy qualified as LBS
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Network.HTTP.Client (Manager, Response, httpLbs, newManager, parseRequest, responseStatus)
