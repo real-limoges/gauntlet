@@ -1,4 +1,4 @@
-# laughing-waffle
+# gauntlet
 
 **Statistically rigorous HTTP performance benchmarking with A/B testing and distributed tracing.**
 
@@ -91,8 +91,8 @@ sudo pacman -S ghc cabal-install
 ### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/laughing-waffle.git
-cd laughing-waffle
+git clone https://github.com/yourusername/gauntlet.git
+cd gauntlet
 
 # Build with optimizations
 cabal build -O2
@@ -132,7 +132,7 @@ Save as `config.json`.
 ### 2. Run the benchmark
 
 ```bash
-cabal run laughing-waffle-exe -- benchmark-multiple --config config.json
+cabal run gauntlet-exe -- benchmark-multiple --config config.json
 ```
 
 ### 3. View results
@@ -169,13 +169,13 @@ BAYESIAN COMPARISON
 
 ```bash
 # Run A/B comparison benchmark
-cabal run laughing-waffle-exe -- benchmark-multiple --config config.json
+cabal run gauntlet-exe -- benchmark-multiple --config config.json
 
 # Run single endpoint benchmark
-cabal run laughing-waffle-exe -- benchmark-single --config config.json
+cabal run gauntlet-exe -- benchmark-single --config config.json
 
 # Verify configuration and responses
-cabal run laughing-waffle-exe -- verify --config config.json
+cabal run gauntlet-exe -- verify --config config.json
 ```
 
 ### Command-Line Options
@@ -303,7 +303,7 @@ See [`examples/`](examples/) directory for complete configuration examples.
 
 ### Bayesian A/B Comparison
 
-Instead of traditional hypothesis testing (p-values), laughing-waffle uses **Bayesian inference** to provide direct probability statements:
+Instead of traditional hypothesis testing (p-values), gauntlet uses **Bayesian inference** to provide direct probability statements:
 
 - **"95% probability candidate is faster"** - Clear, interpretable results
 - **95% Credible Intervals** - Range of plausible mean differences
@@ -345,14 +345,14 @@ Instead of traditional hypothesis testing (p-values), laughing-waffle uses **Bay
 ### Example 1: Simple Health Check
 
 ```bash
-cabal run laughing-waffle-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/minimal.json
 ```
 
 ### Example 2: A/B API Comparison
 
 ```bash
-cabal run laughing-waffle-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/ab-comparison.json \
   -o json > results.json
 ```
@@ -361,12 +361,12 @@ cabal run laughing-waffle-exe -- benchmark-multiple \
 
 ```bash
 # Save baseline
-cabal run laughing-waffle-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/simple-benchmark.json \
   --save-baseline prod-baseline
 
 # Compare against baseline (fails with exit code 1 if regression detected)
-cabal run laughing-waffle-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/simple-benchmark.json \
   --compare-baseline prod-baseline \
   --regression-threshold 10  # Fail if >10% slower
@@ -379,7 +379,7 @@ cabal run laughing-waffle-exe -- benchmark-multiple \
 mkdir -p .secrets
 echo "Bearer your-token-here" > .secrets/token.txt
 
-cabal run laughing-waffle-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/api-with-auth.json
 ```
 
@@ -399,8 +399,8 @@ See [`examples/README.md`](examples/README.md) for more examples.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/laughing-waffle.git
-cd laughing-waffle
+git clone https://github.com/yourusername/gauntlet.git
+cd gauntlet
 
 # Install dependencies
 cabal build --only-dependencies
@@ -433,7 +433,7 @@ make format
 ### Project Structure
 
 ```
-laughing-waffle/
+gauntlet/
 ├── src/
 │   ├── Benchmark/          # HTTP benchmarking engine
 │   │   ├── Types.hs        # Core data types
@@ -549,7 +549,7 @@ performance-test:
   stage: test
   script:
     - cabal build
-    - cabal run laughing-waffle-exe -- benchmark-multiple \
+    - cabal run gauntlet-exe -- benchmark-multiple \
         --config config.json \
         --compare-baseline prod-baseline \
         --regression-threshold 10 \
@@ -583,7 +583,7 @@ jobs:
       - name: Run benchmark
         run: |
           cabal build
-          cabal run laughing-waffle-exe -- benchmark-multiple \
+          cabal run gauntlet-exe -- benchmark-multiple \
             --config config.json \
             --compare-baseline prod-baseline \
             --regression-threshold 10
@@ -648,7 +648,7 @@ Statistical methodology inspired by Bayesian Data Analysis (Gelman et al.) and p
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/laughing-waffle/issues)
+- **Issues**: [GitHub Issues](https://github.com/yourusername/gauntlet/issues)
 - **Documentation**: See [`docs/`](docs/) directory
 - **Examples**: See [`examples/`](examples/) directory
 

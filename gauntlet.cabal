@@ -1,5 +1,5 @@
 cabal-version: 3.12
-name:               laughing-waffle
+name:               gauntlet
 version:            0.1.0.0
 license:            NONE
 author:             Real Limoges
@@ -99,16 +99,16 @@ library
 common warnings
     ghc-options: -Wall -O2
 
-executable            laughing-waffle-exe
+executable            gauntlet-exe
   import:             warnings
   default-language:   GHC2024
   main-is:            Main.hs
   hs-source-dirs:     app
   build-depends:      base >= 4.20.0.0,
-                      laughing-waffle
+                      gauntlet
 
 
-test-suite            laughing-waffle-test
+test-suite            gauntlet-test
   import:             warnings, rts-properties
   type:               exitcode-stdio-1.0
   default-language:   GHC2024
@@ -140,7 +140,7 @@ test-suite            laughing-waffle-test
                       http-types,
                       network,
                       QuickCheck,
-                      laughing-waffle,
+                      gauntlet,
                       text,
                       time,
                       vector,
