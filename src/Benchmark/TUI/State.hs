@@ -28,6 +28,7 @@ module Benchmark.TUI.State (
     tsFinished,
     tsStatus,
     tsElapsedSecs,
+    tsLatencyHistory,
 
     -- * RollingStats lenses
     rsMeanMs,
@@ -58,6 +59,7 @@ data BenchmarkEvent
     | RequestFailed Text
     | EndpointStarted Text Int Int
     | StatusMessage Text
+    | PhaseStarted Int
     | BenchmarkFinished
     deriving (Show, Eq)
 
@@ -90,6 +92,7 @@ data TUIState = TUIState
     , _tsFinished :: Bool
     , _tsStatus :: Text
     , _tsElapsedSecs :: Double
+    , _tsLatencyHistory :: Seq RollingStats
     }
     deriving (Show, Eq)
 
@@ -114,6 +117,7 @@ initialState target total endpoints =
         , _tsFinished = False
         , _tsStatus = ""
         , _tsElapsedSecs = 0
+        , _tsLatencyHistory = Seq.empty
         }
 
 updateState :: UTCTime -> BenchmarkEvent -> TUIState -> TUIState
@@ -132,6 +136,7 @@ updateState now event state = case event of
                 , _tsRollingStats = Just newStats
                 , _tsBuckets = newBuckets
                 , _tsStartTime = _tsStartTime state <|> Just now
+                , _tsLatencyHistory = Seq.take 60 (newStats Seq.<| _tsLatencyHistory state)
                 }
     RequestFailed err ->
         let newErrors = addToRolling (now, err) (_tsRecentErrors state)
@@ -148,6 +153,19 @@ updateState now event state = case event of
             }
     StatusMessage msg ->
         state{_tsStatus = msg}
+    PhaseStarted total ->
+        state
+            { _tsCompleted = 0
+            , _tsIsTotal = total
+            , _tsSuccessCount = 0
+            , _tsErrorCount = 0
+            , _tsStartTime = Nothing
+            , _tsElapsedSecs = 0
+            , _tsBuckets = [0, 0, 0, 0, 0, 0]
+            , _tsRollingStats = Nothing
+            , _tsRecentDurations = Seq.empty
+            , _tsLatencyHistory = Seq.empty
+            }
     BenchmarkFinished ->
         state{_tsFinished = True}
   where
