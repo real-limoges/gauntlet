@@ -18,13 +18,7 @@ jobs:
       - name: Install system dependencies
         run: |
           apt-get update
-          apt-get install -y \
-            libcairo2-dev \
-            libpango1.0-dev \
-            libglib2.0-dev \
-            pkg-config \
-            libncurses-dev \
-            zlib1g-dev
+          apt-get install -y libncurses-dev
 
       - name: Cache cabal store
         uses: actions/cache@v4

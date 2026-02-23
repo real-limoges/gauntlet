@@ -11,7 +11,6 @@ module Runner (runMultiple, runSingle) where
 import Benchmark.CLI (BaselineMode)
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Output (initOutputFiles, resultsDir)
-import Benchmark.Plotting (plotDistributions)
 import Benchmark.Report (printMultipleBenchmarkReport, printSingleBenchmarkReport, printValidationSummary)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsFinished)
@@ -95,10 +94,6 @@ runMultiple baselineMode cfg = do
                     printMultipleBenchmarkReport "primary" "candidate" statsPrimary statsCandidate bayes
                     printValidationSummary (validPrimary ++ validCandidate)
 
-                    let timesPrimary = map (fromIntegral . unNanoseconds . durationNs) resultsPrimary
-                        timesCandidate = map (fromIntegral . unNanoseconds . durationNs) resultsCandidate
-                        plotFile = resultsDir ++ "/kde_plot-" ++ timestamp ++ ".png"
-                    plotDistributions timesPrimary timesCandidate plotFile
                     runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
 
                     handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) statsCandidate
