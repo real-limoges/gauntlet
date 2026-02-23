@@ -23,12 +23,11 @@ module Benchmark.TUI.State (
     tsStartTime,
     tsRecentDurations,
     tsRecentErrors,
+    tsRecentRequests,
     tsRollingStats,
-    tsBuckets,
     tsFinished,
     tsStatus,
     tsElapsedSecs,
-    tsLatencyHistory,
 
     -- * RollingStats lenses
     rsMeanMs,
@@ -87,12 +86,11 @@ data TUIState = TUIState
     , _tsStartTime :: Maybe UTCTime
     , _tsRecentDurations :: Seq Double
     , _tsRecentErrors :: Seq (UTCTime, Text)
+    , _tsRecentRequests :: Seq Bool
     , _tsRollingStats :: Maybe RollingStats
-    , _tsBuckets :: [Int]
     , _tsFinished :: Bool
     , _tsStatus :: Text
     , _tsElapsedSecs :: Double
-    , _tsLatencyHistory :: Seq RollingStats
     }
     deriving (Show, Eq)
 
@@ -112,12 +110,11 @@ initialState target total endpoints =
         , _tsStartTime = Nothing
         , _tsRecentDurations = Seq.empty
         , _tsRecentErrors = Seq.empty
+        , _tsRecentRequests = Seq.empty
         , _tsRollingStats = Nothing
-        , _tsBuckets = [0, 0, 0, 0, 0, 0]
         , _tsFinished = False
         , _tsStatus = ""
         , _tsElapsedSecs = 0
-        , _tsLatencyHistory = Seq.empty
         }
 
 updateState :: UTCTime -> BenchmarkEvent -> TUIState -> TUIState
@@ -126,17 +123,15 @@ updateState now event state = case event of
         let ms = unMilliseconds $ nsToMs durationNs
             newDurations = addToRolling ms (_tsRecentDurations state)
             newStats = computeRollingStats newDurations
-            newBuckets = updateBuckets ms (_tsBuckets state)
             isSuccess = statusCode >= 200 && statusCode < 400
          in state
                 { _tsCompleted = _tsCompleted state + 1
                 , _tsSuccessCount = _tsSuccessCount state + (if isSuccess then 1 else 0)
                 , _tsErrorCount = _tsErrorCount state + (if isSuccess then 0 else 1)
                 , _tsRecentDurations = newDurations
+                , _tsRecentRequests = addToTimeline isSuccess (_tsRecentRequests state)
                 , _tsRollingStats = Just newStats
-                , _tsBuckets = newBuckets
                 , _tsStartTime = _tsStartTime state <|> Just now
-                , _tsLatencyHistory = Seq.take 60 (newStats Seq.<| _tsLatencyHistory state)
                 }
     RequestFailed err ->
         let newErrors = addToRolling (now, err) (_tsRecentErrors state)
@@ -144,6 +139,7 @@ updateState now event state = case event of
                 { _tsCompleted = _tsCompleted state + 1
                 , _tsErrorCount = _tsErrorCount state + 1
                 , _tsRecentErrors = Seq.take 5 newErrors
+                , _tsRecentRequests = addToTimeline False (_tsRecentRequests state)
                 }
     EndpointStarted endpoint index total ->
         state
@@ -161,10 +157,9 @@ updateState now event state = case event of
             , _tsErrorCount = 0
             , _tsStartTime = Nothing
             , _tsElapsedSecs = 0
-            , _tsBuckets = [0, 0, 0, 0, 0, 0]
             , _tsRollingStats = Nothing
             , _tsRecentDurations = Seq.empty
-            , _tsLatencyHistory = Seq.empty
+            , _tsRecentRequests = Seq.empty
             }
     BenchmarkFinished ->
         state{_tsFinished = True}
@@ -175,6 +170,14 @@ addToRolling :: a -> Seq a -> Seq a
 addToRolling x xs
     | Seq.length xs >= rollingWindow = x Seq.<| Seq.deleteAt (Seq.length xs - 1) xs
     | otherwise = x Seq.<| xs
+
+-- | Append to timeline, dropping oldest when over capacity (newest at end)
+addToTimeline :: a -> Seq a -> Seq a
+addToTimeline x xs
+    | Seq.length xs >= timelineCapacity = Seq.deleteAt 0 xs Seq.|> x
+    | otherwise = xs Seq.|> x
+  where
+    timelineCapacity = 80
 
 computeRollingStats :: Seq Double -> RollingStats
 computeRollingStats durations
@@ -194,13 +197,3 @@ computeRollingStats durations
                 , _rsMinMs = mn
                 , _rsMaxMs = mx
                 }
-
-updateBuckets :: Double -> [Int] -> [Int]
-updateBuckets ms [b0, b1, b2, b3, b4, b5]
-    | ms < 5_000 = [b0 + 1, b1, b2, b3, b4, b5]
-    | ms < 7_500 = [b0, b1 + 1, b2, b3, b4, b5]
-    | ms < 10_000 = [b0, b1, b2 + 1, b3, b4, b5]
-    | ms < 12_500 = [b0, b1, b2, b3 + 1, b4, b5]
-    | ms < 15_000 = [b0, b1, b2, b3, b4 + 1, b5]
-    | otherwise = [b0, b1, b2, b3, b4, b5 + 1]
-updateBuckets _ bs = bs

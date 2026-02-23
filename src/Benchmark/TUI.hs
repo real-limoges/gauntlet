@@ -5,8 +5,7 @@ module Benchmark.TUI (
     initialState,
 ) where
 
-import Benchmark.TUI.State (RollingStats (..))
-import Benchmark.TUI.State hiding (RollingStats (..))
+import Benchmark.TUI.State
 import Benchmark.TUI.Widgets
 import Brick
 import Brick.BChan (BChan, newBChan, writeBChan)
@@ -47,7 +46,7 @@ drawUI state = [borderWithLabel title (vBox sections)]
         , hBorder
         , statsSection state
         , hBorder
-        , hBox [histogramSection state, latencyChartSection state]
+        , hBox [histogramSection state, requestTimelineSection state]
         , hBorder
         , errorsSection state
         , hBorder
@@ -124,38 +123,40 @@ statsSection state =
 histogramSection :: TUIState -> Widget Name
 histogramSection state =
     borderWithLabel (withAttr (attrName "label") $ txt " Distribution ") $
-        histogram (zip labels (state ^. tsBuckets))
+        if null durations
+            then withAttr (attrName "dim") $ txt "Waiting for data..."
+            else histogram (zip labels counts)
   where
-    labels = ["<5s", "<7.5s", "<10s", "<12.5s", "<15s", ">15s"]
+    durations = toList (state ^. tsRecentDurations)
+    lo = minimum durations
+    hi = maximum durations
+    nBuckets = 8
+    bucketWidth = if hi > lo then (hi - lo) / fromIntegral nBuckets else 1
+    bucketIndex v = min (nBuckets - 1) (floor ((v - lo) / bucketWidth))
+    counts = [length (filter (\v -> bucketIndex v == i) durations) | i <- [0 .. nBuckets - 1]]
+    labels =
+        [ formatDuration (lo + fromIntegral i * bucketWidth)
+        | i <- [0 .. nBuckets - 1]
+        ]
 
-latencyChartSection :: TUIState -> Widget Name
-latencyChartSection state =
-    borderWithLabel (withAttr (attrName "label") $ txt " Latency Trend ") $
+requestTimelineSection :: TUIState -> Widget Name
+requestTimelineSection state =
+    borderWithLabel (withAttr (attrName "label") $ txt " Requests ") $
         padLeftRight 1 $
-            if Seq.null (state ^. tsLatencyHistory)
-                then withAttr (attrName "dim") $ txt "Waiting for data..."
-                else
-                    let history = reverse $ toList (state ^. tsLatencyHistory)
-                        p99s = map _rsP99Ms history
-                        p50s = map _rsP50Ms history
-                        maxVal = maximum (p99s ++ p50s)
-                     in vBox
-                            [ sparkRow "P99 " (attrName "err") maxVal p99s
-                            , sparkRow "P50 " (attrName "hi") maxVal p50s
-                            ]
+            if Seq.null (state ^. tsRecentRequests)
+                then withAttr (attrName "dim") $ txt "Waiting..."
+                else vBox [renderRow r | r <- rows]
   where
-    sparkRow label attr maxVal values =
-        hBox
-            [ withAttr (attrName "label") $ txt (label <> " ")
-            , withAttr attr $ txt (mkSparkline maxVal values)
-            ]
-    mkSparkline maxVal values =
-        let blocks = "▁▂▃▄▅▆▇█"
-            nLevels = 7
-            toChar v
-                | maxVal <= 0 = '▁'
-                | otherwise = T.index blocks $ min nLevels $ round (v / maxVal * fromIntegral nLevels)
-         in T.pack $ map toChar values
+    cols = 10
+    reqs = toList (state ^. tsRecentRequests)
+    padded = replicate (cols * 8 - length reqs) Nothing ++ map Just reqs
+    rows = chunksOf cols padded
+    chunksOf _ [] = []
+    chunksOf n xs = take n xs : chunksOf n (drop n xs)
+    renderRow bs = hBox (map renderBlock bs)
+    renderBlock Nothing = withAttr (attrName "dim") $ txt "·"
+    renderBlock (Just True) = withAttr (attrName "ok") $ txt "■"
+    renderBlock (Just False) = withAttr (attrName "err") $ txt "■"
 
 errorsSection :: TUIState -> Widget Name
 errorsSection state =
@@ -210,8 +211,8 @@ theAttrMap =
         , (attrName "label", fg V.yellow)
         , (attrName "hi", fg V.cyan)
         , (attrName "stat", V.withStyle V.defAttr V.bold)
-        , (attrName "ok", fg V.green)
-        , (attrName "err", fg V.red)
+        , (attrName "ok", fg V.brightBlue)
+        , (attrName "err", fg V.magenta)
         , (attrName "dim", fg V.brightBlack)
         , (attrName "progress", fg V.blue)
         ]
