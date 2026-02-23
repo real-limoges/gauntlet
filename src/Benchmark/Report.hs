@@ -14,7 +14,7 @@ module Benchmark.Report (
 )
 where
 
-import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), Endpoint (..), KSResult (..), MWUResult (..), PercentileComparison (..), ValidationError (..), ValidationSummary (..), VerificationResult (..))
+import Benchmark.Types (ADResult (..), BayesianComparison (..), BenchmarkStats (..), Endpoint (..), KSResult (..), MWUResult (..), PercentileComparison (..), ValidationError (..), ValidationSummary (..), VerificationResult (..))
 import Control.Monad (forM_, when)
 import Data.Aeson (Value, encode)
 import Data.ByteString.Lazy.Char8 qualified as LBS8
@@ -41,7 +41,8 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
     putStrLn ""
     printHeader "Bayesian Analysis"
 
-    printf "Probability Candidate is Faster: %.2f%%\n" (probBFasterThanA bayes * 100.0)
+    printf "Probability Candidate is Faster (means):   %.2f%%\n" (probBFasterThanA bayes * 100.0)
+    printf "Probability Single Request Faster:          %.2f%%\n" (probSingleRequestFaster bayes * 100.0)
     printf "Mean Difference: %.2f ms\n" (meanDifference bayes)
     printf "95%% Credible Interval: [%.2f ms, %.2f ms]\n" (credibleIntervalLower bayes) (credibleIntervalUpper bayes)
     printf "Effect Size (Cohen's d): %.3f\n" (effectSize bayes)
@@ -62,6 +63,7 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
     printHeader "Distribution Tests"
     printMWU (mannWhitneyU bayes)
     printKS (kolmogorovSmirnov bayes)
+    printAD (andersonDarling bayes)
 
 printVerifyReport :: [(Endpoint, VerificationResult)] -> IO ()
 printVerifyReport results = do
@@ -107,6 +109,7 @@ printStats stats = do
     printf "  p50:     %.2f ms\n" (p50Ms stats)
     printf "  p95:     %.2f ms\n" (p95Ms stats)
     printf "  p99:     %.2f ms\n" (p99Ms stats)
+    printf "  ES(p99): %.2f ms\n" (esMs stats)
     printf "  Min:     %.2f ms\n" (minMs stats)
     printf "  Max:     %.2f ms\n" (maxMs stats)
     printf "  Success: %d / %d\n" (countSuccess stats) (totalRequests stats)
@@ -125,6 +128,15 @@ printKS (Just r) =
         (ksStatistic r)
         (ksPValue r)
         (if ksSignificant r then "significant" else "not significant" :: String)
+
+printAD :: Maybe ADResult -> IO ()
+printAD Nothing = putStrLn "Anderson-Darling:    (sample too small)"
+printAD (Just r) =
+    printf
+        "Anderson-Darling:    A² = %.3f, p ≈ %.3f (%s)\n"
+        (adStatistic r)
+        (adPValue r)
+        (if adSignificant r then "significant" else "not significant" :: String)
 
 printHeader :: String -> IO ()
 printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"

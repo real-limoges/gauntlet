@@ -14,6 +14,7 @@ module Benchmark.Report.Markdown (
 ) where
 
 import Benchmark.Types (
+    ADResult (..),
     BayesianComparison (..),
     BenchmarkStats (..),
     KSResult (..),
@@ -165,6 +166,7 @@ statsTable s =
     , row "p50" (printf "%.2f ms" (p50Ms s))
     , row "p95" (printf "%.2f ms" (p95Ms s))
     , row "p99" (printf "%.2f ms" (p99Ms s))
+    , row "ES(p99)" (printf "%.2f ms" (esMs s))
     ]
   where
     row label val = T.pack $ printf "| %s | %s |" (label :: String) (val :: String)
@@ -173,7 +175,8 @@ bayesTable :: BayesianComparison -> [Text]
 bayesTable b =
     [ "| Metric | Value |"
     , "|--------|-------|"
-    , row "P(candidate faster)" (printf "%.1f%%" (probBFasterThanA b * 100))
+    , row "P(candidate faster, means)" (printf "%.1f%%" (probBFasterThanA b * 100))
+    , row "P(single request faster)" (printf "%.1f%%" (probSingleRequestFaster b * 100))
     , row "Mean difference" (printf "%+.2f ms" (meanDifference b))
     , row "95% credible interval" credInterval
     , row "Effect size (Cohen's d)" (printf "%.3f" (effectSize b))
@@ -182,6 +185,7 @@ bayesTable b =
     , row "p99 difference" (pctRow $ p99Comparison b)
     , row "Mann-Whitney U" (mwuCell $ mannWhitneyU b)
     , row "Kolmogorov-Smirnov" (ksCell $ kolmogorovSmirnov b)
+    , row "Anderson-Darling" (adCell $ andersonDarling b)
     ]
   where
     row label val = T.pack $ printf "| %s | %s |" (label :: String) (val :: String)
@@ -207,3 +211,10 @@ bayesTable b =
             (ksStatistic r)
             (ksPValue r)
             (if ksSignificant r then "significant" else "not significant" :: String)
+    adCell Nothing = "sample too small"
+    adCell (Just r) =
+        printf
+            "A² = %.3f, p ≈ %.3f (%s)"
+            (adStatistic r)
+            (adPValue r)
+            (if adSignificant r then "significant" else "not significant" :: String)

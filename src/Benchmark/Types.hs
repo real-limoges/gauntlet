@@ -22,6 +22,7 @@ module Benchmark.Types (
     PercentileComparison (..),
     MWUResult (..),
     KSResult (..),
+    ADResult (..),
 
     -- * Verification
     VerificationResult (..),
@@ -187,6 +188,8 @@ data BenchmarkStats = BenchmarkStats
     , p50Ms :: Double
     , p95Ms :: Double
     , p99Ms :: Double
+    , esMs :: Double
+    -- ^ Expected Shortfall: mean latency of the worst 1% of requests (E[X | X > p99])
     }
     deriving stock (Show, Eq, Generic)
     deriving anyclass (FromJSON, ToJSON)
@@ -222,10 +225,26 @@ data KSResult = KSResult
     deriving stock (Show, Eq, Generic)
     deriving anyclass (ToJSON)
 
+{- | Result of a two-sample Anderson-Darling test (Scholz & Stephens 1987).
+More sensitive to tail differences than the KS test.
+-}
+data ADResult = ADResult
+    { adStatistic :: Double
+    -- ^ Raw A² statistic (unnormalized)
+    , adPValue :: Double
+    -- ^ Approximate p-value interpolated from Scholz-Stephens Table 2 quantiles
+    , adSignificant :: Bool
+    -- ^ True if distributions differ significantly at p < 0.05
+    }
+    deriving stock (Show, Eq, Generic)
+    deriving anyclass (ToJSON)
+
 -- | Bayesian A/B comparison results.
 data BayesianComparison = BayesianComparison
     { probBFasterThanA :: Double
-    -- ^ Probability candidate is faster than primary
+    -- ^ Probability candidate is faster than primary (mean-level, based on σ/√n)
+    , probSingleRequestFaster :: Double
+    -- ^ Probability a single request to B is faster than a single request to A (based on σ)
     , meanDifference :: Double
     -- ^ Primary mean - Candidate mean (positive = candidate faster)
     , credibleIntervalLower :: Double
@@ -240,6 +259,8 @@ data BayesianComparison = BayesianComparison
     -- ^ Mann-Whitney U test (Nothing if sample too small)
     , kolmogorovSmirnov :: Maybe KSResult
     -- ^ Two-sample KS test (Nothing if sample too small)
+    , andersonDarling :: Maybe ADResult
+    -- ^ Two-sample Anderson-Darling test; more tail-sensitive than KS (Nothing if sample too small)
     }
     deriving stock (Show, Eq, Generic)
     deriving anyclass (ToJSON)
