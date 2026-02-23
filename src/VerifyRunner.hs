@@ -8,7 +8,7 @@ Runs verification checks comparing responses from primary and candidate targets.
 module VerifyRunner where
 
 import Benchmark.Config (buildEndpoints)
-import Benchmark.Network (NetworkHandle (H1), addAuth, initNetwork, readToken, runComparison)
+import Benchmark.Network (addAuth, initNetwork, readToken, runComparison)
 import Benchmark.Report (printVerifyReport)
 import Benchmark.Types (Settings (..), TestConfig (..), exitWithError)
 import Benchmark.Verify qualified as Verify
@@ -29,7 +29,7 @@ runVerify cfg = do
     results <- forM (zip epsA epsB) $ \(epA, epB) -> do
         let authEpA = addAuth token epA
             authEpB = addAuth token epB
-        (resA, resB) <- runComparison setts (H1 mgr) authEpA authEpB
+        (resA, resB) <- runComparison setts mgr authEpA authEpB
         let check = Verify.verify resA resB
         return (epA, check)
 

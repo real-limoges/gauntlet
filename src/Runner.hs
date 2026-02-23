@@ -60,7 +60,7 @@ runMultiple baselineMode outFmt cfg = do
                 targetUrl = candidate (targets cfg) <> " vs " <> primary (targets cfg)
                 tuiState = initialState targetUrl candidateTotal numEndpoints
 
-            ctx <- initContext setts csvFile timestamp (Just eventChan) (candidate (targets cfg))
+            ctx <- initContext setts csvFile timestamp (Just eventChan)
 
             benchmarkWork <- async $
                 (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
@@ -126,7 +126,7 @@ runSingle baselineMode outFmt cfg = do
         numEndpoints = length eps
         tuiState = initialState targetUrl totalRequests numEndpoints
 
-    ctx <- initContext setts csvFile timestamp (Just eventChan) targetUrl
+    ctx <- initContext setts csvFile timestamp (Just eventChan)
 
     benchmarkWork <- async $
         (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do

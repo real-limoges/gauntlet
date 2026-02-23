@@ -11,8 +11,6 @@ Re-exports the full public API from the Network sub-modules:
 * "Benchmark.Network.Exec"    — concurrent benchmark loops and A/B comparison
 -}
 module Benchmark.Network (
-    NetworkHandle (..),
-    initNetworkHandle,
     initNetwork,
     runBenchmark,
     runBenchmarkWithEvents,
@@ -26,5 +24,5 @@ where
 
 import Benchmark.Network.Auth (addAuth, readToken)
 import Benchmark.Network.Exec (runBenchmark, runBenchmarkWithEvents, runComparison)
-import Benchmark.Network.Pool (NetworkHandle (..), initNetwork, initNetworkHandle)
+import Benchmark.Network.Pool (initNetwork)
 import Benchmark.Network.Request (prepareRequest, timedRequest)
