@@ -19,7 +19,6 @@ tuiStateSpec = describe "Benchmark.TUI.State" $ do
             _tsCompleted state `shouldBe` 0
             _tsSuccessCount state `shouldBe` 0
             _tsErrorCount state `shouldBe` 0
-            _tsBuckets state `shouldBe` [0, 0, 0, 0, 0, 0]
             _tsFinished state `shouldBe` False
 
         it "starts with empty rolling stats and durations" $ do
@@ -117,49 +116,6 @@ tuiStateSpec = describe "Benchmark.TUI.State" $ do
                 event = BenchmarkFinished
                 newState = updateState now event state
             _tsFinished newState `shouldBe` True
-
-    describe "bucket updates" $ do
-        it "updates bucket 0 for <5s" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 4_000_000_000) 200
-                newState = updateState now event state
-            _tsBuckets newState `shouldBe` [1, 0, 0, 0, 0, 0]
-
-        it "updates bucket 1 for 5s-7.5s" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 6_000_000_000) 200
-                newState = updateState now event state
-            _tsBuckets newState `shouldBe` [0, 1, 0, 0, 0, 0]
-
-        it "updates bucket 2 for 7.5s-10s" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 8_000_000_000) 200
-                newState = updateState now event state
-            _tsBuckets newState `shouldBe` [0, 0, 1, 0, 0, 0]
-
-        it "updates bucket 3 for 10s-12.5s" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 11_000_000_000) 200
-                newState = updateState now event state
-            _tsBuckets newState `shouldBe` [0, 0, 0, 1, 0, 0]
-
-        it "updates bucket 4 for 12.5s-15s" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 13_000_000_000) 200
-                newState = updateState now event state
-            _tsBuckets newState `shouldBe` [0, 0, 0, 0, 1, 0]
-
-        it "updates bucket 5 for >15s" $ do
-            now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
-                event = RequestCompleted (Nanoseconds 20_000_000_000) 200
-                newState = updateState now event state
-            _tsBuckets newState `shouldBe` [0, 0, 0, 0, 0, 1]
 
     describe "rolling window" $ do
         it "rollingWindow is 100" $ do

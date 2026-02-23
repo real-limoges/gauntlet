@@ -31,10 +31,19 @@ jobs:
         with:
           path: |
             ~/.cabal/store
-            dist-newstyle
-          key: ${{ runner.os }}-ghc-9.12.2-cabal-${{ hashFiles('gauntlet.cabal') }}
+            ~/.cabal/packages
+          key: ${{ runner.os }}-ghc-9.12.2-store-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'cabal.project') }}
           restore-keys: |
-            ${{ runner.os }}-ghc-9.12.2-cabal-
+            ${{ runner.os }}-ghc-9.12.2-store-
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: dist-newstyle
+          key: ${{ runner.os }}-ghc-9.12.2-dist-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'src/**/*.hs', 'test/**/*.hs') }}
+          restore-keys: |
+            ${{ runner.os }}-ghc-9.12.2-dist-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal') }}
+            ${{ runner.os }}-ghc-9.12.2-dist-
 
       - name: Update cabal index
         run: cabal update
