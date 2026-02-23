@@ -212,7 +212,7 @@ theAttrMap =
         , (attrName "hi", fg V.cyan)
         , (attrName "stat", V.withStyle V.defAttr V.bold)
         , (attrName "ok", fg V.brightBlue)
-        , (attrName "err", fg V.magenta)
+        , (attrName "err", fg V.red)
         , (attrName "dim", fg V.brightBlack)
         , (attrName "progress", fg V.blue)
         ]

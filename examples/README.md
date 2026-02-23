@@ -200,13 +200,14 @@ cabal run gauntlet-exe -- benchmark-multiple \
   --compare-baseline my-baseline
 ```
 
-### JSON Output
-Output results as JSON instead of terminal format:
+### Markdown Report
+Write a full markdown report (stats, Bayesian analysis, validation) in addition to terminal output:
 
 ```bash
 cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/simple-benchmark.json \
-  -o json
+  --output markdown \
+  --report-path results/report.md
 ```
 
 ## Tips

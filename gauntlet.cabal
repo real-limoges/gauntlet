@@ -3,7 +3,7 @@ name:               gauntlet
 version:            0.1.0.0
 license:            NONE
 author:             Real Limoges
-maintainer:         real.limoges@truefootage.tech
+maintainer:         b.real.limoges@gmail.com
 build-type:         Simple
 
 
@@ -41,6 +41,7 @@ library
                           Benchmark.Network.Request
                           Benchmark.Output
                           Benchmark.Report
+                          Benchmark.Report.Markdown
                           Benchmark.Types
                           Benchmark.Validation
                           Benchmark.Verify

@@ -23,8 +23,8 @@ run = do
     config <- loadAndValidateConfig (configPath cmd)
 
     result <- case cmd of
-        BenchmarkMultiple _ baseline -> runMultiple baseline config
-        BenchmarkSingle _ baseline -> runSingle baseline config
+        BenchmarkMultiple _ baseline fmt -> runMultiple baseline fmt config
+        BenchmarkSingle _ baseline fmt -> runSingle baseline fmt config
         Verify _ -> runVerify config >> return RunSuccess
 
     exitWithResult result

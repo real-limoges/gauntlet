@@ -51,6 +51,9 @@ module Benchmark.Types (
     RunResult (..),
     defaultThresholds,
 
+    -- * Output Format
+    OutputFormat (..),
+
     -- * Error Handling
     PerfTestError (..),
     formatError,
@@ -439,6 +442,14 @@ data RegressionResult = RegressionResult
     }
     deriving stock (Show, Eq, Generic)
     deriving anyclass (ToJSON)
+
+-- | Output format for benchmark reports.
+data OutputFormat
+    = -- | Terminal-only output (default)
+      OutputTerminal
+    | -- | Also write a markdown report to the given file path
+      OutputMarkdown FilePath
+    deriving stock (Show, Eq)
 
 -- | Exit status from a benchmark run.
 data RunResult
