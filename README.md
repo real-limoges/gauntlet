@@ -30,11 +30,12 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 - **Real-time TUI** - Live progress tracking with Brick-based terminal UI
 - **Grafana Tempo Integration** - Distributed trace collection and analysis
 - **Structured Logging** - Configurable log levels (debug, info, warning, error)
-- **Multiple Output Formats** - Terminal, JSON, CSV
+- **Multiple Output Formats** - Terminal, JSON, CSV, Markdown
 
 ### 🚀 Production Ready
 - **Regression Detection** - Compare against saved baselines with configurable thresholds
-- **CI/CD Integration** - Exit codes for automated pipeline integration
+- **CI/CD Integration** - Native GitLab CI and GitHub Actions support with automatic step summaries
+- **Markdown Reports** - Full stats, Bayesian analysis, and validation results in a single `.md` file
 - **Retry Logic** - Exponential backoff for flaky networks
 - **Warmup Support** - Prime caches before benchmarking
 - **Custom Headers** - Full HTTP header control per endpoint
@@ -184,15 +185,13 @@ cabal run gauntlet-exe -- verify --config config.json
 # Specify configuration file
 --config FILE              Path to JSON/YAML config
 
-# Output format
--o, --output FORMAT        Output format: terminal (default), json, csv
+# Markdown report output
+--output markdown          Write a markdown report in addition to terminal output
+--report-path FILE         Path for the markdown report (default: results/report.md)
 
 # Baseline comparison
 --save-baseline NAME       Save results as baseline
---compare-baseline NAME    Compare against saved baseline
-
-# Regression detection
---regression-threshold PCT Fail if performance regresses by more than PCT%
+--compare-baseline NAME    Compare against saved baseline (exit 1 on regression)
 ```
 
 ### Exit Codes
@@ -349,12 +348,13 @@ cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/minimal.json
 ```
 
-### Example 2: A/B API Comparison
+### Example 2: A/B API Comparison with Markdown Report
 
 ```bash
 cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/ab-comparison.json \
-  -o json > results.json
+  --output markdown \
+  --report-path results/report.md
 ```
 
 ### Example 3: Regression Detection
@@ -365,11 +365,10 @@ cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/simple-benchmark.json \
   --save-baseline prod-baseline
 
-# Compare against baseline (fails with exit code 1 if regression detected)
+# Compare against baseline (exits 1 if regression detected)
 cabal run gauntlet-exe -- benchmark-multiple \
   --config examples/simple-benchmark.json \
-  --compare-baseline prod-baseline \
-  --regression-threshold 10  # Fail if >10% slower
+  --compare-baseline prod-baseline
 ```
 
 ### Example 4: Authenticated API with Custom Headers
@@ -525,7 +524,7 @@ Optional: Fetch Traces → Aggregate Spans → Trace Report
     ↓
 Optional: Compare Baseline → Detect Regressions
     ↓
-Terminal/JSON/CSV Output + Exit Code
+Terminal Output + Optional Markdown Report + Exit Code
 ```
 
 ### Key Modules
@@ -544,6 +543,8 @@ See [`CLAUDE.md`](CLAUDE.md) for detailed architecture documentation.
 
 ### GitLab CI Example
 
+When `GITLAB_CI=true` is set, gauntlet automatically emits collapsible section markers and writes a markdown artifact report.
+
 ```yaml
 performance-test:
   stage: test
@@ -551,17 +552,17 @@ performance-test:
     - cabal build
     - cabal run gauntlet-exe -- benchmark-multiple \
         --config config.json \
-        --compare-baseline prod-baseline \
-        --regression-threshold 10 \
-        -o json > results.json
+        --compare-baseline prod-baseline
   artifacts:
-    reports:
-      performance: results.json
+    paths:
+      - results/benchmark-report-*.md
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 ```
 
 ### GitHub Actions Example
+
+When `GITHUB_ACTIONS=true` is set, gauntlet automatically appends the regression report to `$GITHUB_STEP_SUMMARY`, making results visible directly in the Actions UI.
 
 ```yaml
 name: Performance Tests
@@ -572,7 +573,7 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Haskell
         uses: haskell/actions/setup@v2
@@ -586,8 +587,28 @@ jobs:
           cabal run gauntlet-exe -- benchmark-multiple \
             --config config.json \
             --compare-baseline prod-baseline \
-            --regression-threshold 10
+            --output markdown \
+            --report-path results/report.md
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: results/report.md
 ```
+
+### Markdown Reports
+
+Use `--output markdown` to write a full report covering stats, Bayesian analysis, and validation results:
+
+```bash
+cabal run gauntlet-exe -- benchmark-multiple \
+  --config config.json \
+  --output markdown \
+  --report-path /tmp/report.md
+```
+
+The markdown report is written **in addition to** terminal output — it does not replace it.
 
 ### Exit Codes for CI
 

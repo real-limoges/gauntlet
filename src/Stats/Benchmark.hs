@@ -14,17 +14,24 @@ module Stats.Benchmark (
     -- * Bayesian Comparison
     compareBayesian,
 
+    -- * Frequentist Tests
+    addFrequentistTests,
+
     -- * Distribution Comparison
     earthMoversDistance,
 )
 where
 
-import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), Milliseconds (..), PercentileComparison (..), TestingResponse (..), nsToMs)
+import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), KSResult (..), MWUResult (..), Milliseconds (..), PercentileComparison (..), TestingResponse (..), nsToMs)
 import Data.Maybe qualified as M
 import Data.Vector.Algorithms.Intro qualified as VA
 import Data.Vector.Unboxed qualified as V
 import Numeric.SpecFunctions (erfc)
 import Statistics.Sample (mean, stdDev)
+import Statistics.Test.KolmogorovSmirnov (kolmogorovSmirnovTest2)
+import Statistics.Test.MannWhitneyU (mannWhitneyUtest)
+import Statistics.Test.Types (PositionTest (..), Test (..), TestResult (..))
+import Statistics.Types (mkPValue, pValue)
 import Stats.Common (percentileSorted)
 import Stats.Common qualified as Stats
 
@@ -108,6 +115,8 @@ compareBayesian statsA statsB =
             , relativeEffect = relEffect
             , p95Comparison = p95Comp
             , p99Comparison = p99Comp
+            , mannWhitneyU = Nothing
+            , kolmogorovSmirnov = Nothing
             }
 
 -- | Compare percentiles between primary and candidate with Maritz-Jarrett SE.
@@ -151,6 +160,42 @@ inverseNormalCDF p
 -- | Standard normal cumulative distribution function.
 standardNormalCDF :: Double -> Double
 standardNormalCDF x = 0.5 * erfc (-(x / sqrt 2))
+
+{- | Enrich a 'BayesianComparison' with Mann-Whitney U and KS test results.
+Call this after 'compareBayesian' when the raw responses are available.
+Both tests require at least 2 successful responses per sample.
+-}
+addFrequentistTests :: [TestingResponse] -> [TestingResponse] -> BayesianComparison -> BayesianComparison
+addFrequentistTests responsesA responsesB bayes =
+    let durA = V.fromList $ M.mapMaybe getDuration responsesA
+        durB = V.fromList $ M.mapMaybe getDuration responsesB
+     in bayes
+            { mannWhitneyU = runMWU durA durB
+            , kolmogorovSmirnov = runKS durA durB
+            }
+
+-- | Run Mann-Whitney U test. Returns Nothing if either sample has fewer than 2 observations.
+runMWU :: V.Vector Double -> V.Vector Double -> Maybe MWUResult
+runMWU a b
+    | V.length a < 2 || V.length b < 2 = Nothing
+    | otherwise =
+        let result = mannWhitneyUtest SamplesDiffer (mkPValue 0.05) a b
+         in Just $ MWUResult{mwuSignificant = result == Just Significant}
+
+-- | Run two-sample KS test. Returns Nothing if either sample has fewer than 2 observations.
+runKS :: V.Vector Double -> V.Vector Double -> Maybe KSResult
+runKS a b
+    | V.length a < 2 || V.length b < 2 = Nothing
+    | otherwise = case kolmogorovSmirnovTest2 a b of
+        Nothing -> Nothing
+        Just t ->
+            let p = pValue (testSignificance t)
+             in Just
+                    KSResult
+                        { ksStatistic = testStatistics t
+                        , ksPValue = p
+                        , ksSignificant = p < 0.05
+                        }
 
 -- | Extract duration from response (Nothing if error).
 getDuration :: TestingResponse -> Maybe Double

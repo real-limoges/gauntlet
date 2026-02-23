@@ -1,18 +1,20 @@
 {- |
 Module      : Benchmark.CI
-Description : GitLab CI integration for benchmark results
+Description : CI environment integration for benchmark results
 Stability   : experimental
 
-Detects CI environment and formats regression output for GitLab pipelines.
-Writes markdown reports for merge request artifacts.
+Detects CI environment and formats regression output for GitLab and GitHub Actions pipelines.
+Writes markdown reports for merge request artifacts and job summaries.
 -}
 module Benchmark.CI (
     CIMode (..),
     detectCIMode,
     formatForCI,
     writeArtifactReport,
+    writeGitHubStepSummary,
 ) where
 
+import Benchmark.Report.Markdown (markdownRegressionReport)
 import Benchmark.Types (MetricRegression (..), RegressionResult (..))
 import Control.Monad (forM_)
 import Data.Text (Text)
@@ -23,19 +25,22 @@ import System.Environment (lookupEnv)
 import Text.Printf (printf)
 
 -- | CI environment detection.
-data CIMode = GitLab | None
+data CIMode = GitLab | GitHub | None
     deriving (Show, Eq)
 
--- | Detect if running in GitLab CI.
+-- | Detect if running in a known CI environment.
 detectCIMode :: IO CIMode
 detectCIMode = do
     gitlab <- lookupEnv "GITLAB_CI"
-    return $ case gitlab of
-        Just "true" -> GitLab
+    github <- lookupEnv "GITHUB_ACTIONS"
+    return $ case (gitlab, github) of
+        (Just "true", _) -> GitLab
+        (_, Just "true") -> GitHub
         _ -> None
 
 {- | Format regression results for CI output.
 In GitLab, section markers and colored output help visibility.
+GitHub Actions uses plain stdout (no section markers).
 -}
 formatForCI :: CIMode -> RegressionResult -> IO ()
 formatForCI None _ = return ()
@@ -63,58 +68,36 @@ formatForCI GitLab result = do
 
     putStrLn ""
     putStrLn $ "\x1b[0Ksection_end:" ++ show epoch ++ ":benchmark_results"
+formatForCI GitHub result = do
+    putStrLn ""
+    putStrLn "========== Benchmark Regression Check =========="
+    putStrLn ""
 
--- | Write a markdown report for GitLab artifacts/MR comments.
+    forM_ (regressionMetrics result) $ \m -> do
+        let status = if metricRegressed m then "REGRESSED" else "ok" :: String
+        printf
+            "  %s: %.2fms -> %.2fms (%+.1f%%) [%s]\n"
+            (T.unpack $ metricName m)
+            (metricBaseline m)
+            (metricCurrent m)
+            (metricChange m * 100)
+            status
+
+    putStrLn ""
+    if regressionPassed result
+        then putStrLn "[PASS] Benchmark passed - no regressions detected"
+        else putStrLn "[FAIL] Benchmark FAILED - regression detected"
+    putStrLn ""
+
+-- | Write a markdown report for CI artifacts / GitHub Step Summary.
 writeArtifactReport :: FilePath -> RegressionResult -> IO ()
 writeArtifactReport path result =
-    TIO.writeFile path (formatMarkdownReport result)
+    TIO.writeFile path (markdownRegressionReport result)
 
-formatMarkdownReport :: RegressionResult -> Text
-formatMarkdownReport result =
-    T.unlines $
-        [ "## Benchmark Results"
-        , ""
-        , statusBadge
-        , ""
-        , "### Metrics"
-        , ""
-        , "| Metric | Baseline | Current | Change | Threshold | Status |"
-        , "|--------|----------|---------|--------|-----------|--------|"
-        ]
-            ++ map formatRow (regressionMetrics result)
-            ++ [""]
-            ++ summary
-  where
-    statusBadge
-        | regressionPassed result = "**Status:** PASSED"
-        | otherwise = "**Status:** FAILED - Regression Detected"
-
-    formatRow m =
-        T.pack $
-            printf
-                "| %s | %.2f ms | %.2f ms | %+.1f%% | %.0f%% | %s |"
-                (T.unpack $ metricName m)
-                (metricBaseline m)
-                (metricCurrent m)
-                (metricChange m * 100)
-                (metricThreshold m * 100)
-                (if metricRegressed m then "FAIL" else "PASS" :: String)
-
-    summary
-        | regressionPassed result =
-            [ "All metrics within acceptable thresholds."
-            ]
-        | otherwise =
-            [ "**Action Required:** Performance regression detected. Please investigate before merging."
-            , ""
-            , "Regressed metrics:"
-            ]
-                ++ map formatRegression (filter metricRegressed $ regressionMetrics result)
-
-    formatRegression m =
-        T.pack $
-            printf
-                "- **%s**: increased by %.1f%% (threshold: %.0f%%)"
-                (T.unpack $ metricName m)
-                (metricChange m * 100)
-                (metricThreshold m * 100)
+-- | Write the markdown regression report to $GITHUB_STEP_SUMMARY if set.
+writeGitHubStepSummary :: RegressionResult -> IO ()
+writeGitHubStepSummary result = do
+    mpath <- lookupEnv "GITHUB_STEP_SUMMARY"
+    case mpath of
+        Nothing -> return ()
+        Just path -> TIO.appendFile path (markdownRegressionReport result)

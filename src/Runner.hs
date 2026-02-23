@@ -12,32 +12,36 @@ import Benchmark.CLI (BaselineMode)
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Output (initOutputFiles, resultsDir)
 import Benchmark.Report (printMultipleBenchmarkReport, printSingleBenchmarkReport, printValidationSummary)
+import Benchmark.Report.Markdown (markdownMultipleReport, markdownSingleReport, markdownValidationReport)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsFinished)
 import Benchmark.Types (
     Nanoseconds (..),
+    OutputFormat (..),
     PerfTestError (..),
     RunResult (..),
     Settings (..),
     Targets (..),
     TestConfig (..),
     TestingResponse (..),
+    ValidationSummary,
     exitWithError,
  )
 import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (newTChanIO)
 import Control.Exception (onException)
 import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
 import Lens.Micro ((^.))
 import Runner.Baseline (handleBaseline)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
-import Stats.Benchmark (calculateStats, compareBayesian)
+import Stats.Benchmark (addFrequentistTests, calculateStats, compareBayesian)
 
 -- | Run A/B benchmark comparing candidate against primary target.
-runMultiple :: BaselineMode -> TestConfig -> IO RunResult
-runMultiple baselineMode cfg = do
+runMultiple :: BaselineMode -> OutputFormat -> TestConfig -> IO RunResult
+runMultiple baselineMode outFmt cfg = do
     (csvFile, timestamp) <- initOutputFiles
 
     let epsCandidate = buildEndpoints cfg True
@@ -89,18 +93,27 @@ runMultiple baselineMode cfg = do
 
                     let statsCandidate = calculateStats resultsCandidate
                         statsPrimary = calculateStats resultsPrimary
-                        bayes = compareBayesian statsPrimary statsCandidate
+                        bayes =
+                            addFrequentistTests
+                                resultsPrimary
+                                resultsCandidate
+                                (compareBayesian statsPrimary statsCandidate)
 
                     printMultipleBenchmarkReport "primary" "candidate" statsPrimary statsCandidate bayes
-                    printValidationSummary (validPrimary ++ validCandidate)
+                    let validAll = validPrimary ++ validCandidate
+                    printValidationSummary validAll
+
+                    writeMarkdownReport outFmt $
+                        markdownMultipleReport "primary" "candidate" statsPrimary statsCandidate bayes
+                            <> markdownValidationReport validAll
 
                     runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
 
                     handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) statsCandidate
 
 -- | Run single-target benchmark without comparison.
-runSingle :: BaselineMode -> TestConfig -> IO RunResult
-runSingle baselineMode cfg = do
+runSingle :: BaselineMode -> OutputFormat -> TestConfig -> IO RunResult
+runSingle baselineMode outFmt cfg = do
     (csvFile, timestamp) <- initOutputFiles
 
     let eps = buildEndpoints cfg True
@@ -140,6 +153,16 @@ runSingle baselineMode cfg = do
 
             printSingleBenchmarkReport targetUrl stats
             printValidationSummary validSummaries
+
+            writeMarkdownReport outFmt $
+                markdownSingleReport targetUrl stats
+                    <> markdownValidationReport validSummaries
+
             runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
 
             handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) stats
+
+-- | Write a markdown report to disk when 'OutputMarkdown' is requested.
+writeMarkdownReport :: OutputFormat -> T.Text -> IO ()
+writeMarkdownReport OutputTerminal _ = return ()
+writeMarkdownReport (OutputMarkdown path) content = TIO.writeFile path content

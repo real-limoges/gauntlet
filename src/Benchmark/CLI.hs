@@ -12,6 +12,7 @@ module Benchmark.CLI (
 )
 where
 
+import Benchmark.Types (OutputFormat (..))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Options.Applicative
@@ -29,10 +30,12 @@ data Command
     = BenchmarkMultiple
         { configPath :: FilePath
         , baselineMode :: BaselineMode
+        , outputFormat :: OutputFormat
         }
     | BenchmarkSingle
         { configPath :: FilePath
         , baselineMode :: BaselineMode
+        , outputFormat :: OutputFormat
         }
     | Verify {configPath :: FilePath}
     deriving (Show, Eq)
@@ -93,13 +96,35 @@ baselineModeParser = combineBaseline <$> saveBaselineOption <*> compareBaselineO
     combineBaseline Nothing (Just c) = CompareBaseline c
     combineBaseline (Just s) (Just c) = SaveAndCompare s c
 
+outputFormatParser :: Parser OutputFormat
+outputFormatParser = do
+    let outputOption =
+            optional $
+                strOption
+                    ( long "output"
+                        <> metavar "FORMAT"
+                        <> help "Output format: 'markdown' to write a markdown report"
+                    )
+    let reportPathOption =
+            strOption
+                ( long "report-path"
+                    <> metavar "FILE"
+                    <> help "Path for the markdown report (default: results/report.md)"
+                    <> value "results/report.md"
+                    <> showDefault
+                )
+    buildOutputFormat <$> outputOption <*> reportPathOption
+  where
+    buildOutputFormat (Just "markdown") path = OutputMarkdown path
+    buildOutputFormat _ _ = OutputTerminal
+
 benchmarkMultipleOptions :: Parser Command
 benchmarkMultipleOptions =
-    BenchmarkMultiple <$> configOption <*> baselineModeParser
+    BenchmarkMultiple <$> configOption <*> baselineModeParser <*> outputFormatParser
 
 benchmarkSingleOptions :: Parser Command
 benchmarkSingleOptions =
-    BenchmarkSingle <$> configOption <*> baselineModeParser
+    BenchmarkSingle <$> configOption <*> baselineModeParser <*> outputFormatParser
 
 verifyOptions :: Parser Command
 verifyOptions = Verify <$> configOption

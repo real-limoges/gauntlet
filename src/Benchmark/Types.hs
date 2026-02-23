@@ -20,6 +20,8 @@ module Benchmark.Types (
     BenchmarkStats (..),
     BayesianComparison (..),
     PercentileComparison (..),
+    MWUResult (..),
+    KSResult (..),
 
     -- * Verification
     VerificationResult (..),
@@ -50,6 +52,9 @@ module Benchmark.Types (
     MetricRegression (..),
     RunResult (..),
     defaultThresholds,
+
+    -- * Output Format
+    OutputFormat (..),
 
     -- * Error Handling
     PerfTestError (..),
@@ -197,6 +202,26 @@ data PercentileComparison = PercentileComparison
     deriving stock (Show, Eq, Generic)
     deriving anyclass (ToJSON)
 
+-- | Result of a Mann-Whitney U test between two samples.
+data MWUResult = MWUResult
+    { mwuSignificant :: Bool
+    -- ^ True if distributions differ significantly at p < 0.05
+    }
+    deriving stock (Show, Eq, Generic)
+    deriving anyclass (ToJSON)
+
+-- | Result of a two-sample Kolmogorov-Smirnov test.
+data KSResult = KSResult
+    { ksStatistic :: Double
+    -- ^ KS D statistic (0 = identical CDFs, 1 = no overlap)
+    , ksPValue :: Double
+    -- ^ Approximate p-value
+    , ksSignificant :: Bool
+    -- ^ True if distributions differ significantly at p < 0.05
+    }
+    deriving stock (Show, Eq, Generic)
+    deriving anyclass (ToJSON)
+
 -- | Bayesian A/B comparison results.
 data BayesianComparison = BayesianComparison
     { probBFasterThanA :: Double
@@ -211,6 +236,10 @@ data BayesianComparison = BayesianComparison
     -- ^ Percentage improvement (positive = candidate faster)
     , p95Comparison :: PercentileComparison
     , p99Comparison :: PercentileComparison
+    , mannWhitneyU :: Maybe MWUResult
+    -- ^ Mann-Whitney U test (Nothing if sample too small)
+    , kolmogorovSmirnov :: Maybe KSResult
+    -- ^ Two-sample KS test (Nothing if sample too small)
     }
     deriving stock (Show, Eq, Generic)
     deriving anyclass (ToJSON)
@@ -439,6 +468,14 @@ data RegressionResult = RegressionResult
     }
     deriving stock (Show, Eq, Generic)
     deriving anyclass (ToJSON)
+
+-- | Output format for benchmark reports.
+data OutputFormat
+    = -- | Terminal-only output (default)
+      OutputTerminal
+    | -- | Also write a markdown report to the given file path
+      OutputMarkdown FilePath
+    deriving stock (Show, Eq)
 
 -- | Exit status from a benchmark run.
 data RunResult

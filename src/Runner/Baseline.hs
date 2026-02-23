@@ -5,7 +5,7 @@ Description : Baseline save/compare operations and regression reporting
 module Runner.Baseline (handleBaseline, printRegressionResult) where
 
 import Benchmark.Baseline (compareToBaseline, loadBaseline, saveBaseline)
-import Benchmark.CI (CIMode (..), detectCIMode, formatForCI, writeArtifactReport)
+import Benchmark.CI (CIMode (..), detectCIMode, formatForCI, writeArtifactReport, writeGitHubStepSummary)
 import Benchmark.CLI (BaselineMode (..))
 import Benchmark.Output (resultsDir)
 import Benchmark.Types (
@@ -63,7 +63,7 @@ handleBaseline logger mode timestamp stats = case mode of
                 return RunSuccess
             Right baseline -> doBaselineComparison timestamp stats baseline
 
--- | Emit CI-specific output when running in GitLab.
+-- | Emit CI-specific output based on the detected CI environment.
 emitCIOutput :: RegressionResult -> String -> IO ()
 emitCIOutput regression timestamp = do
     ciMode <- detectCIMode
@@ -71,6 +71,11 @@ emitCIOutput regression timestamp = do
         None -> return ()
         GitLab -> do
             formatForCI GitLab regression
+            let reportFile = resultsDir ++ "/benchmark-report-" ++ timestamp ++ ".md"
+            writeArtifactReport reportFile regression
+        GitHub -> do
+            formatForCI GitHub regression
+            writeGitHubStepSummary regression
             let reportFile = resultsDir ++ "/benchmark-report-" ++ timestamp ++ ".md"
             writeArtifactReport reportFile regression
 
