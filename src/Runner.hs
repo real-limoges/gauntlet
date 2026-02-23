@@ -37,7 +37,7 @@ import Runner.Baseline (handleBaseline)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
-import Stats.Benchmark (calculateStats, compareBayesian)
+import Stats.Benchmark (addFrequentistTests, calculateStats, compareBayesian)
 
 -- | Run A/B benchmark comparing candidate against primary target.
 runMultiple :: BaselineMode -> OutputFormat -> TestConfig -> IO RunResult
@@ -93,7 +93,11 @@ runMultiple baselineMode outFmt cfg = do
 
                     let statsCandidate = calculateStats resultsCandidate
                         statsPrimary = calculateStats resultsPrimary
-                        bayes = compareBayesian statsPrimary statsCandidate
+                        bayes =
+                            addFrequentistTests
+                                resultsPrimary
+                                resultsCandidate
+                                (compareBayesian statsPrimary statsCandidate)
 
                     printMultipleBenchmarkReport "primary" "candidate" statsPrimary statsCandidate bayes
                     let validAll = validPrimary ++ validCandidate

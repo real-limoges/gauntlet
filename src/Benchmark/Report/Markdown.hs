@@ -16,6 +16,8 @@ module Benchmark.Report.Markdown (
 import Benchmark.Types (
     BayesianComparison (..),
     BenchmarkStats (..),
+    KSResult (..),
+    MWUResult (..),
     MetricRegression (..),
     PercentileComparison (..),
     RegressionResult (..),
@@ -178,6 +180,8 @@ bayesTable b =
     , row "Relative effect" (printf "%+.1f%%" (relativeEffect b * 100))
     , row "p95 difference" (pctRow $ p95Comparison b)
     , row "p99 difference" (pctRow $ p99Comparison b)
+    , row "Mann-Whitney U" (mwuCell $ mannWhitneyU b)
+    , row "Kolmogorov-Smirnov" (ksCell $ kolmogorovSmirnov b)
     ]
   where
     row label val = T.pack $ printf "| %s | %s |" (label :: String) (val :: String)
@@ -192,3 +196,14 @@ bayesTable b =
             (pctDifference p)
             (pctCredibleLower p)
             (pctCredibleUpper p)
+    mwuCell Nothing = "sample too small"
+    mwuCell (Just r)
+        | mwuSignificant r = "significant (p < 0.05)"
+        | otherwise = "not significant (p >= 0.05)"
+    ksCell Nothing = "sample too small"
+    ksCell (Just r) =
+        printf
+            "D = %.3f, p = %.3f (%s)"
+            (ksStatistic r)
+            (ksPValue r)
+            (if ksSignificant r then "significant" else "not significant" :: String)

@@ -14,7 +14,7 @@ module Benchmark.Report (
 )
 where
 
-import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), Endpoint (..), PercentileComparison (..), ValidationError (..), ValidationSummary (..), VerificationResult (..))
+import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), Endpoint (..), KSResult (..), MWUResult (..), PercentileComparison (..), ValidationError (..), ValidationSummary (..), VerificationResult (..))
 import Control.Monad (forM_, when)
 import Data.Aeson (Value, encode)
 import Data.ByteString.Lazy.Char8 qualified as LBS8
@@ -57,6 +57,11 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
     let p99 = p99Comparison bayes
     printf "P99 Difference: %.2f ms [%.2f, %.2f]\n" (pctDifference p99) (pctCredibleLower p99) (pctCredibleUpper p99)
     printf "P99 Regression Probability: %.2f%%\n" (probPctRegression p99 * 100.0)
+
+    putStrLn ""
+    printHeader "Distribution Tests"
+    printMWU (mannWhitneyU bayes)
+    printKS (kolmogorovSmirnov bayes)
 
 printVerifyReport :: [(Endpoint, VerificationResult)] -> IO ()
 printVerifyReport results = do
@@ -105,6 +110,21 @@ printStats stats = do
     printf "  Min:     %.2f ms\n" (minMs stats)
     printf "  Max:     %.2f ms\n" (maxMs stats)
     printf "  Success: %d / %d\n" (countSuccess stats) (totalRequests stats)
+
+printMWU :: Maybe MWUResult -> IO ()
+printMWU Nothing = putStrLn "Mann-Whitney U:      (sample too small)"
+printMWU (Just r)
+    | mwuSignificant r = putStrLn "Mann-Whitney U:      Significant — distributions differ (p < 0.05)"
+    | otherwise = putStrLn "Mann-Whitney U:      Not significant (p >= 0.05)"
+
+printKS :: Maybe KSResult -> IO ()
+printKS Nothing = putStrLn "Kolmogorov-Smirnov:  (sample too small)"
+printKS (Just r) =
+    printf
+        "Kolmogorov-Smirnov:  D = %.3f, p = %.3f (%s)\n"
+        (ksStatistic r)
+        (ksPValue r)
+        (if ksSignificant r then "significant" else "not significant" :: String)
 
 printHeader :: String -> IO ()
 printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
