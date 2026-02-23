@@ -19,10 +19,6 @@ jobs:
         run: |
           apt-get update
           apt-get install -y \
-            libcairo2-dev \
-            libpango1.0-dev \
-            libglib2.0-dev \
-            pkg-config \
             libncurses-dev \
             zlib1g-dev
 

@@ -4,7 +4,6 @@ Description : Structured logging with timestamps and log levels
 Stability   : experimental
 
 Provides structured logging with timestamps, log levels, and configurable verbosity.
-Uses co-log-core for efficient logging infrastructure.
 -}
 module Log (
     Logger,
@@ -19,7 +18,6 @@ module Log (
 where
 
 import Benchmark.Types (LogLevel (..))
-import Colog.Core (LogAction (..))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
@@ -29,7 +27,7 @@ import System.IO (stderr)
 -- | Logger type that carries configuration
 data Logger = Logger
     { logLevel :: LogLevel
-    , logAction :: LogAction IO (LogLevel, UTCTime, Text)
+    , logAction :: (LogLevel, UTCTime, Text) -> IO ()
     }
 
 -- | Format a log message with timestamp and level
@@ -48,11 +46,10 @@ makeLogger :: LogLevel -> Logger
 makeLogger minLevel =
     Logger
         { logLevel = minLevel
-        , logAction =
-            LogAction $ \(level, time, msg) ->
-                when (level >= minLevel) $ do
-                    let formatted = "     " <> formatMessage level time msg
-                    TIO.hPutStrLn stderr formatted
+        , logAction = \(level, time, msg) ->
+            when (level >= minLevel) $ do
+                let formatted = "     " <> formatMessage level time msg
+                TIO.hPutStrLn stderr formatted
         }
   where
     when True action = action
@@ -68,7 +65,7 @@ withTimestamp level msg = do
 logAt :: LogLevel -> Logger -> Text -> IO ()
 logAt level logger msg = do
     entry <- withTimestamp level msg
-    unLogAction (logAction logger) entry
+    logAction logger entry
 
 logDebug, logInfo, logWarning, logError :: Logger -> Text -> IO ()
 logDebug = logAt Debug

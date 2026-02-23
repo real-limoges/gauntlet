@@ -40,7 +40,6 @@ library
                           Benchmark.Network.Pool
                           Benchmark.Network.Request
                           Benchmark.Output
-                          Benchmark.Plotting
                           Benchmark.Report
                           Benchmark.Types
                           Benchmark.Validation
@@ -68,10 +67,7 @@ library
                           brick,
                           bytestring,
                           case-insensitive,
-                          Chart,
-                          Chart-cairo,
                           clock,
-                          co-log-core,
                           containers,
                           directory,
                           filepath,
