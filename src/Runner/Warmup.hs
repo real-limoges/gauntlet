@@ -30,5 +30,5 @@ runWarmup RunContext{..} ep = do
                     ++ ")..."
         sem <- newQSem 1
         let authorizedEp = addAuth rcToken ep
-        _ <- runBenchmark rcSettings sem rcNetwork warmupIters 1 authorizedEp
+        _ <- runBenchmark rcSettings sem rcManager warmupIters 1 authorizedEp
         return ()

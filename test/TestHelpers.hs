@@ -83,7 +83,6 @@ makeValidConfig =
                 , warmup = Nothing
                 , logLevel = Nothing
                 , tempo = Nothing
-                , httpVersion = Nothing
                 , healthCheckPath = Nothing
                 , healthCheckTimeout = Nothing
                 }

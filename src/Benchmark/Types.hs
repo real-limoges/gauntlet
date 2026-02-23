@@ -366,8 +366,6 @@ data Settings = Settings
     , logLevel :: Maybe LogLevel
     -- ^ Logging verbosity (default: Info)
     , tempo :: Maybe TempoSettings
-    , httpVersion :: Maybe Text
-    -- ^ HTTP version: "1.1" (default) or "2" (HTTP/2 over TLS)
     , healthCheckPath :: Maybe Text
     -- ^ Health check path appended to service URL (default: "/health")
     , healthCheckTimeout :: Maybe Int

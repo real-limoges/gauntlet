@@ -33,7 +33,6 @@ library
                           Benchmark.CLI
                           Benchmark.Config
                           Benchmark.Environment
-                          Benchmark.HTTP2
                           Benchmark.Network
                           Benchmark.Network.Auth
                           Benchmark.Network.Exec
@@ -75,18 +74,15 @@ library
                           http-client,
                           http-client-tls,
                           http-types,
-                          http2,
                           math-functions,
                           microlens,
                           microlens-th,
-                          network,
                           optparse-applicative,
                           process,
                           statistics,
                           stm,
                           text,
                           time,
-                          tls,
                           vector,
                           vector-algorithms,
                           vty,
@@ -116,7 +112,6 @@ test-suite            gauntlet-test
                     , ConfigSpec
                     , Integration
                     , MockServer
-                    , NetworkSpec
                     , PropertySpec
                     , StatsSpec
                     , TestHelpers

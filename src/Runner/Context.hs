@@ -12,9 +12,9 @@ module Runner.Context (
 where
 
 import Benchmark.Environment (setupEnvironment)
-import Benchmark.Network (NetworkHandle, initNetwork, initNetworkHandle, readToken)
+import Benchmark.Network (initNetwork, readToken)
 import Benchmark.TUI.State (BenchmarkEvent)
-import Benchmark.Types (PerfTestError, Settings (..), exitWithError)
+import Benchmark.Types (Settings (..), exitWithError)
 import Benchmark.Types qualified as PT
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
 import Data.Maybe (fromMaybe)
@@ -28,9 +28,7 @@ import Tracing.Types qualified as TT
 data RunContext = RunContext
     { rcSettings :: Settings
     , rcManager :: Manager
-    -- ^ HTTP manager used for Tempo trace fetching (always HTTP/1.1)
-    , rcNetwork :: NetworkHandle
-    -- ^ Network transport for benchmark requests (H1 or H2)
+    -- ^ HTTP manager for all requests (benchmark + Tempo trace fetching)
     , rcToken :: Text
     , rcCsvFile :: FilePath
     , rcTimestamp :: String
@@ -44,17 +42,15 @@ setupOrFail setts branch target =
     setupEnvironment setts branch target >>= either exitWithError return
 
 -- | Initialise a 'RunContext' from benchmark settings.
-initContext :: Settings -> FilePath -> String -> Maybe (TChan BenchmarkEvent) -> Text -> IO RunContext
-initContext setts csvFile timestamp eventChan targetUrl = do
+initContext :: Settings -> FilePath -> String -> Maybe (TChan BenchmarkEvent) -> IO RunContext
+initContext setts csvFile timestamp eventChan = do
     token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
     mgr <- initNetwork setts
-    network <- initNetworkHandle setts targetUrl
     let logger = makeLogger (fromMaybe PT.defaultLogLevel (PT.logLevel setts))
     return
         RunContext
             { rcSettings = setts
             , rcManager = mgr
-            , rcNetwork = network
             , rcToken = token
             , rcCsvFile = csvFile
             , rcTimestamp = timestamp

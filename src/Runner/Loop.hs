@@ -51,8 +51,8 @@ runEndpointLoop RunContext{..} endpoints = do
                 emitEvent rcEventChan (EndpointStarted (url ep) idx numEndpoints)
                 let authorizedEp = addAuth rcToken ep
                 responses <- case rcEventChan of
-                    Just chan -> runBenchmarkWithEvents rcSettings sem rcNetwork iters idx authorizedEp chan
-                    Nothing -> runBenchmark rcSettings sem rcNetwork iters idx authorizedEp
+                    Just chan -> runBenchmarkWithEvents rcSettings sem rcManager iters idx authorizedEp chan
+                    Nothing -> runBenchmark rcSettings sem rcManager iters idx authorizedEp
                 return (idx, ep, responses)
             )
             indexedEndpoints
