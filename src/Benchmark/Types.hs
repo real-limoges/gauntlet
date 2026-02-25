@@ -405,8 +405,6 @@ data TempoSettings = TempoSettings
     -- ^ Defaults to True if tempo section present
     , tempoAuthToken :: Maybe Text
     -- ^ Optional Bearer token
-    , tempoQueryLimit :: Maybe Int
-    -- ^ Maximum number of traces to fetch (default: 100)
     }
     deriving stock (Show, Eq, Generic)
     deriving anyclass (FromJSON)

@@ -25,7 +25,6 @@ buildTraceQuery tempoSetts startNs endNs =
         , querySpanName = Nothing
         , queryStartNs = startNs
         , queryEndNs = endNs
-        , queryLimit = fromMaybe 100 (PT.tempoQueryLimit tempoSetts)
         , queryMinDuration = Nothing
         }
 

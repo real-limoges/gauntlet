@@ -45,8 +45,7 @@ searchTraces mgr cfg query = do
                 <> show startSec
                 <> "&end="
                 <> show endSec
-                <> "&limit="
-                <> show (queryLimit query)
+                <> "&limit=10000"
 
     result <- doGet mgr cfg url
     case result of

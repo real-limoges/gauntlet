@@ -62,8 +62,6 @@ data TraceQuery = TraceQuery
     -- ^ Start of time range (nanoseconds since epoch)
     , queryEndNs :: Nanoseconds
     -- ^ End of time range (nanoseconds since epoch)
-    , queryLimit :: Int
-    -- ^ Maximum traces to return
     , queryMinDuration :: Maybe Text
     -- ^ Optional minimum duration filter (e.g., "100ms")
     }

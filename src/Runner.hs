@@ -67,12 +67,12 @@ runMultiple baselineMode outFmt cfg = do
                     startNs <- getNowNs
 
                     emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
-                    setupOrFail setts (candidate $ git cfg) (candidate $ targets cfg)
+                    setupOrFail setts (candidate $ git cfg) (candidate $ targets cfg) (Just ["--profile", "testing", "up", "-d", "--build"])
                     emitEvent (Just eventChan) (StatusMessage $ "Running " <> candidate (targets cfg) <> " (" <> candidate (git cfg) <> ")")
                     (resultsCandidate, validCandidate) <- benchmarkEndpoints ctx "candidate" epsCandidate
 
                     emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> primary (git cfg) <> "...")
-                    setupOrFail setts (primary $ git cfg) (primary $ targets cfg)
+                    setupOrFail setts (primary $ git cfg) (primary $ targets cfg) (Just ["up", "-d", "--build"])
                     emitEvent (Just eventChan) (PhaseStarted primaryTotal)
                     emitEvent (Just eventChan) (StatusMessage $ "Running " <> primary (targets cfg) <> " (" <> primary (git cfg) <> ")")
                     (resultsPrimary, validPrimary) <- benchmarkEndpoints ctx "primary" epsPrimary
@@ -132,7 +132,7 @@ runSingle baselineMode outFmt cfg = do
         (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
             startNs <- getNowNs
             emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
-            setupOrFail setts (candidate $ git cfg) (candidate $ targets cfg)
+            setupOrFail setts (candidate $ git cfg) (candidate $ targets cfg) (Just ["--profile", "testing", "up", "-d", "--build"])
             emitEvent (Just eventChan) (StatusMessage $ "Running " <> targetUrl <> " (" <> candidate (git cfg) <> ")")
             (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
             endNs <- getNowNs

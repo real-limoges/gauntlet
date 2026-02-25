@@ -56,6 +56,7 @@ mockStats mean dev =
         , p50Ms = mean
         , p95Ms = mean + 1.65 * dev
         , p99Ms = mean + 2.33 * dev
+        , esMs = mean + 3 * dev
         }
 
 makeValidConfig :: TestConfig

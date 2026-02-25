@@ -37,9 +37,9 @@ data RunContext = RunContext
     }
 
 -- | Set up the git environment or exit with an error.
-setupOrFail :: Settings -> Text -> Text -> IO ()
-setupOrFail setts branch target =
-    setupEnvironment setts branch target >>= either exitWithError return
+setupOrFail :: Settings -> Text -> Text -> Maybe [String] -> IO ()
+setupOrFail setts branch target composeArgs =
+    setupEnvironment setts branch target composeArgs >>= either exitWithError return
 
 -- | Initialise a 'RunContext' from benchmark settings.
 initContext :: Settings -> FilePath -> String -> Maybe (TChan BenchmarkEvent) -> IO RunContext

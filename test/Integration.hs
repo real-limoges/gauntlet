@@ -202,4 +202,5 @@ testBenchmarkStats =
         , p50Ms = 42.0
         , p95Ms = 75.0
         , p99Ms = 120.0
+        , esMs = 135.0
         }
