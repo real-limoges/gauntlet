@@ -1,16 +1,16 @@
-{- |
+{-|
 Module      : Tracing.Report
 Description : Terminal output for trace analysis
 Stability   : experimental
 
 Formats and prints span duration statistics from trace analysis.
 -}
-module Tracing.Report (
-    printTraceAnalysis,
-    printSpanTable,
-    formatSpanRow,
-    writeRawTraces,
-) where
+module Tracing.Report
+  ( printTraceAnalysis
+  , printSpanTable
+  , formatSpanRow
+  , writeRawTraces
+  ) where
 
 import Data.Aeson (encode)
 import Data.ByteString.Lazy qualified as LBS
@@ -24,41 +24,41 @@ import Tracing.Types (SpanAggregation (..), Trace (..))
 
 printTraceAnalysis :: [Trace] -> IO ()
 printTraceAnalysis traces = do
-    let allSpans = concatMap traceSpans traces
-        aggregations = aggregateBySpanName allSpans
+  let allSpans = concatMap traceSpans traces
+      aggregations = aggregateBySpanName allSpans
 
-    putStrLn $ "Traces Analyzed: " ++ show (length traces)
-    putStrLn $ "Total Spans: " ++ show (length allSpans)
-    putStrLn ""
-    printSpanTable aggregations
+  putStrLn $ "Traces Analyzed: " ++ show (length traces)
+  putStrLn $ "Total Spans: " ++ show (length allSpans)
+  putStrLn ""
+  printSpanTable aggregations
 
 printSpanTable :: [SpanAggregation] -> IO ()
 printSpanTable [] = putStrLn "No spans to display."
 printSpanTable aggs = do
-    let sorted_aggs = sortBy (comparing (Down . aggP95Ms)) aggs
-    putStrLn "#----- Span Duration Statistics -----#"
-    putStrLn $
-        printf
-            "%-50s %6s %10s %10s %10s %10s"
-            ("Span Name" :: String)
-            ("Count" :: String)
-            ("Mean" :: String)
-            ("P50" :: String)
-            ("P95" :: String)
-            ("P99" :: String)
-    putStrLn $ replicate 120 '-'
-    mapM_ (putStrLn . formatSpanRow) (take 20 sorted_aggs)
+  let sorted_aggs = sortBy (comparing (Down . aggP95Ms)) aggs
+  putStrLn "#----- Span Duration Statistics -----#"
+  putStrLn $
+    printf
+      "%-50s %6s %10s %10s %10s %10s"
+      ("Span Name" :: String)
+      ("Count" :: String)
+      ("Mean" :: String)
+      ("P50" :: String)
+      ("P95" :: String)
+      ("P99" :: String)
+  putStrLn $ replicate 120 '-'
+  mapM_ (putStrLn . formatSpanRow) (take 20 sorted_aggs)
 
 formatSpanRow :: SpanAggregation -> String
-formatSpanRow SpanAggregation{..} =
-    printf
-        "%-50s %6d %9.2fms %9.2fms %9.2fms %9.2fms"
-        (T.unpack $ T.take 50 aggSpanName)
-        aggCount
-        aggMeanMs
-        aggP50Ms
-        aggP95Ms
-        aggP99Ms
+formatSpanRow SpanAggregation {..} =
+  printf
+    "%-50s %6d %9.2fms %9.2fms %9.2fms %9.2fms"
+    (T.unpack $ T.take 50 aggSpanName)
+    aggCount
+    aggMeanMs
+    aggP50Ms
+    aggP95Ms
+    aggP99Ms
 
 -- | Write raw trace data to a JSON file for later inspection.
 writeRawTraces :: FilePath -> [Trace] -> IO ()

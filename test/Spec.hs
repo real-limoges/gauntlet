@@ -15,14 +15,14 @@ import VerifySpec (verifySpec)
 
 main :: IO ()
 main = hspec $ do
-    statsSpec
-    bayesianSpec
-    verifySpec
-    validationSpec
-    configSpec
-    tracingSpec
-    baselineSpec
-    tuiStateSpec
-    tuiWidgetsSpec
-    propertySpec
-    integrationSpec
+  statsSpec
+  bayesianSpec
+  verifySpec
+  validationSpec
+  configSpec
+  tracingSpec
+  baselineSpec
+  tuiStateSpec
+  tuiWidgetsSpec
+  propertySpec
+  integrationSpec

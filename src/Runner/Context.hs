@@ -1,14 +1,14 @@
-{- |
+{-|
 Module      : Runner.Context
 Description : Per-run context record, initialisation, and shared utilities
 -}
-module Runner.Context (
-    RunContext (..),
-    initContext,
-    getNowNs,
-    emitEvent,
-    setupOrFail,
-)
+module Runner.Context
+  ( RunContext (..)
+  , initContext
+  , getNowNs
+  , emitEvent
+  , setupOrFail
+  )
 where
 
 import Benchmark.Environment (setupEnvironment)
@@ -26,37 +26,37 @@ import System.Clock (Clock (Realtime), getTime, toNanoSecs)
 import Tracing.Types qualified as TT
 
 data RunContext = RunContext
-    { rcSettings :: Settings
-    , rcManager :: Manager
-    -- ^ HTTP manager for all requests (benchmark + Tempo trace fetching)
-    , rcToken :: Text
-    , rcCsvFile :: FilePath
-    , rcTimestamp :: String
-    , rcEventChan :: Maybe (TChan BenchmarkEvent)
-    , rcLogger :: Logger
-    }
+  { rcSettings :: Settings
+  , rcManager :: Manager
+  -- ^ HTTP manager for all requests (benchmark + Tempo trace fetching)
+  , rcToken :: Text
+  , rcCsvFile :: FilePath
+  , rcTimestamp :: String
+  , rcEventChan :: Maybe (TChan BenchmarkEvent)
+  , rcLogger :: Logger
+  }
 
 -- | Set up the git environment or exit with an error.
 setupOrFail :: Settings -> Text -> Text -> Maybe [String] -> IO ()
 setupOrFail setts branch target composeArgs =
-    setupEnvironment setts branch target composeArgs >>= either exitWithError return
+  setupEnvironment setts branch target composeArgs >>= either exitWithError return
 
 -- | Initialise a 'RunContext' from benchmark settings.
 initContext :: Settings -> FilePath -> String -> Maybe (TChan BenchmarkEvent) -> IO RunContext
 initContext setts csvFile timestamp eventChan = do
-    token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
-    mgr <- initNetwork setts
-    let logger = makeLogger (fromMaybe PT.defaultLogLevel (PT.logLevel setts))
-    return
-        RunContext
-            { rcSettings = setts
-            , rcManager = mgr
-            , rcToken = token
-            , rcCsvFile = csvFile
-            , rcTimestamp = timestamp
-            , rcEventChan = eventChan
-            , rcLogger = logger
-            }
+  token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
+  mgr <- initNetwork setts
+  let logger = makeLogger (fromMaybe PT.defaultLogLevel (PT.logLevel setts))
+  return
+    RunContext
+      { rcSettings = setts
+      , rcManager = mgr
+      , rcToken = token
+      , rcCsvFile = csvFile
+      , rcTimestamp = timestamp
+      , rcEventChan = eventChan
+      , rcLogger = logger
+      }
 
 -- | Current time as nanoseconds (wall clock).
 getNowNs :: IO TT.Nanoseconds
