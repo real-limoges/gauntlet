@@ -4,7 +4,7 @@
 
 A Haskell-based performance testing tool that goes beyond simple request/second metrics, providing Bayesian statistical analysis, regression detection, and CI/CD integration for production-grade performance monitoring.
 
-[![GHC Version](https://img.shields.io/badge/GHC-9.10%2B-blue)](https://www.haskell.org/ghc/)
+[![GHC Version](https://img.shields.io/badge/GHC-9.12%2B-blue)](https://www.haskell.org/ghc/)
 [![Cabal Version](https://img.shields.io/badge/Cabal-3.12%2B-blue)](https://www.haskell.org/cabal/)
 [![Language](https://img.shields.io/badge/Language-GHC2024-purple)](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/control.html#extension-GHC2024)
 
@@ -25,6 +25,9 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 - **Percentile Analysis** - P50, P95, P99 with Maritz-Jarrett standard errors
 - **Earth Mover's Distance** - 1-Wasserstein distance for distribution comparison
 - **Credible Intervals** - 95% Bayesian credible intervals for mean differences
+- **Expected Shortfall** - Mean latency of the worst 1% of requests (E[X | X > p99])
+- **Anderson-Darling Test** - Tail-sensitive two-sample test (Scholz-Stephens 1987)
+- **Mann-Whitney U / KS Tests** - Non-parametric distribution comparison
 
 ### 🔍 Observability
 - **Real-time TUI** - Live progress tracking with Brick-based terminal UI
@@ -62,7 +65,7 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 
 ### Prerequisites
 
-- **GHC 9.10+** - Haskell compiler
+- **GHC 9.12+** - Haskell compiler
 - **Cabal 3.12+** - Haskell build tool
 
 ### macOS
@@ -211,9 +214,14 @@ cabal run gauntlet-exe -- verify --config config.json
   "targets": {
     "primary": "http://api.example.com"
   },
+  "git": {
+    "primary": "main",
+    "candidate": "main"
+  },
   "settings": {
     "iterations": 100,
-    "concurrency": 10
+    "concurrency": 10,
+    "secrets": ".secrets/token.txt"
   },
   "payloads": [
     {
@@ -233,6 +241,10 @@ cabal run gauntlet-exe -- verify --config config.json
     "primary": "http://api-v1.example.com",
     "candidate": "http://api-v2.example.com"
   },
+  "git": {
+    "primary": "main",
+    "candidate": "feature/my-branch"
+  },
   "settings": {
     "iterations": 10000,
     "concurrency": 100,
@@ -241,6 +253,8 @@ cabal run gauntlet-exe -- verify --config config.json
     "requestTimeout": 60,
     "logLevel": "info",
     "secrets": ".secrets/token.txt",
+    "healthCheckPath": "/health",
+    "healthCheckTimeout": 60,
 
     "warmup": {
       "warmupIterations": 10
@@ -271,6 +285,13 @@ cabal run gauntlet-exe -- verify --config config.json
       "body": {
         "name": "test-user",
         "email": "test@example.com"
+      },
+      "validate": {
+        "status": 201,
+        "fields": {
+          "$.id": {"present": true},
+          "$.status": {"eq": "active"}
+        }
       }
     }
   ]
@@ -281,18 +302,26 @@ cabal run gauntlet-exe -- verify --config config.json
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `targets.primary` | string | required | Primary endpoint URL |
-| `targets.candidate` | string | - | Candidate endpoint URL for A/B testing |
+| `targets.primary` | string | required | Primary endpoint base URL |
+| `targets.candidate` | string | - | Candidate endpoint base URL for A/B testing |
+| `git.primary` | string | required | Git branch for primary target |
+| `git.candidate` | string | required | Git branch for candidate target |
 | `settings.iterations` | int | required | Number of requests to execute |
 | `settings.concurrency` | int | required | Concurrent request limit |
+| `settings.secrets` | string | required | Path to file containing Bearer token |
 | `settings.maxConnections` | int | 10 | HTTP connection pool size |
 | `settings.connIdleTimeout` | int | 30 | Connection idle timeout (seconds) |
 | `settings.requestTimeout` | int | 30 | Request timeout (seconds) |
 | `settings.logLevel` | string | `"info"` | Log level: `debug`, `info`, `warning`, `error` |
+| `settings.healthCheckPath` | string | `"/health"` | Path appended to service URL for health polling |
+| `settings.healthCheckTimeout` | int | 60 | Health check poll timeout (seconds) |
 | `settings.warmup.warmupIterations` | int | 1 | Warmup iterations before benchmark |
 | `settings.retry.retryMaxAttempts` | int | 3 | Maximum retry attempts |
 | `settings.retry.retryInitialDelayMs` | int | 1000 | Initial retry delay (ms) |
 | `settings.retry.retryBackoffMultiplier` | double | 2.0 | Exponential backoff multiplier |
+| `payloads[].headers` | object | - | Custom HTTP headers (key/value map) |
+| `payloads[].validate.status` | int | - | Expected HTTP status code |
+| `payloads[].validate.fields` | object | - | Dot-path field assertions (`present: true` or `eq: value`) |
 
 See [`examples/`](examples/) directory for complete configuration examples.
 
@@ -307,6 +336,13 @@ Instead of traditional hypothesis testing (p-values), gauntlet uses **Bayesian i
 - **"95% probability candidate is faster"** - Clear, interpretable results
 - **95% Credible Intervals** - Range of plausible mean differences
 - **Effect Size (Cohen's d)** - Practical significance measurement
+
+Two distinct probability metrics are reported:
+
+| Metric | Formula | Answers |
+|--------|---------|---------|
+| `probBFasterThanA` | Φ((μ_A - μ_B) / √(σ_A²/n_A + σ_B²/n_B)) | Is B's *average* faster? |
+| `probSingleRequestFaster` | Φ((μ_A - μ_B) / √(σ_A² + σ_B²)) | Will a *single* request to B be faster? |
 
 #### How It Works
 
@@ -336,6 +372,15 @@ Instead of traditional hypothesis testing (p-values), gauntlet uses **Bayesian i
 - Measures "cost" to transform one distribution into another
 - Scale: 0 (identical) to 1 (completely different)
 - Useful for detecting distribution shifts beyond mean differences
+
+**Anderson-Darling Test (Scholz-Stephens 1987)**
+- Two-sample test more sensitive to tail differences than KS
+- Minimum sample size: 5 per group
+- Complements Mann-Whitney U (rank-based) and KS (CDF-based) tests
+
+**Expected Shortfall (ES)**
+- `esMs` = E[X | X > p99]: mean latency of the worst 1% of requests
+- Captures tail risk beyond what p99 alone conveys
 
 ---
 
@@ -390,7 +435,7 @@ See [`examples/README.md`](examples/README.md) for more examples.
 
 ### Prerequisites
 
-- **GHC 9.10+** with GHC2024 language standard
+- **GHC 9.12+** with GHC2024 language standard
 - **Cabal 3.12+**
 - **ormolu** or **fourmolu** (for code formatting)
 
@@ -437,28 +482,46 @@ gauntlet/
 │   ├── Benchmark/          # HTTP benchmarking engine
 │   │   ├── Types.hs        # Core data types
 │   │   ├── Config.hs       # Configuration parsing
-│   │   ├── Network.hs      # HTTP client with timing
+│   │   ├── Environment.hs  # Git switch + docker-compose + health check
+│   │   ├── Network.hs      # HTTP client facade
+│   │   ├── Network/        # Network sub-modules (Auth, Pool, Exec, Request)
 │   │   ├── CLI.hs          # Command-line interface
-│   │   ├── Baseline.hs     # Baseline comparison
+│   │   ├── Baseline.hs     # Baseline save/load
+│   │   ├── Validation.hs   # Per-response JSON field validation
+│   │   ├── Verify.hs       # Response body/status verification
 │   │   ├── TUI.hs          # Real-time terminal UI
+│   │   ├── TUI/            # TUI sub-modules (State, Widgets)
 │   │   ├── Report.hs       # Terminal output
-│   │   └── Output.hs       # JSON/CSV serialization
+│   │   ├── Report/         # Markdown report generation
+│   │   ├── Output.hs       # JSON/CSV serialization
+│   │   └── CI.hs           # GitLab CI / GitHub Actions integration
+│   ├── Runner/             # Benchmark orchestration
+│   │   ├── Context.hs      # RunContext, initContext, setupOrFail
+│   │   ├── Loop.hs         # Concurrent benchmark loops
+│   │   ├── Warmup.hs       # Warmup execution
+│   │   ├── Tracing.hs      # Tempo trace fetching
+│   │   └── Baseline.hs     # Baseline compare + CI emit
 │   ├── Stats/              # Statistical analysis
 │   │   ├── Common.hs       # Percentiles, std dev
-│   │   └── Benchmark.hs    # Bayesian comparison
+│   │   └── Benchmark.hs    # Bayesian + frequentist comparison
 │   ├── Tracing/            # Grafana Tempo integration
 │   │   ├── Types.hs        # Trace data structures
 │   │   ├── Client.hs       # Tempo HTTP client
-│   │   └── Analysis.hs     # Span aggregation
+│   │   ├── Query.hs        # TraceQL query construction
+│   │   ├── Analysis.hs     # Span aggregation
+│   │   └── Report.hs       # Trace terminal output
 │   ├── Log.hs              # Structured logging
-│   ├── Runner.hs           # Benchmark orchestration
-│   └── Lib.hs              # Main entry point
+│   ├── Runner.hs           # Top-level entry points
+│   └── Lib.hs              # Main dispatcher
 ├── test/                   # Test suite
 │   ├── ConfigSpec.hs       # Config parsing tests
 │   ├── StatsSpec.hs        # Statistical tests
 │   ├── BayesianSpec.hs     # Bayesian analysis tests
+│   ├── BaselineSpec.hs     # Baseline tests
+│   ├── TracingSpec.hs      # Tracing tests
 │   ├── Integration.hs      # End-to-end tests
 │   ├── PropertySpec.hs     # QuickCheck properties
+│   ├── TUISpec.hs          # Brick widget tests
 │   └── MockServer.hs       # HTTP mock utilities
 ├── examples/               # Example configurations
 ├── docs/                   # Documentation
@@ -514,11 +577,15 @@ cabal test --test-show-details=direct
 ```
 CLI Parse → Config Load → Endpoint Build
     ↓
-Environment Setup → Network Init → Warmup
+Git Switch (candidate) → docker-compose up → Health Check
     ↓
-Concurrent Execution (STM) → Nanosecond-timed Responses
+Warmup → Concurrent Execution (STM) → Nanosecond-timed Responses
     ↓
-Statistical Analysis → Bayesian Comparison → Report
+Git Switch (primary) → docker-compose up → Health Check
+    ↓
+Warmup → Concurrent Execution (STM) → Nanosecond-timed Responses
+    ↓
+Statistical Analysis → Bayesian + Frequentist Comparison → Report
     ↓
 Optional: Fetch Traces → Aggregate Spans → Trace Report
     ↓
@@ -661,7 +728,7 @@ Built with:
 - [statistics](https://hackage.haskell.org/package/statistics) - Statistical analysis
 - [brick](https://hackage.haskell.org/package/brick) - Terminal UI framework
 - [aeson](https://hackage.haskell.org/package/aeson) - JSON parsing
-- [Chart](https://hackage.haskell.org/package/Chart) - Plotting library
+- [vector](https://hackage.haskell.org/package/vector) - High-performance arrays
 
 Statistical methodology inspired by Bayesian Data Analysis (Gelman et al.) and practical A/B testing literature.
 
