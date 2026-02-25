@@ -1,4 +1,4 @@
-{- |
+{-|
 Module      : Tracing.Query
 Description : TraceQL query builder
 Stability   : experimental
@@ -17,10 +17,10 @@ import Tracing.Types (TraceQuery (..))
 -- | Build a TraceQL query string from query parameters.
 buildTraceQL :: TraceQuery -> Text
 buildTraceQL tq =
-    let conditions =
-            catMaybes
-                [ Just $ "resource.service.name=\"" <> queryService tq <> "\""
-                , (\sn -> "name=\"" <> sn <> "\"") <$> querySpanName tq
-                , ("duration>" <>) <$> queryMinDuration tq
-                ]
-     in "{" <> T.intercalate " && " conditions <> "}"
+  let conditions =
+        catMaybes
+          [ Just $ "resource.service.name=\"" <> queryService tq <> "\""
+          , (\sn -> "name=\"" <> sn <> "\"") <$> querySpanName tq
+          , ("duration>" <>) <$> queryMinDuration tq
+          ]
+   in "{" <> T.intercalate " && " conditions <> "}"

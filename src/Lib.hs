@@ -1,6 +1,6 @@
 {- HLINT ignore "Use exitSuccess" -}
 
-{- |
+{-|
 Module      : Lib
 Description : Main entry point
 Stability   : experimental
@@ -19,17 +19,17 @@ import VerifyRunner (runVerify)
 
 run :: IO ()
 run = do
-    cmd <- parseArgs
-    config <- loadAndValidateConfig (configPath cmd)
+  cmd <- parseArgs
+  config <- loadAndValidateConfig (configPath cmd)
 
-    result <- case cmd of
-        BenchmarkMultiple _ baseline fmt -> runMultiple baseline fmt config
-        BenchmarkSingle _ baseline fmt -> runSingle baseline fmt config
-        Verify _ -> runVerify config >> return RunSuccess
+  result <- case cmd of
+    BenchmarkMultiple _ baseline fmt -> runMultiple baseline fmt config
+    BenchmarkSingle _ baseline fmt -> runSingle baseline fmt config
+    Verify _ -> runVerify config >> return RunSuccess
 
-    exitWithResult result
+  exitWithResult result
 
-{- | Exit with appropriate code based on run result.
+{-| Exit with appropriate code based on run result.
 0 = success, 1 = regression detected, 2 = error
 -}
 exitWithResult :: RunResult -> IO ()
@@ -39,7 +39,7 @@ exitWithResult (RunError _) = exitWith (ExitFailure 2)
 
 loadAndValidateConfig :: FilePath -> IO TestConfig
 loadAndValidateConfig path = do
-    res <- loadConfig path
-    case res of
-        Left err -> exitWithError $ ConfigParseError err
-        Right cfg -> either exitWithError return (validateConfig cfg)
+  res <- loadConfig path
+  case res of
+    Left err -> exitWithError $ ConfigParseError err
+    Right cfg -> either exitWithError return (validateConfig cfg)

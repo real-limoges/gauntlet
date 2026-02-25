@@ -1,9 +1,9 @@
-module Benchmark.TUI (
-    runTUI,
-    TUIState,
-    BenchmarkEvent (..),
-    initialState,
-) where
+module Benchmark.TUI
+  ( runTUI
+  , TUIState
+  , BenchmarkEvent (..)
+  , initialState
+  ) where
 
 import Benchmark.TUI.State
 import Benchmark.TUI.Widgets
@@ -28,8 +28,8 @@ import System.Directory (getTemporaryDirectory, removeFile)
 import System.IO (hClose, hFlush, hPutStr, openTempFile, stderr)
 
 data CustomEvent
-    = Tick
-    | BenchEvent BenchmarkEvent
+  = Tick
+  | BenchEvent BenchmarkEvent
 
 type Name = ()
 
@@ -40,55 +40,55 @@ drawUI state = [borderWithLabel title (vBox sections)]
   where
     title = withAttr (attrName "title") (txt " gauntlet ")
     sections =
-        [ headerSection state
-        , hBorder
-        , progressSection state
-        , hBorder
-        , statsSection state
-        , hBorder
-        , hBox [histogramSection state, requestTimelineSection state]
-        , hBorder
-        , errorsSection state
-        , hBorder
-        , footerSection
-        ]
+      [ headerSection state
+      , hBorder
+      , progressSection state
+      , hBorder
+      , statsSection state
+      , hBorder
+      , hBox [histogramSection state, requestTimelineSection state]
+      , hBorder
+      , errorsSection state
+      , hBorder
+      , footerSection
+      ]
 
 headerSection :: TUIState -> Widget Name
 headerSection state =
-    padLeftRight 1 $
-        vBox
-            [ row "Target  " $ withAttr (attrName "hi") $ txt (state ^. tsTarget)
-            , row "Phase   " $
-                hBox
-                    [ txt $ state ^. tsCurrentEndpoint
-                    , withAttr (attrName "dim") $
-                        txt $
-                            "  ["
-                                <> T.pack (show (state ^. tsEndpointIndex))
-                                <> "/"
-                                <> T.pack (show (state ^. tsTotalEndpoints))
-                                <> "]"
-                    ]
-            , if T.null (state ^. tsStatus)
-                then emptyWidget
-                else row "Status  " $ withAttr (attrName "dim") $ txt (state ^. tsStatus)
+  padLeftRight 1 $
+    vBox
+      [ row "Target  " $ withAttr (attrName "hi") $ txt (state ^. tsTarget)
+      , row "Phase   " $
+          hBox
+            [ txt $ state ^. tsCurrentEndpoint
+            , withAttr (attrName "dim") $
+                txt $
+                  "  ["
+                    <> T.pack (show (state ^. tsEndpointIndex))
+                    <> "/"
+                    <> T.pack (show (state ^. tsTotalEndpoints))
+                    <> "]"
             ]
+      , if T.null (state ^. tsStatus)
+          then emptyWidget
+          else row "Status  " $ withAttr (attrName "dim") $ txt (state ^. tsStatus)
+      ]
   where
     row label w = hBox [withAttr (attrName "label") (txt label), w]
 
 progressSection :: TUIState -> Widget Name
 progressSection state =
-    padLeftRight 1 $
-        vBox
-            [ progressBar pct ""
-            , hBox
-                [ withAttr (attrName "dim") $ txt $ T.pack $ show completed <> "/" <> show total
-                , txt $ "  " <> T.pack (show (round (pct * 100) :: Int)) <> "%"
-                , if elapsed > 0
-                    then withAttr (attrName "dim") $ txt $ "   " <> formatElapsed elapsed
-                    else emptyWidget
-                ]
-            ]
+  padLeftRight 1 $
+    vBox
+      [ progressBar pct ""
+      , hBox
+          [ withAttr (attrName "dim") $ txt $ T.pack $ show completed <> "/" <> show total
+          , txt $ "  " <> T.pack (show (round (pct * 100) :: Int)) <> "%"
+          , if elapsed > 0
+              then withAttr (attrName "dim") $ txt $ "   " <> formatElapsed elapsed
+              else emptyWidget
+          ]
+      ]
   where
     completed = state ^. tsCompleted
     total = state ^. tsIsTotal
@@ -97,35 +97,36 @@ progressSection state =
 
 statsSection :: TUIState -> Widget Name
 statsSection state =
-    padLeftRight 1 $ case state ^. tsRollingStats of
-        Nothing -> withAttr (attrName "dim") $ txt $ "Waiting for data...  (rolling last " <> T.pack (show rollingWindow) <> ")"
-        Just stats ->
-            vBox
-                [ withAttr (attrName "dim") $ txt $ "Latency  (rolling last " <> T.pack (show rollingWindow) <> ")"
-                , txt " "
-                , hBox
-                    [ statBox "Mean" (formatDuration $ stats ^. rsMeanMs)
-                    , statBox "P50 " (formatDuration $ stats ^. rsP50Ms)
-                    , statBox "P95 " (formatDuration $ stats ^. rsP95Ms)
-                    , statBox "P99 " (formatDuration $ stats ^. rsP99Ms)
-                    , statBox "Min " (formatDuration $ stats ^. rsMinMs)
-                    , statBox "Max " (formatDuration $ stats ^. rsMaxMs)
-                    ]
-                ]
+  padLeftRight 1 $ case state ^. tsRollingStats of
+    Nothing ->
+      withAttr (attrName "dim") $ txt $ "Waiting for data...  (rolling last " <> T.pack (show rollingWindow) <> ")"
+    Just stats ->
+      vBox
+        [ withAttr (attrName "dim") $ txt $ "Latency  (rolling last " <> T.pack (show rollingWindow) <> ")"
+        , txt " "
+        , hBox
+            [ statBox "Mean" (formatDuration $ stats ^. rsMeanMs)
+            , statBox "P50 " (formatDuration $ stats ^. rsP50Ms)
+            , statBox "P95 " (formatDuration $ stats ^. rsP95Ms)
+            , statBox "P99 " (formatDuration $ stats ^. rsP99Ms)
+            , statBox "Min " (formatDuration $ stats ^. rsMinMs)
+            , statBox "Max " (formatDuration $ stats ^. rsMaxMs)
+            ]
+        ]
   where
     statBox label value =
-        padRight (Pad 4) $
-            vBox
-                [ withAttr (attrName "label") $ txt label
-                , withAttr (attrName "stat") $ txt value
-                ]
+      padRight (Pad 4) $
+        vBox
+          [ withAttr (attrName "label") $ txt label
+          , withAttr (attrName "stat") $ txt value
+          ]
 
 histogramSection :: TUIState -> Widget Name
 histogramSection state =
-    borderWithLabel (withAttr (attrName "label") $ txt " Distribution ") $
-        if null durations
-            then withAttr (attrName "dim") $ txt "Waiting for data..."
-            else histogram (zip labels counts)
+  borderWithLabel (withAttr (attrName "label") $ txt " Distribution ") $
+    if null durations
+      then withAttr (attrName "dim") $ txt "Waiting for data..."
+      else histogram (zip labels counts)
   where
     durations = toList (state ^. tsRecentDurations)
     lo = minimum durations
@@ -135,17 +136,17 @@ histogramSection state =
     bucketIndex v = min (nBuckets - 1) (floor ((v - lo) / bucketWidth))
     counts = [length (filter (\v -> bucketIndex v == i) durations) | i <- [0 .. nBuckets - 1]]
     labels =
-        [ formatDuration (lo + fromIntegral i * bucketWidth)
-        | i <- [0 .. nBuckets - 1]
-        ]
+      [ formatDuration (lo + fromIntegral i * bucketWidth)
+      | i <- [0 .. nBuckets - 1]
+      ]
 
 requestTimelineSection :: TUIState -> Widget Name
 requestTimelineSection state =
-    borderWithLabel (withAttr (attrName "label") $ txt " Requests ") $
-        padLeftRight 1 $
-            if Seq.null (state ^. tsRecentRequests)
-                then withAttr (attrName "dim") $ txt "Waiting..."
-                else vBox [renderRow r | r <- rows]
+  borderWithLabel (withAttr (attrName "label") $ txt " Requests ") $
+    padLeftRight 1 $
+      if Seq.null (state ^. tsRecentRequests)
+        then withAttr (attrName "dim") $ txt "Waiting..."
+        else vBox [renderRow r | r <- rows]
   where
     cols = 10
     reqs = toList (state ^. tsRecentRequests)
@@ -160,20 +161,20 @@ requestTimelineSection state =
 
 errorsSection :: TUIState -> Widget Name
 errorsSection state =
-    padLeftRight 1 $
-        vBox
-            [ hBox
-                [ withAttr (attrName "ok") $ txt $ "✓ " <> T.pack (show (state ^. tsSuccessCount)) <> " ok"
-                , txt "   "
-                , withAttr (attrName "err") $ txt $ "✗ " <> T.pack (show (state ^. tsErrorCount)) <> " errors"
-                , if errorCount > 0 && total > 0
-                    then withAttr (attrName "dim") $ txt $ "  (" <> T.pack (show pct) <> "%)"
-                    else emptyWidget
-                ]
-            , if Seq.null (state ^. tsRecentErrors)
-                then emptyWidget
-                else vBox $ map renderErr $ foldr (:) [] $ Seq.take 3 (state ^. tsRecentErrors)
-            ]
+  padLeftRight 1 $
+    vBox
+      [ hBox
+          [ withAttr (attrName "ok") $ txt $ "✓ " <> T.pack (show (state ^. tsSuccessCount)) <> " ok"
+          , txt "   "
+          , withAttr (attrName "err") $ txt $ "✗ " <> T.pack (show (state ^. tsErrorCount)) <> " errors"
+          , if errorCount > 0 && total > 0
+              then withAttr (attrName "dim") $ txt $ "  (" <> T.pack (show pct) <> "%)"
+              else emptyWidget
+          ]
+      , if Seq.null (state ^. tsRecentErrors)
+          then emptyWidget
+          else vBox $ map renderErr $ foldr (:) [] $ Seq.take 3 (state ^. tsRecentErrors)
+      ]
   where
     errorCount = state ^. tsErrorCount
     total = errorCount + state ^. tsSuccessCount
@@ -189,89 +190,89 @@ handleEvent :: BrickEvent Name CustomEvent -> EventM Name TUIState ()
 handleEvent (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt
 handleEvent (VtyEvent (V.EvKey (V.KChar 'c') [V.MCtrl])) = halt
 handleEvent (AppEvent Tick) = do
-    now <- liftIO getCurrentTime
-    modify $ \st -> case _tsStartTime st of
-        Nothing -> st
-        Just start -> st{_tsElapsedSecs = realToFrac (diffUTCTime now start)}
+  now <- liftIO getCurrentTime
+  modify $ \st -> case _tsStartTime st of
+    Nothing -> st
+    Just start -> st {_tsElapsedSecs = realToFrac (diffUTCTime now start)}
 handleEvent (AppEvent (BenchEvent event)) = do
-    now <- liftIO getCurrentTime
-    modify (updateState now event)
-    case event of
-        BenchmarkFinished -> halt
-        _ -> return ()
+  now <- liftIO getCurrentTime
+  modify (updateState now event)
+  case event of
+    BenchmarkFinished -> halt
+    _ -> return ()
 handleEvent _ = return ()
 
 -- ── Attributes ───────────────────────────────────────────────────────────────
 
 theAttrMap :: AttrMap
 theAttrMap =
-    attrMap
-        V.defAttr
-        [ (attrName "title", fg V.yellow)
-        , (attrName "label", fg V.yellow)
-        , (attrName "hi", fg V.cyan)
-        , (attrName "stat", V.withStyle V.defAttr V.bold)
-        , (attrName "ok", fg V.brightBlue)
-        , (attrName "err", fg V.red)
-        , (attrName "dim", fg V.brightBlack)
-        , (attrName "progress", fg V.blue)
-        ]
+  attrMap
+    V.defAttr
+    [ (attrName "title", fg V.yellow)
+    , (attrName "label", fg V.yellow)
+    , (attrName "hi", fg V.cyan)
+    , (attrName "stat", V.withStyle V.defAttr V.bold)
+    , (attrName "ok", fg V.brightBlue)
+    , (attrName "err", fg V.red)
+    , (attrName "dim", fg V.brightBlack)
+    , (attrName "progress", fg V.blue)
+    ]
 
 tuiApp :: App TUIState CustomEvent Name
 tuiApp =
-    App
-        { appDraw = drawUI
-        , appChooseCursor = neverShowCursor
-        , appHandleEvent = handleEvent
-        , appStartEvent = return ()
-        , appAttrMap = const theAttrMap
-        }
+  App
+    { appDraw = drawUI
+    , appChooseCursor = neverShowCursor
+    , appHandleEvent = handleEvent
+    , appStartEvent = return ()
+    , appAttrMap = const theAttrMap
+    }
 
 -- ── Runner ────────────────────────────────────────────────────────────────────
 
-{- | Redirect stderr to a temp file for the duration of 'action', then replay
+{-| Redirect stderr to a temp file for the duration of 'action', then replay
 any captured output to the real stderr afterwards. Prevents log/error lines
 from corrupting the Brick terminal while the TUI is active.
 -}
 withStderrBuffered :: IO a -> IO a
 withStderrBuffered action =
-    bracket acquire release (const action)
+  bracket acquire release (const action)
   where
     acquire = do
-        stderrSaved <- hDuplicate stderr
-        tmpDir <- getTemporaryDirectory
-        (tmpPath, tmpHandle) <- openTempFile tmpDir "gauntlet-stderr.tmp"
-        hDuplicateTo tmpHandle stderr
-        hClose tmpHandle
-        return (stderrSaved, tmpPath)
+      stderrSaved <- hDuplicate stderr
+      tmpDir <- getTemporaryDirectory
+      (tmpPath, tmpHandle) <- openTempFile tmpDir "gauntlet-stderr.tmp"
+      hDuplicateTo tmpHandle stderr
+      hClose tmpHandle
+      return (stderrSaved, tmpPath)
     release (stderrSaved, tmpPath) = do
-        hFlush stderr
-        hDuplicateTo stderrSaved stderr
-        hClose stderrSaved
-        content <- try (readFile tmpPath) :: IO (Either SomeException String)
-        case content of
-            Right s -> unless (null s) $ hPutStr stderr s
-            Left _ -> return ()
-        _ <- try (removeFile tmpPath) :: IO (Either SomeException ())
-        return ()
+      hFlush stderr
+      hDuplicateTo stderrSaved stderr
+      hClose stderrSaved
+      content <- try (readFile tmpPath) :: IO (Either SomeException String)
+      case content of
+        Right s -> unless (null s) $ hPutStr stderr s
+        Left _ -> return ()
+      _ <- try (removeFile tmpPath) :: IO (Either SomeException ())
+      return ()
 
 runTUI :: TChan BenchmarkEvent -> TUIState -> IO TUIState
 runTUI eventChan initialSt = do
-    brickChan <- newBChan 1000
+  brickChan <- newBChan 1000
 
-    tid1 <- forkIO $ forever $ do
-        event <- atomically $ readTChan eventChan
-        writeBChan brickChan (BenchEvent event)
+  tid1 <- forkIO $ forever $ do
+    event <- atomically $ readTChan eventChan
+    writeBChan brickChan (BenchEvent event)
 
-    tid2 <- forkIO $ forever $ do
-        threadDelay 100_000
-        writeBChan brickChan Tick
+  tid2 <- forkIO $ forever $ do
+    threadDelay 100_000
+    writeBChan brickChan Tick
 
-    let buildVty = mkVty V.defaultConfig
-    initialVty <- buildVty
-    result <-
-        withStderrBuffered $
-            customMain initialVty buildVty (Just brickChan) tuiApp initialSt
-    killThread tid1
-    killThread tid2
-    return result
+  let buildVty = mkVty V.defaultConfig
+  initialVty <- buildVty
+  result <-
+    withStderrBuffered $
+      customMain initialVty buildVty (Just brickChan) tuiApp initialSt
+  killThread tid1
+  killThread tid2
+  return result

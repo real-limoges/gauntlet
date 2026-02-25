@@ -1,22 +1,22 @@
-{- |
+{-|
 Module      : Benchmark.Network.Exec
 Description : Concurrent benchmark execution loops and A/B comparison
 -}
-module Benchmark.Network.Exec (
-    runBenchmark,
-    runBenchmarkWithEvents,
-    runComparison,
-)
+module Benchmark.Network.Exec
+  ( runBenchmark
+  , runBenchmarkWithEvents
+  , runComparison
+  )
 where
 
 import Benchmark.Network.Request (prepareRequest, timedRequestPrepared)
 import Benchmark.TUI.State (BenchmarkEvent (..))
-import Benchmark.Types (
-    Endpoint (..),
-    Settings (..),
-    TestingResponse (..),
-    defaultLogLevel,
- )
+import Benchmark.Types
+  ( Endpoint (..)
+  , Settings (..)
+  , TestingResponse (..)
+  , defaultLogLevel
+  )
 import Benchmark.Types qualified as Types
 import Control.Concurrent (QSem)
 import Control.Concurrent.Async (concurrently, replicateConcurrently)
@@ -30,53 +30,56 @@ import Data.Text qualified as T
 import Log (Logger, logInfo, makeLogger)
 import Network.HTTP.Client (Manager)
 
-{- | Run concurrent benchmark iterations with rate limiting via semaphore.
+{-| Run concurrent benchmark iterations with rate limiting via semaphore.
 Prepares the request once (H1) or dispatches over the H2 connection.
 -}
 runBenchmark :: Settings -> QSem -> Manager -> Int -> Int -> Endpoint -> IO [TestingResponse]
 runBenchmark settings sem mgr iters pIdx endpoint = do
-    let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
-    countRef <- newIORef 0
-    preparedReq <- prepareRequest settings endpoint
-    replicateConcurrently iters $
-        bracket_ (waitQSem sem) (signalQSem sem) $ do
-            res <- timedRequestPrepared settings mgr preparedReq
-            current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
-            printProgressBar logger pIdx current iters
-            return res
+  let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
+  countRef <- newIORef 0
+  preparedReq <- prepareRequest settings endpoint
+  replicateConcurrently iters $
+    bracket_ (waitQSem sem) (signalQSem sem) $ do
+      res <- timedRequestPrepared settings mgr preparedReq
+      current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
+      printProgressBar logger pIdx current iters
+      return res
 
-{- | Run benchmark with event emission for TUI updates.
+{-| Run benchmark with event emission for TUI updates.
 Emits 'RequestCompleted' or 'RequestFailed' after each request.
 -}
-runBenchmarkWithEvents :: Settings -> QSem -> Manager -> Int -> Int -> Endpoint -> TChan BenchmarkEvent -> IO [TestingResponse]
+runBenchmarkWithEvents ::
+  Settings -> QSem -> Manager -> Int -> Int -> Endpoint -> TChan BenchmarkEvent -> IO [TestingResponse]
 runBenchmarkWithEvents settings sem mgr iters pIdx endpoint eventChan = do
-    let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
-    countRef <- newIORef 0
-    let emitAndProgress res = do
-            let event = case errorMessage res of
-                    Nothing -> RequestCompleted (durationNs res) (statusCode res)
-                    Just err -> RequestFailed (T.pack err)
-            atomically $ writeTChan eventChan event
-            current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
-            printProgressBar logger pIdx current iters
-            return res
-    preparedReq <- prepareRequest settings endpoint
-    replicateConcurrently iters $
-        bracket_ (waitQSem sem) (signalQSem sem) $
-            timedRequestPrepared settings mgr preparedReq >>= emitAndProgress
+  let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
+  countRef <- newIORef 0
+  let emitAndProgress res = do
+        let event = case errorMessage res of
+              Nothing -> RequestCompleted (durationNs res) (statusCode res)
+              Just err -> RequestFailed (T.pack err)
+        atomically $ writeTChan eventChan event
+        current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
+        printProgressBar logger pIdx current iters
+        return res
+  preparedReq <- prepareRequest settings endpoint
+  replicateConcurrently iters $
+    bracket_ (waitQSem sem) (signalQSem sem) $
+      timedRequestPrepared settings mgr preparedReq >>= emitAndProgress
 
 -- | Execute two endpoints concurrently for A/B comparison.
 runComparison :: Settings -> Manager -> Endpoint -> Endpoint -> IO (TestingResponse, TestingResponse)
 runComparison settings mgr epA epB = do
-    reqA <- prepareRequest settings epA
-    reqB <- prepareRequest settings epB
-    concurrently (timedRequestPrepared settings mgr reqA) (timedRequestPrepared settings mgr reqB)
+  reqA <- prepareRequest settings epA
+  reqB <- prepareRequest settings epB
+  concurrently (timedRequestPrepared settings mgr reqA) (timedRequestPrepared settings mgr reqB)
 
 printProgressBar :: Logger -> Int -> Int -> Int -> IO ()
 printProgressBar logger idx c total = do
-    let numUpdates = min total 10
-        step = max 1 (total `div` numUpdates)
-        shouldPrint = c > 0 && (c `mod` step == 0 || c == total)
-    when shouldPrint $ do
-        let percent = (c * 100) `div` total
-        logInfo logger $ T.pack $ "[Ep " ++ show idx ++ "] Progress: " ++ show percent ++ "% (" ++ show c ++ "/" ++ show total ++ ")"
+  let numUpdates = min total 10
+      step = max 1 (total `div` numUpdates)
+      shouldPrint = c > 0 && (c `mod` step == 0 || c == total)
+  when shouldPrint $ do
+    let percent = (c * 100) `div` total
+    logInfo logger $
+      T.pack $
+        "[Ep " ++ show idx ++ "] Progress: " ++ show percent ++ "% (" ++ show c ++ "/" ++ show total ++ ")"

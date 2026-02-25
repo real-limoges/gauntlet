@@ -1,4 +1,4 @@
-{- |
+{-|
 Module      : VerifyRunner
 Description : Response verification orchestration
 Stability   : experimental
@@ -17,20 +17,20 @@ import Data.Text qualified as T
 
 runVerify :: TestConfig -> IO ()
 runVerify cfg = do
-    putStrLn "Running Verification..."
+  putStrLn "Running Verification..."
 
-    let epsA = buildEndpoints cfg False
-        epsB = buildEndpoints cfg True
-        setts = settings cfg
+  let epsA = buildEndpoints cfg False
+      epsB = buildEndpoints cfg True
+      setts = settings cfg
 
-    token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
-    mgr <- initNetwork setts
+  token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
+  mgr <- initNetwork setts
 
-    results <- forM (zip epsA epsB) $ \(epA, epB) -> do
-        let authEpA = addAuth token epA
-            authEpB = addAuth token epB
-        (resA, resB) <- runComparison setts mgr authEpA authEpB
-        let check = Verify.verify resA resB
-        return (epA, check)
+  results <- forM (zip epsA epsB) $ \(epA, epB) -> do
+    let authEpA = addAuth token epA
+        authEpB = addAuth token epB
+    (resA, resB) <- runComparison setts mgr authEpA authEpB
+    let check = Verify.verify resA resB
+    return (epA, check)
 
-    printVerifyReport results
+  printVerifyReport results

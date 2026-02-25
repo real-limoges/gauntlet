@@ -1,4 +1,4 @@
-{- |
+{-|
 Module      : Benchmark.Network
 Description : HTTP client for benchmark requests
 Stability   : experimental
@@ -10,16 +10,16 @@ Re-exports the full public API from the Network sub-modules:
 * "Benchmark.Network.Request" — request preparation and timed execution
 * "Benchmark.Network.Exec"    — concurrent benchmark loops and A/B comparison
 -}
-module Benchmark.Network (
-    initNetwork,
-    runBenchmark,
-    runBenchmarkWithEvents,
-    runComparison,
-    timedRequest,
-    addAuth,
-    readToken,
-    prepareRequest,
-)
+module Benchmark.Network
+  ( initNetwork
+  , runBenchmark
+  , runBenchmarkWithEvents
+  , runComparison
+  , timedRequest
+  , addAuth
+  , readToken
+  , prepareRequest
+  )
 where
 
 import Benchmark.Network.Auth (addAuth, readToken)
