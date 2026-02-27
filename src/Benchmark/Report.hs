@@ -132,6 +132,7 @@ printVerificationResult :: VerificationResult -> IO ()
 printVerificationResult Match = return ()
 printVerificationResult (StatusMismatch a b) = printf "  Status Mismatch: Expected %d, Got %d\n" a b
 printVerificationResult (InvalidJSON err) = printf "  JSON Error: %s\n" err
+printVerificationResult (NetworkError msg) = printf "  Network Error: %s\n" msg
 printVerificationResult (BodyMismatch diffs) = do
   printf "  Body Mismatch (%d field(s) differ):\n" (length diffs)
   mapM_

@@ -37,7 +37,10 @@ data Command
       , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
       }
-  | Verify {configPath :: FilePath}
+  | Verify
+      { configPath :: FilePath
+      , outputFormat :: OutputFormat
+      }
   deriving (Show, Eq)
 
 parseArgs :: IO Command
@@ -127,4 +130,4 @@ benchmarkSingleOptions =
   BenchmarkSingle <$> configOption <*> baselineModeParser <*> outputFormatParser
 
 verifyOptions :: Parser Command
-verifyOptions = Verify <$> configOption
+verifyOptions = Verify <$> configOption <*> outputFormatParser

@@ -25,8 +25,8 @@ run = do
   result <- case cmd of
     BenchmarkMultiple _ baseline fmt -> runMultiple baseline fmt config
     BenchmarkSingle _ baseline fmt -> runSingle baseline fmt config
-    Verify _ -> do
-      passed <- runVerify config
+    Verify {outputFormat = fmt} -> do
+      passed <- runVerify fmt config
       return $ if passed then RunSuccess else RunRegression (RegressionResult "verify" [] False)
 
   exitWithResult result

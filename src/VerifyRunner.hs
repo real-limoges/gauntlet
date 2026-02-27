@@ -10,24 +10,33 @@ module VerifyRunner where
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Network (addAuth, initNetwork, readToken, runComparison)
 import Benchmark.Report (printVerifyReport)
+import Benchmark.Report.Markdown (markdownVerifyReport)
 import Benchmark.Types
-  ( PerfTestError (..)
+  ( OutputFormat (..)
+  , PerfTestError (..)
   , Settings (..)
   , TestConfig (..)
   , VerificationResult (..)
+  , defaultLogLevel
   , exitWithError
   )
 import Benchmark.Verify qualified as Verify
 import Control.Monad (forM, replicateM)
+import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
+import Log (logInfo, makeLogger)
+import System.Directory (createDirectoryIfMissing)
+import System.FilePath (takeDirectory)
 
-runVerify :: TestConfig -> IO Bool
-runVerify cfg = do
-  putStrLn "Running Verification..."
+runVerify :: OutputFormat -> TestConfig -> IO Bool
+runVerify fmt cfg = do
+  let setts = settings cfg
+      logger = makeLogger (fromMaybe defaultLogLevel (logLevel setts))
+  logInfo logger "Running Verification..."
 
   let epsA = buildEndpoints cfg False
       epsB = buildEndpoints cfg True
-      setts = settings cfg
 
   token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
   mgr <- initNetwork setts
@@ -45,16 +54,24 @@ runVerify cfg = do
             <> " endpoint(s)"
     else return ()
 
-  let n = maybe 1 id (verifyIterations setts)
+  let n = fromMaybe 1 (verifyIterations setts)
 
   results <- forM (zip epsA epsB) $ \(epA, epB) -> do
     let authEpA = addAuth token epA
         authEpB = addAuth token epB
-        tol = maybe 0.0 id (floatTolerance setts)
+        tol = fromMaybe 0.0 (floatTolerance setts)
     checks <- replicateM n $ do
       (resA, resB) <- runComparison setts mgr authEpA authEpB
-      return $ Verify.verify tol (compareFields setts) resA resB
+      return $ Verify.verifyWithNetworkCheck tol (compareFields setts) (ignoreFields setts) resA resB
     return (epA, checks)
 
   printVerifyReport results
+
+  case fmt of
+    OutputTerminal -> return ()
+    OutputMarkdown path -> do
+      createDirectoryIfMissing True (takeDirectory path)
+      TIO.writeFile path (markdownVerifyReport results)
+      logInfo logger (T.pack ("Markdown report written to: " <> path))
+
   return (all (all (== Match) . snd) results)

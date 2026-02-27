@@ -8,6 +8,7 @@ Supports an optional float tolerance for stochastic data science responses.
 -}
 module Benchmark.Verify
   ( verify
+  , verifyWithNetworkCheck
   )
 where
 
@@ -23,33 +24,74 @@ import Data.Text.Lazy qualified as TL
 import Data.Text.Lazy.Encoding qualified as TLE
 import Data.Vector qualified as V
 
+{-| Check for network-level errors before comparing responses.
+Returns a 'NetworkError' if either response has an 'errorMessage', otherwise
+delegates to 'verify'.
+-}
+verifyWithNetworkCheck ::
+  Double ->
+  -- | compareFields whitelist
+  Maybe [T.Text] ->
+  -- | ignoreFields blacklist
+  Maybe [T.Text] ->
+  TestingResponse ->
+  TestingResponse ->
+  VerificationResult
+verifyWithNetworkCheck tol mCompare mIgnore respA respB =
+  case (errorMessage respA, errorMessage respB) of
+    (Just e, _) -> NetworkError ("Primary request failed: " <> e)
+    (_, Just e) -> NetworkError ("Candidate request failed: " <> e)
+    (Nothing, Nothing) -> verify tol mCompare mIgnore respA respB
+
 {-| Compare two responses for semantic equality.
 The 'Double' tolerance is applied to all JSON number comparisons;
 pass @0.0@ for exact matching.
 When 'compareFields' is provided, only those keys (and their subtrees) are compared.
+When 'ignoreFields' is provided, those keys are stripped at every depth before comparison.
 -}
-verify :: Double -> Maybe [T.Text] -> TestingResponse -> TestingResponse -> VerificationResult
-verify tol mFields respA respB
+verify ::
+  Double -> Maybe [T.Text] -> Maybe [T.Text] -> TestingResponse -> TestingResponse -> VerificationResult
+verify tol mCompare mIgnore respA respB
   | statusCode respA /= statusCode respB =
       StatusMismatch (statusCode respA) (statusCode respB)
-  | otherwise = compareBodies tol mFields (respBody respA) (respBody respB)
+  | otherwise = compareBodies tol mCompare mIgnore (respBody respA) (respBody respB)
 
-compareBodies :: Double -> Maybe [T.Text] -> Maybe ByteString -> Maybe ByteString -> VerificationResult
-compareBodies _ _ Nothing Nothing = Match
-compareBodies _ _ (Just _) Nothing = InvalidJSON "Response B body absent"
-compareBodies _ _ Nothing (Just _) = InvalidJSON "Response A body absent"
-compareBodies tol mFields (Just bodyA) (Just bodyB) =
+compareBodies ::
+  Double -> Maybe [T.Text] -> Maybe [T.Text] -> Maybe ByteString -> Maybe ByteString -> VerificationResult
+compareBodies _ _ _ Nothing Nothing = Match
+compareBodies _ _ _ (Just _) Nothing = InvalidJSON "Response B body absent"
+compareBodies _ _ _ Nothing (Just _) = InvalidJSON "Response A body absent"
+compareBodies tol mCompare mIgnore (Just bodyA) (Just bodyB) =
   case (decode bodyA :: Maybe Value, decode bodyB :: Maybe Value) of
     (Nothing, _) -> InvalidJSON "Response A is not valid JSON"
     (_, Nothing) -> InvalidJSON "Response B is not valid JSON"
     (Just jsonA, Just jsonB) ->
-      let (effA, effB) = case mFields of
-            Nothing -> (jsonA, jsonB)
-            Just ks ->
-              let keyset = Set.fromList ks
-               in (extractByKeys keyset jsonA, extractByKeys keyset jsonB)
-          diffs = diffValues tol "" effA effB
-       in if null diffs then Match else BodyMismatch diffs
+      let
+        -- First strip ignored fields
+        (strippedA, strippedB) = case mIgnore of
+          Nothing -> (jsonA, jsonB)
+          Just ks ->
+            let keyset = Set.fromList ks
+             in (stripKeys keyset jsonA, stripKeys keyset jsonB)
+        -- Then apply compareFields whitelist
+        (effA, effB) = case mCompare of
+          Nothing -> (strippedA, strippedB)
+          Just ks ->
+            let keyset = Set.fromList ks
+             in (extractByKeys keyset strippedA, extractByKeys keyset strippedB)
+        diffs = diffValues tol "" effA effB
+       in
+        if null diffs then Match else BodyMismatch diffs
+
+{-| Recursively remove all keys matching the given set from a JSON tree.
+Applied before 'extractByKeys' so that ignored fields are stripped first.
+-}
+stripKeys :: Set.Set T.Text -> Value -> Value
+stripKeys keys (Object obj) =
+  let filtered = KeyMap.filterWithKey (\k _ -> Key.toText k `Set.notMember` keys) obj
+   in Object (KeyMap.map (stripKeys keys) filtered)
+stripKeys keys (Array arr) = Array (fmap (stripKeys keys) arr)
+stripKeys _ v = v
 
 {-| Recursively search a JSON tree and return a flat 'Object' containing
 every key in @keys@ paired with its full subtree.

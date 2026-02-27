@@ -51,12 +51,15 @@ validateResponse spec resp = statusErrors ++ fieldErrors
           Nothing -> [BodyInvalidJSON]
           Just jsonVal -> concatMap (checkField jsonVal) (Map.toList fields)
 
--- | Validate all responses for one endpoint, producing a summary.
+{-| Validate all responses for one endpoint, producing a summary.
+Errors are collected from at most 50 failing responses to prevent unbounded accumulation.
+-}
 validateResponses :: ValidationSpec -> [TestingResponse] -> ValidationSummary
 validateResponses spec resps =
   let perResp = map (validateResponse spec) resps
-      errors = concat perResp
-      numFailed = length (filter (not . null) perResp)
+      failedPerResp = filter (not . null) perResp
+      errors = concat (take 50 failedPerResp)
+      numFailed = length failedPerResp
    in ValidationSummary
         { totalValidated = length resps
         , totalFailed = numFailed

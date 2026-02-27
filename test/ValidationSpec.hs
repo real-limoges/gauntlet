@@ -300,3 +300,10 @@ validationSpec = describe "Benchmark.Validation" $ do
           summary = validateResponses spec []
       totalValidated summary `shouldBe` 0
       totalFailed summary `shouldBe` 0
+
+    it "caps error collection at 50 failing responses" $ do
+      let resp = makeResponseWithBody 404 (encode (object ["id" .= (1 :: Int)]))
+          spec = makeSpec (Just 200) []
+          summary = validateResponses spec (replicate 100 resp)
+      totalFailed summary `shouldBe` 100
+      length (validationErrors summary) `shouldBe` 50

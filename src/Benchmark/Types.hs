@@ -326,6 +326,8 @@ data VerificationResult
   | StatusMismatch Int Int
   | BodyMismatch [JsonDiff]
   | InvalidJSON String
+  | -- | Request-level failure (timeout, connection error) on primary or candidate
+    NetworkError String
   deriving stock (Show, Eq, Generic)
 
 data PerfTestError
@@ -451,6 +453,8 @@ data Settings = Settings
   -- ^ Absolute tolerance for floating-point comparisons in verify mode (default: exact match)
   , compareFields :: Maybe [Text]
   -- ^ When set, only these keys (and their full subtrees) are compared in verify mode
+  , ignoreFields :: Maybe [Text]
+  -- ^ Keys stripped at any depth before comparison in verify mode (complement of compareFields)
   , verifyIterations :: Maybe Int
   -- ^ Number of request pairs to run per endpoint in verify mode (default: 1)
   }
