@@ -36,7 +36,9 @@ module Benchmark.Types
 
     -- * Configuration
   , TestConfig (..)
+  , NwayConfig (..)
   , Targets (..)
+  , NamedTarget (..)
   , Settings (..)
   , RetrySettings (..)
   , defaultRetrySettings
@@ -359,6 +361,12 @@ data TestConfig = TestConfig
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
 
+data NwayConfig = NwayConfig
+    { nwayTargets :: [NamedTarget]
+    , nwaySettings :: Settings
+    , nwayPayloads :: [PayloadSpec]
+    }
+
 -- | Primary and candidate target URLs or git branches.
 data Targets = Targets
   { primary :: Text
@@ -366,6 +374,15 @@ data Targets = Targets
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
+
+-- | Single named target in N-Way run
+data NamedTarget = NamedTarget
+    { targetName :: Text
+    , targetUrl :: Text
+    , targetBranch :: Maybe Text
+    }
+    deriving stock (Show, Eq, Generic)
+    deriving anyclass (FromJSON, ToJSON)
 
 -- | Retry configuration for failed requests.
 data RetrySettings = RetrySettings

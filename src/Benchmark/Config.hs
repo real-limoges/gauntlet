@@ -27,6 +27,14 @@ loadConfig path = do
     Left err -> return $ Left (show err)
     Right content -> return $ eitherDecode content
 
+loadNwayConfig :: FilePath -> IO (Either Text NWayConfig)
+loadNwayConfig path = do
+  result <- try (LBS.readFile path) :: IO (Either IOException LBS.ByteString)
+  case result of
+    Left err -> return $ Left (show err)
+    Right content -> return $ eitherDecode content
+
+
 {-| Build endpoint list from config, selecting primary or candidate target.
 When useCandidate is True, uses candidate target; otherwise uses primary.
 -}
