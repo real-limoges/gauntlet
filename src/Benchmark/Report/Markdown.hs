@@ -145,7 +145,9 @@ markdownValidationReport summaries =
       "Field not found: `" <> path <> "`"
     describeError (FieldValueMismatch path _ _) =
       "Field value mismatch at `" <> path <> "`"
-    describeError BodyNotJSON =
+    describeError BodyAbsent =
+      "Response body absent"
+    describeError BodyInvalidJSON =
       "Response body is not valid JSON"
 
 -- ---------------------------------------------------------------------------

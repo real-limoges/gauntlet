@@ -185,7 +185,22 @@ setupManager = newManager defaultManagerSettings
 
 testSettings :: Settings
 testSettings =
-  Settings 10 4 "" (Just 10) (Just 5) (Just 30) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+  Settings
+    10
+    4
+    ""
+    (Just 10)
+    (Just 5)
+    (Just 30)
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
+    Nothing
 
 endpoint :: Int -> Endpoint
 endpoint port = Endpoint "GET" ("http://127.0.0.1:" <> T.pack (show port)) Nothing [] Nothing

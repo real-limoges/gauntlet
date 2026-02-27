@@ -18,7 +18,7 @@ import Benchmark.Types
   , exitWithError
   )
 import Benchmark.Verify qualified as Verify
-import Control.Monad (forM)
+import Control.Monad (forM, replicateM)
 import Data.Text qualified as T
 
 runVerify :: TestConfig -> IO Bool
@@ -45,13 +45,16 @@ runVerify cfg = do
             <> " endpoint(s)"
     else return ()
 
+  let n = maybe 1 id (verifyIterations setts)
+
   results <- forM (zip epsA epsB) $ \(epA, epB) -> do
     let authEpA = addAuth token epA
         authEpB = addAuth token epB
-    (resA, resB) <- runComparison setts mgr authEpA authEpB
-    let tol = maybe 0.0 id (floatTolerance setts)
-        check = Verify.verify tol (compareFields setts) resA resB
-    return (epA, check)
+        tol = maybe 0.0 id (floatTolerance setts)
+    checks <- replicateM n $ do
+      (resA, resB) <- runComparison setts mgr authEpA authEpB
+      return $ Verify.verify tol (compareFields setts) resA resB
+    return (epA, checks)
 
   printVerifyReport results
-  return (all ((== Match) . snd) results)
+  return (all (all (== Match) . snd) results)

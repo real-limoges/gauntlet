@@ -89,24 +89,24 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
   printKS (kolmogorovSmirnov bayes)
   printAD (andersonDarling bayes)
 
-printVerifyReport :: [(Endpoint, VerificationResult)] -> IO ()
+printVerifyReport :: [(Endpoint, [VerificationResult])] -> IO ()
 printVerifyReport results = do
   printHeader "Verification Report:"
 
   let total = length results
-  let failures = filter ((/= Match) . snd) results
+  let failures = filter (any (/= Match) . snd) results
   let successes = total - length failures
 
-  putStrLn $ printf "Total Tests: %d" total
-  printf "Passed:      %d\n" successes
+  putStrLn $ printf "Total Endpoints: %d" total
+  printf "Passed:          %d\n" successes
 
   if null failures
     then printf "VERIFICATION TESTS PASSED.\n"
     else do
-      printf "Failed:      %d\n" (length failures)
+      printf "Failed:          %d\n" (length failures)
       putStrLn ""
       printHeader "FAILURE DETAILS"
-      forM_ failures printFailure
+      forM_ failures printMultiSampleFailure
 
 printSingleBenchmarkReport :: Text -> BenchmarkStats -> IO ()
 printSingleBenchmarkReport name stats = do
@@ -115,25 +115,34 @@ printSingleBenchmarkReport name stats = do
   printf "(%s):" (T.unpack name)
   printStats stats
 
-printFailure :: (Endpoint, VerificationResult) -> IO ()
-printFailure (ep, res) = do
-  printf "[%s] %s\n" (T.unpack $ method ep) (T.unpack $ url ep)
-  case res of
-    Match -> return ()
-    StatusMismatch a b -> printf "  Status Mismatch: Expected %d, Got %d\n" a b
-    InvalidJSON err -> printf "  JSON Error: %s\n" err
-    BodyMismatch diffs -> do
-      printf "  Body Mismatch (%d field(s) differ):\n" (length diffs)
-      mapM_
-        ( \d ->
-            printf
-              "    %-40s  primary=%-20s  candidate=%s\n"
-              (T.unpack $ jdPath d)
-              (T.unpack $ jdPrimary d)
-              (T.unpack $ jdCandidate d)
-        )
-        diffs
+printMultiSampleFailure :: (Endpoint, [VerificationResult]) -> IO ()
+printMultiSampleFailure (ep, results) = do
+  let n = length results
+      passed = length (filter (== Match) results)
+  printf "[%s] %s" (T.unpack $ method ep) (T.unpack $ url ep)
+  if n > 1
+    then printf " (%d/%d samples passed)\n" passed n
+    else putStrLn ""
+  case filter (/= Match) results of
+    [] -> return ()
+    (firstFailure : _) -> printVerificationResult firstFailure
   putStrLn ""
+
+printVerificationResult :: VerificationResult -> IO ()
+printVerificationResult Match = return ()
+printVerificationResult (StatusMismatch a b) = printf "  Status Mismatch: Expected %d, Got %d\n" a b
+printVerificationResult (InvalidJSON err) = printf "  JSON Error: %s\n" err
+printVerificationResult (BodyMismatch diffs) = do
+  printf "  Body Mismatch (%d field(s) differ):\n" (length diffs)
+  mapM_
+    ( \d ->
+        printf
+          "    %-40s  primary=%-20s  candidate=%s\n"
+          (T.unpack $ jdPath d)
+          (T.unpack $ jdPrimary d)
+          (T.unpack $ jdCandidate d)
+    )
+    diffs
 
 printStats :: BenchmarkStats -> IO ()
 printStats stats = do
@@ -208,8 +217,10 @@ printValidationError (FieldValueMismatch path expected actual) = do
   printf "  [value]   %s\n" (T.unpack path)
   printf "    expected: %s\n" (renderValue expected)
   printf "    actual:   %s\n" (renderValue actual)
-printValidationError BodyNotJSON =
-  putStrLn "  [body]    response body absent or not valid JSON"
+printValidationError BodyAbsent =
+  putStrLn "  [body]    response body absent"
+printValidationError BodyInvalidJSON =
+  putStrLn "  [body]    response body is not valid JSON"
 
 renderValue :: Value -> String
 renderValue = LBS8.unpack . encode
