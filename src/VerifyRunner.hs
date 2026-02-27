@@ -15,6 +15,7 @@ import Benchmark.Types
   ( OutputFormat (..)
   , PerfTestError (..)
   , Settings (..)
+  , Targets (..)
   , TestConfig (..)
   , VerificationResult (..)
   , defaultLogLevel
@@ -35,8 +36,8 @@ runVerify fmt cfg = do
       logger = makeLogger (fromMaybe defaultLogLevel (logLevel setts))
   logInfo logger "Running Verification..."
 
-  let epsA = buildEndpoints cfg False
-      epsB = buildEndpoints cfg True
+  let epsA = buildEndpoints (primary (targets cfg)) (payloads cfg)
+      epsB = buildEndpoints (candidate (targets cfg)) (payloads cfg)
 
   token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
   mgr <- initNetwork setts

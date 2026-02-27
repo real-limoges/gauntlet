@@ -1,0 +1,25 @@
+{
+  "targets": [
+    { "name": "prod", "url": "http://prod.example.com:8080" },
+    { "name": "staging", "url": "http://staging.example.com:8080" },
+    { "name": "dev", "url": "http://dev.example.com:8080" }
+  ],
+  "settings": {
+    "iterations": 100,
+    "concurrency": 4,
+    "secrets": "secrets.txt"
+  },
+  "payloads": [
+    {
+      "name": "get-users",
+      "method": "GET",
+      "path": "/api/users"
+    },
+    {
+      "name": "create-user",
+      "method": "POST",
+      "path": "/api/users",
+      "body": { "name": "test", "email": "test@example.com" }
+    }
+  ]
+}

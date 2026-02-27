@@ -11,6 +11,7 @@ module Benchmark.Report
   , printSingleBenchmarkReport
   , printVerifyReport
   , printValidationSummary
+  , printNwayReport
   )
 where
 
@@ -27,10 +28,10 @@ import Benchmark.Types
   , ValidationSummary (..)
   , VerificationResult (..)
   )
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, unless, when)
 import Data.Aeson (Value, encode)
 import Data.ByteString.Lazy.Char8 qualified as LBS8
-import Data.List (nub)
+import Data.List (nub, sortOn)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Text.Printf (printf)
@@ -225,3 +226,57 @@ printValidationError BodyInvalidJSON =
 
 renderValue :: Value -> String
 renderValue = LBS8.unpack . encode
+
+-- | Print N-way comparison report: ranking table followed by per-pair comparisons.
+printNwayReport :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)] -> IO ()
+printNwayReport namedStats pairs = do
+  putStrLn ""
+  printHeader "N-Way Benchmark Report"
+
+  -- Ranking table sorted by mean
+  putStrLn ""
+  printHeader "Ranking (by mean latency)"
+  printf
+    "%-4s  %-20s  %10s  %10s  %10s  %10s\n"
+    ("#" :: String)
+    ("Target" :: String)
+    ("Mean" :: String)
+    ("p50" :: String)
+    ("p95" :: String)
+    ("p99" :: String)
+  printf
+    "%-4s  %-20s  %10s  %10s  %10s  %10s\n"
+    ("----" :: String)
+    ("--------------------" :: String)
+    ("----------" :: String)
+    ("----------" :: String)
+    ("----------" :: String)
+    ("----------" :: String)
+  let ranked = sortOn (meanMs . snd) namedStats
+  forM_ (zip [1 :: Int ..] ranked) $ \(rank, (name, stats)) ->
+    printf
+      "%-4d  %-20s  %8.2f ms  %8.2f ms  %8.2f ms  %8.2f ms\n"
+      rank
+      (T.unpack name)
+      (meanMs stats)
+      (p50Ms stats)
+      (p95Ms stats)
+      (p99Ms stats)
+
+  -- Per-pair comparisons
+  unless (null pairs) $ do
+    putStrLn ""
+    printHeader "Pairwise Comparisons"
+    forM_ pairs $ \(nameA, nameB, bayes) -> do
+      putStrLn ""
+      printMultipleBenchmarkReport
+        nameA
+        nameB
+        (lookupStats nameA namedStats)
+        (lookupStats nameB namedStats)
+        bayes
+
+lookupStats :: Text -> [(Text, BenchmarkStats)] -> BenchmarkStats
+lookupStats name xs = case lookup name xs of
+  Just s -> s
+  Nothing -> error $ "lookupStats: target not found: " ++ T.unpack name

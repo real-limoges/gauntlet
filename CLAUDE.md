@@ -198,9 +198,7 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 
 **High-Priority Features:**
 1. Load control modes: constant RPS, ramp-up, step load
-2. Request chaining for authenticated flows (JSONPath extraction, templating)
-3. N-way comparison (`benchmark-nway`): replace `Targets{primary,candidate}` pair with `[NamedTarget]` list
-4. SPRT (Sequential Probability Ratio Test): post-hoc simulation on response lists
+2. N-way comparison (`benchmark-nway`): replace `Targets{primary,candidate}` pair with `[NamedTarget]` list
 
 ## Exit Codes
 

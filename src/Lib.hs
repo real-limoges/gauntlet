@@ -12,21 +12,34 @@ module Lib (run) where
 import System.Exit (ExitCode (..), exitWith)
 
 import Benchmark.CLI (Command (..), parseArgs)
-import Benchmark.Config (loadConfig, validateConfig)
-import Benchmark.Types (PerfTestError (..), RegressionResult (..), RunResult (..), TestConfig, exitWithError)
-import Runner (runMultiple, runSingle)
+import Benchmark.Config (loadConfig, loadNwayConfig, validateConfig, validateNwayConfig)
+import Benchmark.Types
+  ( NwayConfig
+  , PerfTestError (..)
+  , RegressionResult (..)
+  , RunResult (..)
+  , TestConfig
+  , exitWithError
+  )
+import Runner (runSingle)
+import Runner.Nway (runNway)
 import VerifyRunner (runVerify)
 
 run :: IO ()
 run = do
   cmd <- parseArgs
-  config <- loadAndValidateConfig (configPath cmd)
+  --  config <- loadAndValidateConfig (configPath cmd)
 
   result <- case cmd of
-    BenchmarkMultiple _ baseline fmt -> runMultiple baseline fmt config
-    BenchmarkSingle _ baseline fmt -> runSingle baseline fmt config
-    Verify {outputFormat = fmt} -> do
-      passed <- runVerify fmt config
+    BenchmarkNway path fmt -> do
+      cfg <- loadAndValidateNwayConfig path
+      runNway fmt cfg
+    BenchmarkSingle path baseline fmt -> do
+      cfg <- loadAndValidateConfig path
+      runSingle baseline fmt cfg
+    Verify {configPath = path, outputFormat = fmt} -> do
+      cfg <- loadAndValidateConfig path
+      passed <- runVerify fmt cfg
       return $ if passed then RunSuccess else RunRegression (RegressionResult "verify" [] False)
 
   exitWithResult result
@@ -45,3 +58,10 @@ loadAndValidateConfig path = do
   case res of
     Left err -> exitWithError $ ConfigParseError err
     Right cfg -> either exitWithError return (validateConfig cfg)
+
+loadAndValidateNwayConfig :: FilePath -> IO NwayConfig
+loadAndValidateNwayConfig path = do
+  res <- loadNwayConfig path
+  case res of
+    Left err -> exitWithError $ ConfigParseError err
+    Right cfg -> either exitWithError return (validateNwayConfig cfg)

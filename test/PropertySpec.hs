@@ -133,8 +133,8 @@ propertySpec = describe "Property-Based Tests" $ do
          in not (regressionPassed result)
 
     prop "improvement never causes regression" $
-      \(Positive baseMean) (Positive stdDev) ->
-        baseMean > 10 ==>
+      forAll (choose (11, 10000)) $ \baseMean ->
+        forAll (choose (1, 1000)) $ \stdDev ->
           let baseStats = mockStats baseMean stdDev
               currStats = mockStats (baseMean * 0.5) (stdDev * 0.5)
               baseline = makeBaseline "test" baseStats

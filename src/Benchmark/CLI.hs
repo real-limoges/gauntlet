@@ -27,9 +27,8 @@ data BaselineMode
   deriving (Show, Eq)
 
 data Command
-  = BenchmarkMultiple
+  = BenchmarkNway
       { configPath :: FilePath
-      , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
       }
   | BenchmarkSingle
@@ -57,7 +56,7 @@ parseArgs = execParser opts
 commandParser :: Parser Command
 commandParser =
   subparser
-    ( command "benchmark-multiple" (info benchmarkMultipleOptions (progDesc "Run A/B benchmark"))
+    ( command "benchmark-nway" (info benchmarkNwayOptions (progDesc "Run N-way benchmark comparison"))
         <> command "benchmark-single" (info benchmarkSingleOptions (progDesc "Run single-target benchmark"))
         <> command "verify" (info verifyOptions (progDesc "Verify response equality"))
     )
@@ -122,9 +121,9 @@ outputFormatParser = do
     buildOutputFormat (Just "markdown") path = OutputMarkdown path
     buildOutputFormat _ _ = OutputTerminal
 
-benchmarkMultipleOptions :: Parser Command
-benchmarkMultipleOptions =
-  BenchmarkMultiple <$> configOption <*> baselineModeParser <*> outputFormatParser
+benchmarkNwayOptions :: Parser Command
+benchmarkNwayOptions =
+  BenchmarkNway <$> configOption <*> outputFormatParser
 
 benchmarkSingleOptions :: Parser Command
 benchmarkSingleOptions =

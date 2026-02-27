@@ -9,6 +9,7 @@ import CISpec (ciSpec)
 import ConfigSpec (configSpec)
 import Integration (integrationSpec)
 import MarkdownSpec (markdownSpec)
+import NwaySpec (nwaySpec)
 import OutputSpec (outputSpec)
 import PropertySpec (propertySpec)
 import StatsSpec (statsSpec)
@@ -38,3 +39,4 @@ main = hspec $ do
   outputSpec
   tracingClientSpec
   integrationSpec
+  nwaySpec
