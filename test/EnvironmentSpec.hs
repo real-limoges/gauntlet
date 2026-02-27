@@ -3,7 +3,7 @@ module EnvironmentSpec (environmentSpec) where
 import Benchmark.Environment (waitForHealth)
 import Benchmark.Types (PerfTestError (..))
 import Data.Text qualified as T
-import MockServer (mockStatus)
+import MockServer (mockFailThenSucceed, mockStatus)
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types (status200, status503)
@@ -40,3 +40,19 @@ environmentSpec = describe "Benchmark.Environment.waitForHealth" $ do
       let url = T.pack $ "http://127.0.0.1:" ++ show port
       result <- waitForHealth mgr url 10
       result `shouldBe` Right ()
+
+  it "succeeds when server returns 503 then 200" $
+    mockFailThenSucceed 1 $ \port -> do
+      mgr <- newManager tlsManagerSettings
+      let url = T.pack $ "http://127.0.0.1:" ++ show port
+      result <- waitForHealth mgr url 5
+      result `shouldBe` Right ()
+
+  it "times out when all retries see 503" $
+    mockStatus status503 $ \port -> do
+      mgr <- newManager tlsManagerSettings
+      let url = T.pack $ "http://127.0.0.1:" ++ show port
+      result <- waitForHealth mgr url 2
+      case result of
+        Left (HealthCheckTimeout _ 2) -> pure ()
+        other -> expectationFailure $ "Expected HealthCheckTimeout with 2 retries, got: " ++ show other

@@ -36,6 +36,16 @@ runnerBaselineSpec = describe "Runner.Baseline.handleBaseline" $ around_ withCle
         let logText = T.concat [msg | (_, msg) <- msgs]
         logText `shouldSatisfy` T.isInfixOf "Baseline saved"
 
+    it "logs 'Error:' when save path is invalid" $
+      inTempDir $ do
+        (logger, logRef) <- makeTestLogger
+        -- Use a path with null bytes which is invalid on all platforms
+        result <- handleBaseline logger (SaveBaseline "foo\0bar") timestamp stats
+        result `shouldBe` RunSuccess
+        msgs <- readIORef logRef
+        let logText = T.concat [msg | (_, msg) <- msgs]
+        logText `shouldSatisfy` T.isInfixOf "Error:"
+
   describe "CompareBaseline" $ do
     it "returns RunSuccess with error log when baseline missing" $
       inTempDir $ do
