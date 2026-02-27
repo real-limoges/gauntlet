@@ -10,21 +10,18 @@ module Runner (runMultiple, runSingle) where
 
 import Benchmark.CLI (BaselineMode)
 import Benchmark.Config (buildEndpoints)
-import Benchmark.Output (initOutputFiles, resultsDir)
+import Benchmark.Output (initOutputFiles)
 import Benchmark.Report (printMultipleBenchmarkReport, printSingleBenchmarkReport, printValidationSummary)
 import Benchmark.Report.Markdown (markdownMultipleReport, markdownSingleReport, markdownValidationReport)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsFinished)
 import Benchmark.Types
-  ( Nanoseconds (..)
-  , OutputFormat (..)
+  ( OutputFormat (..)
   , PerfTestError (..)
   , RunResult (..)
   , Settings (..)
   , Targets (..)
   , TestConfig (..)
-  , TestingResponse (..)
-  , ValidationSummary
   , exitWithError
   )
 import Control.Concurrent.Async (async, cancel, wait)

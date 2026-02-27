@@ -202,8 +202,6 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 3. N-way comparison (`benchmark-nway`): replace `Targets{primary,candidate}` pair with `[NamedTarget]` list
 4. SPRT (Sequential Probability Ratio Test): post-hoc simulation on response lists
 
-See `docs/ROADMAP.md` and `docs/TODO.md` for detailed implementation guides.
-
 ## Exit Codes
 
 - `0` - Success

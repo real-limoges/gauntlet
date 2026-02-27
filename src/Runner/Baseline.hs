@@ -2,7 +2,7 @@
 Module      : Runner.Baseline
 Description : Baseline save/compare operations and regression reporting
 -}
-module Runner.Baseline (handleBaseline, printRegressionResult) where
+module Runner.Baseline (handleBaseline) where
 
 import Benchmark.Baseline (compareToBaseline, loadBaseline, saveBaseline)
 import Benchmark.CI (CIMode (..), detectCIMode, formatForCI, writeArtifactReport, writeGitHubStepSummary)
@@ -39,27 +39,27 @@ handleBaseline logger mode timestamp stats = case mode of
     result <- saveBaseline name timestamp stats
     case result of
       Left err -> do
-        logInfo logger $ T.pack $ "Error: " ++ err
+        logInfo logger $ "Error: " <> T.pack err
         return RunSuccess
       Right path -> do
-        logInfo logger $ T.pack $ "Baseline saved: " ++ path
+        logInfo logger $ "Baseline saved: " <> T.pack path
         return RunSuccess
   CompareBaseline name -> do
     result <- loadBaseline name
     case result of
       Left err -> do
-        logInfo logger $ T.pack $ "Error: " ++ err
+        logInfo logger $ "Error: " <> T.pack err
         return RunSuccess
       Right baseline -> doBaselineComparison timestamp stats baseline
   SaveAndCompare saveName compareName -> do
     saveResult <- saveBaseline saveName timestamp stats
     case saveResult of
-      Left err -> logInfo logger $ T.pack $ "Warning: Failed to save baseline: " ++ err
-      Right path -> logInfo logger $ T.pack $ "Baseline saved: " ++ path
+      Left err -> logInfo logger $ "Warning: Failed to save baseline: " <> T.pack err
+      Right path -> logInfo logger $ "Baseline saved: " <> T.pack path
     loadResult <- loadBaseline compareName
     case loadResult of
       Left err -> do
-        logInfo logger $ T.pack $ "Error: " ++ err
+        logInfo logger $ "Error: " <> T.pack err
         return RunSuccess
       Right baseline -> doBaselineComparison timestamp stats baseline
 

@@ -16,7 +16,6 @@ import Data.Aeson (encode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.List (sortBy)
 import Data.Ord (Down (..), comparing)
-import Data.Text (Text)
 import Data.Text qualified as T
 import Text.Printf (printf)
 import Tracing.Analysis (aggregateBySpanName)

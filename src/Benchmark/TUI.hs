@@ -8,8 +8,8 @@ module Benchmark.TUI
 import Benchmark.TUI.State
 import Benchmark.TUI.Widgets
 import Brick
-import Brick.BChan (BChan, newBChan, writeBChan)
-import Brick.Widgets.Border (border, borderWithLabel, hBorder)
+import Brick.BChan (newBChan, writeBChan)
+import Brick.Widgets.Border (borderWithLabel, hBorder)
 import Brick.Widgets.Center (hCenter)
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.STM
@@ -131,7 +131,7 @@ histogramSection state =
     durations = toList (state ^. tsRecentDurations)
     lo = minimum durations
     hi = maximum durations
-    nBuckets = 8
+    nBuckets = 8 :: Int
     bucketWidth = if hi > lo then (hi - lo) / fromIntegral nBuckets else 1
     bucketIndex v = min (nBuckets - 1) (floor ((v - lo) / bucketWidth))
     counts = [length (filter (\v -> bucketIndex v == i) durations) | i <- [0 .. nBuckets - 1]]

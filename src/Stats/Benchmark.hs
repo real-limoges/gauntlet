@@ -45,7 +45,6 @@ import Statistics.Test.MannWhitneyU (mannWhitneyUtest)
 import Statistics.Test.Types (PositionTest (..), Test (..), TestResult (..))
 import Statistics.Types (mkPValue, pValue)
 import Stats.Common (percentileSorted)
-import Stats.Common qualified as Stats
 
 {-| Compute descriptive statistics from benchmark responses.
 Failed responses (with errorMessage) are excluded from latency calculations.

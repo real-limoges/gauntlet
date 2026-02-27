@@ -24,7 +24,6 @@ import Data.Aeson (encode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.CaseInsensitive (mk)
 import Data.Maybe (fromMaybe)
-import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
 import Log (Logger, logWarning, makeLogger)
@@ -63,7 +62,7 @@ prepareRequest settings Endpoint {..} = do
 timedRequestPrepared :: Settings -> Manager -> Request -> IO TestingResponse
 timedRequestPrepared settings mgr req = do
   let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
-      retrySettings = maybe defaultRetrySettings id (Types.retry settings)
+      retrySettings = fromMaybe defaultRetrySettings (Types.retry settings)
       maxAttempts = Types.retryMaxAttempts retrySettings
       initialDelay = Types.retryInitialDelayMs retrySettings * 1000
       backoffMult = Types.retryBackoffMultiplier retrySettings

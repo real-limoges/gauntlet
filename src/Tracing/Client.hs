@@ -10,6 +10,8 @@ module Tracing.Client
   ( searchTraces
   , fetchTrace
   , fetchTracesForTimeRange
+  , parseSearchResponse
+  , parseTraceResponse
   ) where
 
 import Control.Applicative ((<|>))
@@ -17,12 +19,12 @@ import Control.Exception (SomeException, try)
 import Data.Aeson
 import Data.Aeson.Types (Parser, parseEither, parseMaybe)
 import Data.ByteString.Lazy qualified as LBS
+import Data.Either (rights)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
-import Data.Word (Word64)
 import Network.HTTP.Client (Manager, Request, httpLbs, parseRequest, responseBody)
 import Network.HTTP.Client qualified as Client
 import Network.HTTP.Types.Status (statusCode)
@@ -74,7 +76,7 @@ fetchTracesForTimeRange mgr cfg query = do
     Left err -> return $ Left err
     Right resp -> do
       traces <- mapM (fetchTrace mgr cfg . metaTraceID) (foundTraces resp)
-      return $ Right $ concatMap (either (const []) pure) traces
+      return $ Right $ rights traces
 
 {-| Perform HTTP GET request with error handling.
 
