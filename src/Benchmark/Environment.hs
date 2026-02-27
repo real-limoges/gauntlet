@@ -8,6 +8,7 @@ Switches git branches and starts Docker containers for benchmark targets.
 module Benchmark.Environment
   ( setupEnvironment
   , waitForHealth
+  , trim
   ) where
 
 import Benchmark.Types (PerfTestError (..), Settings (..))

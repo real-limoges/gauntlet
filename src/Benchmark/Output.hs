@@ -8,10 +8,14 @@ Writes latency measurements to timestamped CSV files in the results directory.
 module Benchmark.Output
   ( initOutputFiles
   , writeLatencies
+  , writeMarkdownReport
   , resultsDir
+  , formatRow
+  , formatResultBuilder
   ) where
 
-import Benchmark.Types (Endpoint (..), Nanoseconds (..), TestingResponse (..))
+import Benchmark.Types (Endpoint (..), Nanoseconds (..), OutputFormat (..), TestingResponse (..))
+import Data.Text (Text)
 import Data.Text.IO qualified as TIO
 import Data.Text.Lazy.Builder (Builder, toLazyText)
 import Data.Text.Lazy.Builder qualified as B
@@ -57,3 +61,8 @@ formatRow idx ep r =
     , B.fromString (show $ unNanoseconds $ durationNs r)
     , B.singleton '\n'
     ]
+
+-- | Write a markdown report to disk when 'OutputMarkdown' is requested.
+writeMarkdownReport :: OutputFormat -> Text -> IO ()
+writeMarkdownReport OutputTerminal _ = return ()
+writeMarkdownReport (OutputMarkdown path) content = TIO.writeFile path content

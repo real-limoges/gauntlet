@@ -2,6 +2,7 @@ module MarkdownSpec (markdownSpec) where
 
 import Benchmark.Report.Markdown
 import Benchmark.Types
+import Data.Aeson (toJSON)
 import Data.Text qualified as T
 import Test.Hspec
 import TestHelpers (mockStats)
@@ -104,6 +105,67 @@ markdownSpec = describe "Benchmark.Report.Markdown" $ do
       let s = ValidationSummary 5 1 [StatusCodeMismatch 200 404]
       let report = markdownValidationReport [s]
       report `shouldSatisfy` T.isInfixOf "Status code mismatch"
+
+    it "describes FieldNotFound errors" $ do
+      let s = ValidationSummary 5 1 [FieldNotFound "data.id"]
+      let report = markdownValidationReport [s]
+      report `shouldSatisfy` T.isInfixOf "Field not found"
+      report `shouldSatisfy` T.isInfixOf "data.id"
+
+    it "describes FieldValueMismatch errors" $ do
+      let s =
+            ValidationSummary 5 1 [FieldValueMismatch "user.name" (toJSON ("alice" :: T.Text)) (toJSON ("bob" :: T.Text))]
+      let report = markdownValidationReport [s]
+      report `shouldSatisfy` T.isInfixOf "Field value mismatch"
+      report `shouldSatisfy` T.isInfixOf "user.name"
+
+    it "describes BodyAbsent error" $ do
+      let s = ValidationSummary 5 1 [BodyAbsent]
+      let report = markdownValidationReport [s]
+      report `shouldSatisfy` T.isInfixOf "Response body absent"
+
+    it "describes BodyInvalidJSON error" $ do
+      let s = ValidationSummary 5 1 [BodyInvalidJSON]
+      let report = markdownValidationReport [s]
+      report `shouldSatisfy` T.isInfixOf "not valid JSON"
+
+  describe "markdownMultipleReport with frequentist results" $ do
+    let primary = mockStats 100.0 10.0
+        candidate = mockStats 80.0 8.0
+
+    it "renders MWU significant result" $ do
+      let bayes = mockBayesianComparison {mannWhitneyU = Just (MWUResult True)}
+      let report = markdownMultipleReport "p" "c" primary candidate bayes
+      report `shouldSatisfy` T.isInfixOf "significant (p < 0.05)"
+
+    it "renders MWU not significant result" $ do
+      let bayes = mockBayesianComparison {mannWhitneyU = Just (MWUResult False)}
+      let report = markdownMultipleReport "p" "c" primary candidate bayes
+      report `shouldSatisfy` T.isInfixOf "not significant (p >= 0.05)"
+
+    it "renders KS test with D statistic" $ do
+      let bayes = mockBayesianComparison {kolmogorovSmirnov = Just (KSResult 0.42 0.03 True)}
+      let report = markdownMultipleReport "p" "c" primary candidate bayes
+      report `shouldSatisfy` T.isInfixOf "D = 0.420"
+      report `shouldSatisfy` T.isInfixOf "significant"
+
+    it "renders AD test with A-squared statistic" $ do
+      let bayes = mockBayesianComparison {andersonDarling = Just (ADResult 2.5 0.01 True)}
+      let report = markdownMultipleReport "p" "c" primary candidate bayes
+      report `shouldSatisfy` T.isInfixOf "2.500"
+      report `shouldSatisfy` T.isInfixOf "significant"
+
+    it "renders 'sample too small' when frequentist tests are Nothing" $ do
+      let report = markdownMultipleReport "p" "c" primary candidate mockBayesianComparison
+      report `shouldSatisfy` T.isInfixOf "sample too small"
+
+  describe "markdownRegressionReport with regressed metrics" $ do
+    it "lists regressed metric names in summary" $ do
+      let m = MetricRegression "p99" 100.0 130.0 0.3 0.15 True
+      let result = mockRegressionResult "baseline" False [m]
+      let report = markdownRegressionReport result
+      report `shouldSatisfy` T.isInfixOf "Regressed metrics:"
+      report `shouldSatisfy` T.isInfixOf "p99"
 
   describe "markdownVerifyReport" $ do
     it "includes Verification Report heading" $ do

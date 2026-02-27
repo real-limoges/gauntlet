@@ -113,23 +113,35 @@ test-suite            gauntlet-test
   hs-source-dirs:     test
   other-modules:      AuthSpec
                     , BaselineSpec
+                    , CLISpec
+                    , ContextSpec
+                    , EnvironmentSpec
                     , NwaySpec
                     , BayesianSpec
                     , CISpec
                     , ConfigSpec
+                    , FrequentistSpec
                     , Integration
+                    , LogSpec
                     , MarkdownSpec
                     , MockServer
                     , OutputSpec
                     , PropertySpec
+                    , ReportSpec
+                    , RunnerBaselineSpec
+                    , StatsCommonSpec
                     , StatsSpec
                     , TestHelpers
                     , TracingClientSpec
                     , TracingQuerySpec
+                    , TracingReportSpec
                     , TracingSpec
                     , TUISpec
+                    , TypesJsonSpec
+                    , TypesSpec
                     , ValidationSpec
                     , VerifySpec
+                    , WarmupSpec
   default-extensions: OverloadedStrings
                     , NumericUnderscores
   build-depends:      base >= 4.20.0.0,
@@ -138,13 +150,17 @@ test-suite            gauntlet-test
                       bytestring,
                       containers,
                       directory,
+                      filepath,
                       hspec,
                       http-client,
+                      http-client-tls,
                       http-types,
                       network,
+                      optparse-applicative,
                       QuickCheck,
                       gauntlet,
                       scientific,
+                      stm,
                       temporary,
                       text,
                       time,

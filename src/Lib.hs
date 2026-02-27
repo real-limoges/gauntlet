@@ -28,8 +28,6 @@ import VerifyRunner (runVerify)
 run :: IO ()
 run = do
   cmd <- parseArgs
-  --  config <- loadAndValidateConfig (configPath cmd)
-
   result <- case cmd of
     BenchmarkNway path fmt -> do
       cfg <- loadAndValidateNwayConfig path

@@ -61,6 +61,19 @@ tracingQuerySpec = describe "Tracing.Query.buildTraceQL" $ do
     let parts = T.splitOn " && " result
     length parts `shouldBe` 2
 
+  it "three conditions (service + span + duration) produce two && separators" $ do
+    let q = baseQuery {querySpanName = Just "op", queryMinDuration = Just "50ms"}
+    let result = buildTraceQL q
+    let parts = T.splitOn " && " result
+    length parts `shouldBe` 3
+
+  it "three conditions include all fields" $ do
+    let q = baseQuery {querySpanName = Just "GET /api", queryMinDuration = Just "100ms"}
+    let result = buildTraceQL q
+    result `shouldSatisfy` T.isInfixOf "resource.service.name=\"test-service\""
+    result `shouldSatisfy` T.isInfixOf "name=\"GET /api\""
+    result `shouldSatisfy` T.isInfixOf "duration>100ms"
+
 -- ---------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------

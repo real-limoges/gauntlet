@@ -6,7 +6,7 @@ Stability   : experimental
 Provides structured logging with timestamps, log levels, and configurable verbosity.
 -}
 module Log
-  ( Logger
+  ( Logger (..)
   , makeLogger
   , logAt
   , logDebug
@@ -14,6 +14,7 @@ module Log
   , logWarning
   , logError
   , withTimestamp
+  , formatMessage
   )
 where
 

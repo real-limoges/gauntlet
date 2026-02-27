@@ -6,14 +6,23 @@ module TestHelpers
   , makeValidConfig
   , makeSpan
   , makeBaseline
+  , mockBayesianComparison
+  , mockPercentileComparison
+  , captureStdout
+  , makeCapturingLogger
   )
 where
 
 import Benchmark.Types
 import Data.ByteString.Lazy qualified as LBS
+import Data.IORef
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Word (Word64)
+import GHC.IO.Handle (hDuplicate, hDuplicateTo)
+import Log (Logger (..))
+import System.IO (hClose, hFlush, hSetEncoding, stdout, utf8)
+import System.IO.Temp (withSystemTempFile)
 import Tracing.Types
 
 makeResult :: Integer -> TestingResponse
@@ -124,4 +133,58 @@ makeBaseline name stats =
     { baselineName = name
     , baselineTimestamp = "2024-01-01T00:00:00Z"
     , baselineStats = stats
+    }
+
+-- | Fixture BayesianComparison with realistic values and Nothing for distribution tests.
+mockBayesianComparison :: BayesianComparison
+mockBayesianComparison =
+  BayesianComparison
+    { probBFasterThanA = 0.85
+    , probSingleRequestFaster = 0.65
+    , meanDifference = 5.0
+    , credibleIntervalLower = 2.0
+    , credibleIntervalUpper = 8.0
+    , effectSize = 0.45
+    , relativeEffect = 10.0
+    , p95Comparison = mockPercentileComparison
+    , p99Comparison = mockPercentileComparison
+    , mannWhitneyU = Nothing
+    , kolmogorovSmirnov = Nothing
+    , andersonDarling = Nothing
+    }
+
+-- | Fixture PercentileComparison.
+mockPercentileComparison :: PercentileComparison
+mockPercentileComparison =
+  PercentileComparison
+    { pctDifference = 3.0
+    , pctCredibleLower = 1.0
+    , pctCredibleUpper = 5.0
+    , probPctRegression = 0.15
+    }
+
+-- | Capture stdout by redirecting to a temp file.
+captureStdout :: IO () -> IO String
+captureStdout action =
+  withSystemTempFile "stdout-capture" $ \path handle -> do
+    hSetEncoding handle utf8
+    oldStdout <- hDuplicate stdout
+    hDuplicateTo handle stdout
+    action
+    hFlush stdout
+    hDuplicateTo oldStdout stdout
+    hClose handle
+    readFile path
+
+{-| Create a Logger that captures (LogLevel, Text) pairs into an IORef.
+Uses the same level-filtering logic as makeLogger.
+-}
+makeCapturingLogger :: LogLevel -> IORef [(LogLevel, Text)] -> Logger
+makeCapturingLogger minLevel ref =
+  Logger
+    { logLevel = minLevel
+    , logAction = \(level, _, msg) ->
+        if level >= minLevel
+          then modifyIORef ref ((level, msg) :)
+          else pure ()
     }

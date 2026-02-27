@@ -9,7 +9,7 @@ Bayesian comparisons.
 module Runner.Nway (runNway, allPairComparisons) where
 
 import Benchmark.Config (buildEndpoints)
-import Benchmark.Output (initOutputFiles)
+import Benchmark.Output (initOutputFiles, writeMarkdownReport)
 import Benchmark.Report (printNwayReport, printValidationSummary)
 import Benchmark.Report.Markdown (markdownNwayReport, markdownValidationReport)
 import Benchmark.Types
@@ -19,11 +19,11 @@ import Benchmark.Types
   , NwayConfig (..)
   , OutputFormat (..)
   , RunResult (..)
+  , TestingResponse
   )
 import Control.Monad (forM)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Text.IO qualified as TIO
 import Runner.Context (initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
 import Stats.Benchmark (addFrequentistTests, calculateStats, compareBayesian)
@@ -47,11 +47,12 @@ runNway outFmt cfg = do
         ctx
         (T.unpack (targetName t))
         (buildEndpoints (targetUrl t) (nwayPayloads cfg))
-    pure (targetName t, calculateStats timings, validSummaries)
+    pure (targetName t, calculateStats timings, timings, validSummaries)
 
-  let namedStats = [(name, stats) | (name, stats, _) <- results]
-      pairs = allPairComparisons namedStats
-      validAll = concatMap (\(_, _, v) -> v) results
+  let namedStats = [(name, stats) | (name, stats, _, _) <- results]
+      pairInput = [(name, stats, raw) | (name, stats, raw, _) <- results]
+      pairs = allPairComparisons pairInput
+      validAll = concatMap (\(_, _, _, v) -> v) results
 
   printNwayReport namedStats pairs
   printValidationSummary validAll
@@ -62,25 +63,15 @@ runNway outFmt cfg = do
   return RunSuccess
 
 -- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
-allPairComparisons :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)]
+allPairComparisons :: [(Text, BenchmarkStats, [TestingResponse])] -> [(Text, Text, BayesianComparison)]
 allPairComparisons [] = []
-allPairComparisons ((nameA, statsA) : rest) =
+allPairComparisons ((nameA, statsA, timingsA) : rest) =
   [ (nameA, nameB, comparison)
-  | (nameB, statsB) <- rest
+  | (nameB, statsB, timingsB) <- rest
   , let comparison =
           addFrequentistTests
-            (fakeTimings statsA)
-            (fakeTimings statsB)
+            timingsA
+            timingsB
             (compareBayesian statsA statsB)
   ]
     ++ allPairComparisons rest
-  where
-    -- Frequentist tests need raw timings, but we only have stats at this point.
-    -- We skip frequentist augmentation by passing empty lists; the tests will
-    -- return Nothing for MWU/KS/AD which is the correct "sample too small" result.
-    fakeTimings _ = []
-
--- | Write a markdown report to disk when 'OutputMarkdown' is requested.
-writeMarkdownReport :: OutputFormat -> T.Text -> IO ()
-writeMarkdownReport OutputTerminal _ = return ()
-writeMarkdownReport (OutputMarkdown path) content = TIO.writeFile path content

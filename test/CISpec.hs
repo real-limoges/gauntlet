@@ -33,6 +33,13 @@ ciSpec = describe "Benchmark.CI" $ do
         mode <- detectCIMode
         mode `shouldBe` GitLab
 
+  describe "formatForCI" $ do
+    it "is a no-op for None mode" $ do
+      formatForCI None mockPassed `shouldReturn` ()
+
+    it "is a no-op for None mode with failed result" $ do
+      formatForCI None mockFailed `shouldReturn` ()
+
   describe "writeArtifactReport" $ do
     it "writes regression markdown to specified file" $
       withSystemTempFile "report.md" $ \path h -> do

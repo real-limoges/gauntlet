@@ -9,6 +9,7 @@ module Benchmark.CLI
   ( parseArgs
   , Command (..)
   , BaselineMode (..)
+  , commandParser
   )
 where
 
