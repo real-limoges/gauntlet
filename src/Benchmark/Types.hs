@@ -25,6 +25,7 @@ module Benchmark.Types
   , ADResult (..)
 
     -- * Verification
+  , JsonDiff (..)
   , VerificationResult (..)
 
     -- * Validation
@@ -73,11 +74,15 @@ import Data.Aeson
   , genericParseJSON
   , object
   , withObject
+  , (.:)
   , (.:?)
   , (.=)
   )
 import Data.ByteString.Lazy qualified as LBS
+import Data.Foldable (asum)
 import Data.Map.Strict (Map)
+import Data.Maybe (catMaybes)
+import Data.Scientific (Scientific)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Word (Word64)
@@ -88,24 +93,51 @@ import Text.Printf (PrintfArg (..))
 
 -- | Per-field assertion in a validation spec.
 data FieldAssertion
-  = -- | Assert the key exists (any value)
+  = -- | Assert the key exists (any value, including null)
     FieldPresent
   | -- | Assert exact value match
     FieldEq Value
+  | -- | Assert field is explicitly @null@
+    FieldNull
+  | -- | Assert field exists and is not @null@
+    FieldNotNull
+  | -- | Assert JSON type: @"string"@, @"number"@, @"boolean"@, @"array"@, @"object"@, @"null"@
+    FieldType Text
+  | -- | Assert string field matches a regex pattern (POSIX ERE)
+    FieldMatches Text
+  | -- | Assert numeric field is within [min, max] (both bounds optional)
+    FieldRange (Maybe Scientific) (Maybe Scientific)
+  | -- | Assert array has exactly N elements
+    ArrayLength Int
+  | -- | Assert a value is present in an array
+    ArrayContains Value
   deriving stock (Show, Eq, Generic)
 
 instance FromJSON FieldAssertion where
-  parseJSON = withObject "FieldAssertion" $ \o -> do
-    mpresent <- o .:? "present"
-    meq <- o .:? "eq"
-    case (mpresent :: Maybe Bool, meq :: Maybe Value) of
-      (Just True, _) -> pure FieldPresent
-      (_, Just v) -> pure (FieldEq v)
-      _ -> fail "FieldAssertion must have 'present: true' or 'eq: <value>'"
+  parseJSON = withObject "FieldAssertion" $ \o ->
+    asum
+      [ FieldPresent <$ (o .: "present" >>= \b -> if (b :: Bool) then pure () else fail "present must be true")
+      , FieldEq <$> o .: "eq"
+      , FieldNull <$ (o .: "null" >>= \b -> if (b :: Bool) then pure () else fail "null must be true")
+      , FieldNotNull <$ (o .: "notNull" >>= \b -> if (b :: Bool) then pure () else fail "notNull must be true")
+      , FieldType <$> o .: "type"
+      , FieldMatches <$> o .: "matches"
+      , o .: "range" >>= withObject "range" (\r -> FieldRange <$> r .:? "min" <*> r .:? "max")
+      , ArrayLength <$> o .: "arrayLength"
+      , ArrayContains <$> o .: "arrayContains"
+      ]
 
 instance ToJSON FieldAssertion where
   toJSON FieldPresent = object ["present" .= True]
   toJSON (FieldEq v) = object ["eq" .= v]
+  toJSON FieldNull = object ["null" .= True]
+  toJSON FieldNotNull = object ["notNull" .= True]
+  toJSON (FieldType t) = object ["type" .= t]
+  toJSON (FieldMatches pat) = object ["matches" .= pat]
+  toJSON (FieldRange mmin mmax) =
+    object ["range" .= object (catMaybes [("min" .=) <$> mmin, ("max" .=) <$> mmax])]
+  toJSON (ArrayLength n) = object ["arrayLength" .= n]
+  toJSON (ArrayContains v) = object ["arrayContains" .= v]
 
 -- | Declarative validation rules applied to every response for an endpoint.
 data ValidationSpec = ValidationSpec
@@ -140,8 +172,10 @@ data ValidationError
     FieldNotFound Text
   | -- | Field path found but value differed: path, expected, actual
     FieldValueMismatch Text Value Value
-  | -- | Response body was absent or not valid JSON
-    BodyNotJSON
+  | -- | Response body was absent (no body returned)
+    BodyAbsent
+  | -- | Response body was present but could not be decoded as JSON
+    BodyInvalidJSON
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)
 
@@ -276,11 +310,24 @@ data BayesianComparison = BayesianComparison
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)
 
+-- | A single differing path between two JSON bodies.
+data JsonDiff = JsonDiff
+  { jdPath :: Text
+  -- ^ Dot-notation path, e.g. @"data.items[0].id"@
+  , jdPrimary :: Text
+  -- ^ JSON-encoded value from primary response
+  , jdCandidate :: Text
+  -- ^ JSON-encoded value from candidate response
+  }
+  deriving stock (Show, Eq, Generic)
+
 data VerificationResult
   = Match
   | StatusMismatch Int Int
-  | BodyMismatch Text
+  | BodyMismatch [JsonDiff]
   | InvalidJSON String
+  | -- | Request-level failure (timeout, connection error) on primary or candidate
+    NetworkError String
   deriving stock (Show, Eq, Generic)
 
 data PerfTestError
@@ -402,6 +449,14 @@ data Settings = Settings
   -- ^ Health check path appended to service URL (default: "/health")
   , healthCheckTimeout :: Maybe Int
   -- ^ Health check poll timeout in seconds (default: 60)
+  , floatTolerance :: Maybe Double
+  -- ^ Absolute tolerance for floating-point comparisons in verify mode (default: exact match)
+  , compareFields :: Maybe [Text]
+  -- ^ When set, only these keys (and their full subtrees) are compared in verify mode
+  , ignoreFields :: Maybe [Text]
+  -- ^ Keys stripped at any depth before comparison in verify mode (complement of compareFields)
+  , verifyIterations :: Maybe Int
+  -- ^ Number of request pairs to run per endpoint in verify mode (default: 1)
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)

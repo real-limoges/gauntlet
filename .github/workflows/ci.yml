@@ -44,9 +44,6 @@ jobs:
         with:
           path: dist-newstyle
           key: ${{ runner.os }}-${{ runner.arch }}-ghc-9.12.2-dist-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'src/**/*.hs', 'test/**/*.hs') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ghc-9.12.2-dist-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal') }}
-            ${{ runner.os }}-${{ runner.arch }}-ghc-9.12.2-dist-
 
       - name: Update cabal index
         run: cabal update

@@ -11,12 +11,15 @@ module Benchmark.Report.Markdown
   , markdownMultipleReport
   , markdownRegressionReport
   , markdownValidationReport
+  , markdownVerifyReport
   ) where
 
 import Benchmark.Types
   ( ADResult (..)
   , BayesianComparison (..)
   , BenchmarkStats (..)
+  , Endpoint (..)
+  , JsonDiff (..)
   , KSResult (..)
   , MWUResult (..)
   , MetricRegression (..)
@@ -24,6 +27,7 @@ import Benchmark.Types
   , RegressionResult (..)
   , ValidationError (..)
   , ValidationSummary (..)
+  , VerificationResult (..)
   )
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -145,8 +149,66 @@ markdownValidationReport summaries =
       "Field not found: `" <> path <> "`"
     describeError (FieldValueMismatch path _ _) =
       "Field value mismatch at `" <> path <> "`"
-    describeError BodyNotJSON =
+    describeError BodyAbsent =
+      "Response body absent"
+    describeError BodyInvalidJSON =
       "Response body is not valid JSON"
+
+-- | Markdown report for verify results.
+markdownVerifyReport :: [(Endpoint, [VerificationResult])] -> Text
+markdownVerifyReport results =
+  T.unlines $
+    [ "## Verification Report"
+    , ""
+    , "| Endpoint | Method | Samples | Passed | Failed |"
+    , "|----------|--------|---------|--------|--------|"
+    ]
+      ++ map formatRow results
+      ++ concatMap formatFailures (filter (any (/= Match) . snd) results)
+  where
+    formatRow (ep, checks) =
+      let n = length checks
+          passed = length (filter (== Match) checks)
+          failed = n - passed
+       in T.pack $
+            printf
+              "| %s | %s | %d | %d | %d |"
+              (T.unpack $ url ep)
+              (T.unpack $ method ep)
+              n
+              passed
+              failed
+
+    formatFailures (ep, checks) =
+      [ ""
+      , "### Failures: " <> method ep <> " " <> url ep
+      , ""
+      ]
+        ++ concatMap describeResult (filter (/= Match) checks)
+
+    describeResult Match = []
+    describeResult (StatusMismatch a b) =
+      [T.pack $ printf "- **Status Mismatch**: expected %d, got %d" a b]
+    describeResult (InvalidJSON err) =
+      ["- **JSON Error**: " <> T.pack err]
+    describeResult (NetworkError msg) =
+      ["- **Network Error**: " <> T.pack msg]
+    describeResult (BodyMismatch diffs) =
+      [ "- **Body Mismatch** (" <> T.pack (show (length diffs)) <> " field(s)):"
+      , ""
+      , "  | Path | Primary | Candidate |"
+      , "  |------|---------|-----------|"
+      ]
+        ++ map
+          ( \d ->
+              T.pack $
+                printf
+                  "  | %s | %s | %s |"
+                  (T.unpack $ jdPath d)
+                  (T.unpack $ jdPrimary d)
+                  (T.unpack $ jdCandidate d)
+          )
+          diffs
 
 -- ---------------------------------------------------------------------------
 -- Internal helpers

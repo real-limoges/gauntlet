@@ -13,7 +13,7 @@ import System.Exit (ExitCode (..), exitWith)
 
 import Benchmark.CLI (Command (..), parseArgs)
 import Benchmark.Config (loadConfig, validateConfig)
-import Benchmark.Types (PerfTestError (..), RunResult (..), TestConfig, exitWithError)
+import Benchmark.Types (PerfTestError (..), RegressionResult (..), RunResult (..), TestConfig, exitWithError)
 import Runner (runMultiple, runSingle)
 import VerifyRunner (runVerify)
 
@@ -25,7 +25,9 @@ run = do
   result <- case cmd of
     BenchmarkMultiple _ baseline fmt -> runMultiple baseline fmt config
     BenchmarkSingle _ baseline fmt -> runSingle baseline fmt config
-    Verify _ -> runVerify config >> return RunSuccess
+    Verify {outputFormat = fmt} -> do
+      passed <- runVerify fmt config
+      return $ if passed then RunSuccess else RunRegression (RegressionResult "verify" [] False)
 
   exitWithResult result
 
