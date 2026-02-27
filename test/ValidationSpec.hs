@@ -12,7 +12,6 @@ import Data.Aeson (Value (..), encode, object, (.=))
 import Data.Map.Strict qualified as Map
 import Data.Scientific (Scientific)
 import Data.Text (Text)
-import Data.Vector qualified as V
 import Test.Hspec
 import TestHelpers (makeResponseWithBody)
 

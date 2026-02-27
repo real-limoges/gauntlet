@@ -17,7 +17,6 @@ module Benchmark.CI
 import Benchmark.Report.Markdown (markdownRegressionReport)
 import Benchmark.Types (MetricRegression (..), RegressionResult (..))
 import Control.Monad (forM_)
-import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Time.Clock.POSIX (getPOSIXTime)
@@ -52,7 +51,8 @@ formatForCI GitLab result = do
   putStrLn ""
 
   forM_ (regressionMetrics result) $ \m -> do
-    let status = if metricRegressed m then "\x1b[1;31mREGRESSED\x1b[0m" else "\x1b[1;32mok\x1b[0m"
+    let status :: String
+        status = if metricRegressed m then "\x1b[1;31mREGRESSED\x1b[0m" else "\x1b[1;32mok\x1b[0m"
     printf
       "  %s: %.2fms -> %.2fms (%+.1f%%) [%s]\n"
       (T.unpack $ metricName m)

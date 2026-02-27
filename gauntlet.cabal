@@ -7,6 +7,9 @@ maintainer:         b.real.limoges@gmail.com
 build-type:         Simple
 
 
+common warnings
+    ghc-options: -Wall -O2
+
 -- Define runtime options specifically for executables and tests
 common rts-properties
     ghc-options:
@@ -16,6 +19,7 @@ common rts-properties
         -O2
 
 library
+  import:                 warnings
   hs-source-dirs:         src
   exposed-modules:        Lib
                           Log
@@ -89,9 +93,6 @@ library
                           vector-algorithms,
                           vty,
                           vty-crossplatform
-
-common warnings
-    ghc-options: -Wall -O2
 
 executable            gauntlet-exe
   import:             warnings

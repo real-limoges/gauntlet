@@ -22,7 +22,6 @@ import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
-import Data.Word (Word64)
 import Network.HTTP.Client (Manager, Request, httpLbs, parseRequest, responseBody)
 import Network.HTTP.Client qualified as Client
 import Network.HTTP.Types.Status (statusCode)

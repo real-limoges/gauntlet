@@ -12,7 +12,6 @@ module Benchmark.Output
   ) where
 
 import Benchmark.Types (Endpoint (..), Nanoseconds (..), TestingResponse (..))
-import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Text.Lazy.Builder (Builder, toLazyText)
 import Data.Text.Lazy.Builder qualified as B

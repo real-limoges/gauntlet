@@ -118,6 +118,7 @@ outputFormatParser = do
           )
   buildOutputFormat <$> outputOption <*> reportPathOption
   where
+    buildOutputFormat :: Maybe String -> String -> OutputFormat
     buildOutputFormat (Just "markdown") path = OutputMarkdown path
     buildOutputFormat _ _ = OutputTerminal
 

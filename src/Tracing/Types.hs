@@ -36,7 +36,6 @@ import Benchmark.Types (Milliseconds (..), Nanoseconds (..), nsToMs)
 import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.Map.Strict (Map)
 import Data.Text (Text)
-import Data.Word (Word64)
 import GHC.Generics (Generic)
 
 -- | Configuration for connecting to Grafana Tempo.

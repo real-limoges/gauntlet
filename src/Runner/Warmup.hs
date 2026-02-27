@@ -5,7 +5,7 @@ Description : Warmup execution before the main benchmark
 module Runner.Warmup (runWarmup) where
 
 import Benchmark.Network (addAuth, runBenchmark)
-import Benchmark.Types (Endpoint, Settings (..), defaultWarmupSettings)
+import Benchmark.Types (Endpoint, defaultWarmupSettings)
 import Benchmark.Types qualified as PT
 import Control.Concurrent (newQSem)
 import Control.Monad (when)

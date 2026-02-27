@@ -24,7 +24,6 @@ import Data.Aeson (encode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.CaseInsensitive (mk)
 import Data.Maybe (fromMaybe)
-import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
 import Log (Logger, logWarning, makeLogger)
