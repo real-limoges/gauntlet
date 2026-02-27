@@ -15,14 +15,19 @@ import Network.Socket qualified as Socket
 import Network.Wai (responseLBS)
 import Network.Wai.Handler.Warp qualified as Warp
 
--- | Run action with mock server returning given status and body
-withMockServer :: Status -> ByteString -> (Int -> IO a) -> IO a
-withMockServer status body action = do
+-- | Allocate a loopback TCP socket bound to an ephemeral port, run action, then close.
+withSocket :: (Socket.Socket -> Int -> IO a) -> IO a
+withSocket action = do
   sock <- Socket.socket Socket.AF_INET Socket.Stream Socket.defaultProtocol
   Socket.setSocketOption sock Socket.ReuseAddr 1
   Socket.bind sock (Socket.SockAddrInet 0 (Socket.tupleToHostAddress (127, 0, 0, 1)))
   Socket.listen sock 1024
   port <- fromIntegral <$> Socket.socketPort sock
+  action sock port
+
+-- | Run action with mock server returning given status and body
+withMockServer :: Status -> ByteString -> (Int -> IO a) -> IO a
+withMockServer status body action = withSocket $ \sock port -> do
   ready <- newEmptyMVar
   let settings = Warp.setBeforeMainLoop (putMVar ready ()) Warp.defaultSettings
       app _ respond = respond $ responseLBS status [("Content-Type", "application/json")] body
@@ -40,12 +45,7 @@ mockStatus status = withMockServer status "{}"
 
 -- | Mock server that counts requests. The second callback argument reads the current count.
 mockCountedRequests :: Status -> ByteString -> (Int -> IO Int -> IO a) -> IO a
-mockCountedRequests status body action = do
-  sock <- Socket.socket Socket.AF_INET Socket.Stream Socket.defaultProtocol
-  Socket.setSocketOption sock Socket.ReuseAddr 1
-  Socket.bind sock (Socket.SockAddrInet 0 (Socket.tupleToHostAddress (127, 0, 0, 1)))
-  Socket.listen sock 1024
-  port <- fromIntegral <$> Socket.socketPort sock
+mockCountedRequests status body action = withSocket $ \sock port -> do
   ready <- newEmptyMVar
   counter <- newMVar (0 :: Int)
   let settings = Warp.setBeforeMainLoop (putMVar ready ()) Warp.defaultSettings
@@ -58,12 +58,7 @@ mockCountedRequests status body action = do
 
 -- | Mock server that fails with 500 for the first N requests, then succeeds
 mockFailThenSucceed :: Int -> (Int -> IO a) -> IO a
-mockFailThenSucceed failCount action = do
-  sock <- Socket.socket Socket.AF_INET Socket.Stream Socket.defaultProtocol
-  Socket.setSocketOption sock Socket.ReuseAddr 1
-  Socket.bind sock (Socket.SockAddrInet 0 (Socket.tupleToHostAddress (127, 0, 0, 1)))
-  Socket.listen sock 1024
-  port <- fromIntegral <$> Socket.socketPort sock
+mockFailThenSucceed failCount action = withSocket $ \sock port -> do
   ready <- newEmptyMVar
   counter <- newMVar 0
   let settings = Warp.setBeforeMainLoop (putMVar ready ()) Warp.defaultSettings
