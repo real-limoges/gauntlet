@@ -10,7 +10,7 @@ module Runner (runSingle) where
 
 import Benchmark.CLI (BaselineMode)
 import Benchmark.Config (buildEndpoints)
-import Benchmark.Output (initOutputFiles)
+import Benchmark.Output (initOutputFiles, writeMarkdownReport)
 import Benchmark.Report (printSingleBenchmarkReport, printValidationSummary)
 import Benchmark.Report.Markdown (markdownSingleReport, markdownValidationReport)
 import Benchmark.TUI (runTUI)
@@ -28,7 +28,6 @@ import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (newTChanIO)
 import Control.Exception (onException)
 import Data.Text qualified as T
-import Data.Text.IO qualified as TIO
 import Lens.Micro ((^.))
 import Runner.Baseline (handleBaseline)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
@@ -90,8 +89,3 @@ runSingle baselineMode outFmt cfg = do
       runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
 
       handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) stats
-
--- | Write a markdown report to disk when 'OutputMarkdown' is requested.
-writeMarkdownReport :: OutputFormat -> T.Text -> IO ()
-writeMarkdownReport OutputTerminal _ = return ()
-writeMarkdownReport (OutputMarkdown path) content = TIO.writeFile path content

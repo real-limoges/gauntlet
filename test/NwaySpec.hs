@@ -9,7 +9,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Runner.Nway (allPairComparisons)
 import Test.Hspec
-import TestHelpers (mockStats)
+import TestHelpers (makeResult, mockStats)
 
 nwaySpec :: Spec
 nwaySpec = describe "N-Way Benchmarking" $ do
@@ -143,11 +143,14 @@ nwaySpec = describe "N-Way Benchmarking" $ do
     it "produces 0 pairs for empty list" $ do
       allPairComparisons [] `shouldBe` []
 
+    it "produces 0 pairs for single target" $ do
+      allPairComparisons [("only", mockStats 10 1, makeTimings 10)] `shouldBe` []
+
     it "includes correct target names in pairs" $ do
       let stats =
-            [ ("alpha", mockStats 10 1)
-            , ("beta", mockStats 20 2)
-            , ("gamma", mockStats 30 3)
+            [ ("alpha", mockStats 10 1, makeTimings 10)
+            , ("beta", mockStats 20 2, makeTimings 20)
+            , ("gamma", mockStats 30 3, makeTimings 30)
             ]
       let pairs = allPairComparisons stats
       let pairNames = [(a, b) | (a, b, _) <- pairs]
@@ -155,16 +158,18 @@ nwaySpec = describe "N-Way Benchmarking" $ do
 
   describe "markdownNwayReport" $ do
     it "contains ranking table header" $ do
-      let stats = [("prod", mockStats 10 1), ("staging", mockStats 20 2)]
-          pairs = allPairComparisons stats
-          md = markdownNwayReport stats pairs
+      let triples = [("prod", mockStats 10 1, makeTimings 10), ("staging", mockStats 20 2, makeTimings 20)]
+          namedStats = [(n, s) | (n, s, _) <- triples]
+          pairs = allPairComparisons triples
+          md = markdownNwayReport namedStats pairs
       T.isInfixOf "Ranking" md `shouldBe` True
       T.isInfixOf "| # | Target |" md `shouldBe` True
 
     it "contains target names" $ do
-      let stats = [("prod", mockStats 10 1), ("staging", mockStats 20 2)]
-          pairs = allPairComparisons stats
-          md = markdownNwayReport stats pairs
+      let triples = [("prod", mockStats 10 1, makeTimings 10), ("staging", mockStats 20 2, makeTimings 20)]
+          namedStats = [(n, s) | (n, s, _) <- triples]
+          pairs = allPairComparisons triples
+          md = markdownNwayReport namedStats pairs
       T.isInfixOf "prod" md `shouldBe` True
       T.isInfixOf "staging" md `shouldBe` True
 
@@ -199,8 +204,14 @@ makeNwayConfig ts =
     , nwayPayloads = [PayloadSpec "test" "GET" "/api/test" Nothing Nothing Nothing]
     }
 
-makePairStats :: Int -> [(Text, BenchmarkStats)]
+makePairStats :: Int -> [(Text, BenchmarkStats, [TestingResponse])]
 makePairStats n =
-  [ (T.pack ("target-" ++ show i), mockStats (fromIntegral i * 10) (fromIntegral i))
+  [ ( T.pack ("target-" ++ show i)
+    , mockStats (fromIntegral i * 10) (fromIntegral i)
+    , makeTimings (fromIntegral i * 10)
+    )
   | i <- [1 .. n]
   ]
+
+makeTimings :: Integer -> [TestingResponse]
+makeTimings baseNs = [makeResult (baseNs * 1_000_000 + offset) | offset <- [0, 100_000 .. 900_000]]
