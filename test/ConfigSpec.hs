@@ -57,21 +57,21 @@ configSpec = describe "Benchmark.Config" $ do
   describe "buildEndpoints" $ do
     it "builds endpoints for primary target" $ do
       let cfg = makeValidConfig
-      let endpoints = buildEndpoints cfg False
+      let endpoints = buildEndpoints (primary (targets cfg)) (payloads cfg)
       case endpoints of
         [ep] -> url ep `shouldBe` "http://primary.test/api/test"
         _ -> expectationFailure "Expected exactly one endpoint"
 
     it "builds endpoints for candidate target" $ do
       let cfg = makeValidConfig
-      let endpoints = buildEndpoints cfg True
+      let endpoints = buildEndpoints (candidate (targets cfg)) (payloads cfg)
       case endpoints of
         [ep] -> url ep `shouldBe` "http://candidate.test/api/test"
         _ -> expectationFailure "Expected exactly one endpoint"
 
     it "preserves method and body from payload spec" $ do
       let cfg = makeValidConfig
-      case buildEndpoints cfg False of
+      case buildEndpoints (primary (targets cfg)) (payloads cfg) of
         [ep] -> do
           method ep `shouldBe` "POST"
           body ep `shouldBe` Nothing
@@ -79,7 +79,7 @@ configSpec = describe "Benchmark.Config" $ do
 
     it "sets content-type header" $ do
       let cfg = makeValidConfig
-      case buildEndpoints cfg False of
+      case buildEndpoints (primary (targets cfg)) (payloads cfg) of
         [ep] -> headers ep `shouldContain` [("Content-Type", "application/json")]
         _ -> expectationFailure "Expected exactly one endpoint"
 
@@ -87,7 +87,7 @@ configSpec = describe "Benchmark.Config" $ do
       let customHeaders = Map.fromList [("X-API-Key", "secret"), ("X-Request-ID", "123")]
       let payload = PayloadSpec "test" "GET" "/api" Nothing (Just customHeaders) Nothing
       let cfg = makeValidConfig {payloads = [payload]}
-      case buildEndpoints cfg False of
+      case buildEndpoints (primary (targets cfg)) (payloads cfg) of
         [ep] -> do
           headers ep `shouldContain` [("X-API-Key", "secret")]
           headers ep `shouldContain` [("X-Request-ID", "123")]
@@ -97,7 +97,7 @@ configSpec = describe "Benchmark.Config" $ do
       let customHeaders = Map.fromList [("X-Custom", "value")]
       let payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders) Nothing
       let cfg = makeValidConfig {payloads = [payload]}
-      case buildEndpoints cfg False of
+      case buildEndpoints (primary (targets cfg)) (payloads cfg) of
         [ep] -> do
           headers ep `shouldContain` [("Content-Type", "application/json")]
           headers ep `shouldContain` [("X-Custom", "value")]
@@ -108,7 +108,7 @@ configSpec = describe "Benchmark.Config" $ do
       let customHeaders = Map.fromList [("Content-Type", "text/xml")]
       let payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders) Nothing
       let cfg = makeValidConfig {payloads = [payload]}
-      case buildEndpoints cfg False of
+      case buildEndpoints (primary (targets cfg)) (payloads cfg) of
         [ep] -> do
           headers ep `shouldContain` [("Content-Type", "text/xml")]
           headers ep `shouldNotContain` [("Content-Type", "application/json")]
@@ -118,7 +118,7 @@ configSpec = describe "Benchmark.Config" $ do
     it "handles empty custom headers" $ do
       let payload = PayloadSpec "test" "GET" "/api" Nothing (Just Map.empty) Nothing
       let cfg = makeValidConfig {payloads = [payload]}
-      case buildEndpoints cfg False of
+      case buildEndpoints (primary (targets cfg)) (payloads cfg) of
         [ep] -> headers ep `shouldBe` [("Content-Type", "application/json")]
         _ -> expectationFailure "Expected exactly one endpoint"
 

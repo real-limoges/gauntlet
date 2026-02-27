@@ -27,6 +27,7 @@ library
                           Runner.Baseline
                           Runner.Context
                           Runner.Loop
+                          Runner.Nway
                           Runner.Tracing
                           Runner.Warmup
                           VerifyRunner
@@ -112,6 +113,7 @@ test-suite            gauntlet-test
   hs-source-dirs:     test
   other-modules:      AuthSpec
                     , BaselineSpec
+                    , NwaySpec
                     , BayesianSpec
                     , CISpec
                     , ConfigSpec
