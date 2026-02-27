@@ -29,6 +29,7 @@ import Data.Scientific (Scientific)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Vector qualified as V
+import Text.Read (readMaybe)
 import Text.Regex.TDFA ((=~))
 
 {-| Validate a single response against a 'ValidationSpec'.
@@ -159,8 +160,7 @@ lookupPath (k : rest) (Object obj) =
     Just v -> lookupPath rest v
 lookupPath (k : rest) (Array arr)
   | T.all isDigit k =
-      let idx = read (T.unpack k) :: Int
-       in if idx < V.length arr
-            then lookupPath rest (arr V.! idx)
-            else Nothing
+      case readMaybe (T.unpack k) :: Maybe Int of
+        Nothing -> Nothing
+        Just idx -> if idx < V.length arr then lookupPath rest (arr V.! idx) else Nothing
 lookupPath _ _ = Nothing

@@ -110,14 +110,20 @@ test-suite            gauntlet-test
   default-language:   GHC2024
   main-is:            Spec.hs
   hs-source-dirs:     test
-  other-modules:      BaselineSpec
+  other-modules:      AuthSpec
+                    , BaselineSpec
                     , BayesianSpec
+                    , CISpec
                     , ConfigSpec
                     , Integration
+                    , MarkdownSpec
                     , MockServer
+                    , OutputSpec
                     , PropertySpec
                     , StatsSpec
                     , TestHelpers
+                    , TracingClientSpec
+                    , TracingQuerySpec
                     , TracingSpec
                     , TUISpec
                     , ValidationSpec
@@ -137,6 +143,7 @@ test-suite            gauntlet-test
                       QuickCheck,
                       gauntlet,
                       scientific,
+                      temporary,
                       text,
                       time,
                       vector,

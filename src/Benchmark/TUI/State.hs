@@ -188,7 +188,7 @@ computeRollingStats durations
           avg = sum sorted / fromIntegral n
           (mn, mx) = case sorted of
             [] -> (0, 0)
-            (lo_ : rest) -> (lo_, foldl (\_ b -> b) lo_ rest)
+            (lo_ : rest) -> (lo_, last rest)
        in RollingStats
             { _rsMeanMs = avg
             , _rsP50Ms = percentileList 0.50 sorted
