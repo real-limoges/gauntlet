@@ -86,6 +86,8 @@ makeValidConfig =
           , tempo = Nothing
           , healthCheckPath = Nothing
           , healthCheckTimeout = Nothing
+          , floatTolerance = Nothing
+          , compareFields = Nothing
           }
     , payloads =
         [ PayloadSpec

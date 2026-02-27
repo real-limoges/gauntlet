@@ -69,14 +69,14 @@ propertySpec = describe "Property-Based Tests" $ do
       \(Positive status) ->
         let body = encode (Map.fromList [("key" :: Text, "test" :: Text)])
             r = makeResponseWithBody status body
-         in verify r r == Match
+         in verify 0.0 Nothing r r == Match
 
     prop "status mismatch when codes differ" $
       \(Positive s1) (Positive s2) ->
         s1 /= s2 ==>
           let r1 = makeResponseWithBody s1 ""
               r2 = makeResponseWithBody s2 ""
-           in case verify r1 r2 of
+           in case verify 0.0 Nothing r1 r2 of
                 StatusMismatch _ _ -> True
                 _ -> False
 

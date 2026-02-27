@@ -25,6 +25,7 @@ module Benchmark.Types
   , ADResult (..)
 
     -- * Verification
+  , JsonDiff (..)
   , VerificationResult (..)
 
     -- * Validation
@@ -276,10 +277,21 @@ data BayesianComparison = BayesianComparison
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)
 
+-- | A single differing path between two JSON bodies.
+data JsonDiff = JsonDiff
+  { jdPath :: Text
+  -- ^ Dot-notation path, e.g. @"data.items[0].id"@
+  , jdPrimary :: Text
+  -- ^ JSON-encoded value from primary response
+  , jdCandidate :: Text
+  -- ^ JSON-encoded value from candidate response
+  }
+  deriving stock (Show, Eq, Generic)
+
 data VerificationResult
   = Match
   | StatusMismatch Int Int
-  | BodyMismatch Text
+  | BodyMismatch [JsonDiff]
   | InvalidJSON String
   deriving stock (Show, Eq, Generic)
 
@@ -402,6 +414,10 @@ data Settings = Settings
   -- ^ Health check path appended to service URL (default: "/health")
   , healthCheckTimeout :: Maybe Int
   -- ^ Health check poll timeout in seconds (default: 60)
+  , floatTolerance :: Maybe Double
+  -- ^ Absolute tolerance for floating-point comparisons in verify mode (default: exact match)
+  , compareFields :: Maybe [Text]
+  -- ^ When set, only these keys (and their full subtrees) are compared in verify mode
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)

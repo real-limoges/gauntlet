@@ -52,14 +52,14 @@ integrationSpec = describe "Integration Tests" $ beforeAll setupManager $ do
       mockJson "{\"x\":1}" $ \port -> do
         a <- timedRequest testSettings mgr (endpoint port)
         b <- timedRequest testSettings mgr (endpoint port)
-        verify a b `shouldBe` Match
+        verify 0.0 Nothing a b `shouldBe` Match
 
     it "detects status mismatch" $ \mgr ->
       mockStatus status200 $ \p1 ->
         mockStatus status404 $ \p2 -> do
           a <- timedRequest testSettings mgr (endpoint p1)
           b <- timedRequest testSettings mgr (endpoint p2)
-          case verify a b of
+          case verify 0.0 Nothing a b of
             StatusMismatch 200 404 -> pure ()
             x -> expectationFailure $ "Expected StatusMismatch, got: " ++ show x
 
@@ -184,7 +184,8 @@ setupManager :: IO Manager
 setupManager = newManager defaultManagerSettings
 
 testSettings :: Settings
-testSettings = Settings 10 4 "" (Just 10) (Just 5) (Just 30) Nothing Nothing Nothing Nothing Nothing Nothing
+testSettings =
+  Settings 10 4 "" (Just 10) (Just 5) (Just 30) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 endpoint :: Int -> Endpoint
 endpoint port = Endpoint "GET" ("http://127.0.0.1:" <> T.pack (show port)) Nothing [] Nothing

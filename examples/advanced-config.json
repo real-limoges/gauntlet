@@ -24,7 +24,9 @@
       "tempoServiceName": "my-service",
       "tempoEnabled": true,
       "tempoAuthToken": "optional-tempo-bearer-token"
-    }
+    },
+    "floatTolerance": 0.001,
+    "compareFields": ["revenue", "orders", "region", "category"]
   },
   "payloads": [
     {

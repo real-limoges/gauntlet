@@ -19,6 +19,7 @@ import Benchmark.Types
   , BayesianComparison (..)
   , BenchmarkStats (..)
   , Endpoint (..)
+  , JsonDiff (..)
   , KSResult (..)
   , MWUResult (..)
   , PercentileComparison (..)
@@ -121,8 +122,17 @@ printFailure (ep, res) = do
     Match -> return ()
     StatusMismatch a b -> printf "  Status Mismatch: Expected %d, Got %d\n" a b
     InvalidJSON err -> printf "  JSON Error: %s\n" err
-    BodyMismatch msg ->
-      printf "  Body Mismatch: %s\n" (T.unpack msg)
+    BodyMismatch diffs -> do
+      printf "  Body Mismatch (%d field(s) differ):\n" (length diffs)
+      mapM_
+        ( \d ->
+            printf
+              "    %-40s  primary=%-20s  candidate=%s\n"
+              (T.unpack $ jdPath d)
+              (T.unpack $ jdPrimary d)
+              (T.unpack $ jdCandidate d)
+        )
+        diffs
   putStrLn ""
 
 printStats :: BenchmarkStats -> IO ()

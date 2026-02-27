@@ -16,7 +16,8 @@
       "retryMaxAttempts": 3,
       "retryInitialDelayMs": 1000,
       "retryBackoffMultiplier": 2.0
-    }
+    },
+    "compareFields": ["id", "results", "total", "status"]
   },
   "payloads": [
     {
