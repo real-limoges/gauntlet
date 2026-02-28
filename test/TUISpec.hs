@@ -109,6 +109,30 @@ tuiStateSpec = describe "Benchmark.TUI.State" $ do
       _tsEndpointIndex newState `shouldBe` 2
       _tsTotalEndpoints newState `shouldBe` 5
 
+  describe "updateState with TargetStarted" $ do
+    it "resets counters and sets target name" $ do
+      now <- getCurrentTime
+      let state = initialState "old" 100 5
+          event = TargetStarted "new-target" 2 50
+          newState = updateState now event state
+      _tsTarget newState `shouldBe` "new-target"
+      _tsCompleted newState `shouldBe` 0
+      _tsIsTotal newState `shouldBe` 50
+      _tsSuccessCount newState `shouldBe` 0
+      _tsErrorCount newState `shouldBe` 0
+      _tsStartTime newState `shouldBe` Nothing
+      _tsRollingStats newState `shouldBe` Nothing
+      Seq.null (_tsRecentDurations newState) `shouldBe` True
+
+    it "resets after requests have been recorded" $ do
+      now <- getCurrentTime
+      let state = initialState "old" 100 5
+          withRequests = updateState now (RequestCompleted (Nanoseconds 50_000_000) 200) state
+          newState = updateState now (TargetStarted "new-target" 1 75) withRequests
+      _tsCompleted newState `shouldBe` 0
+      _tsSuccessCount newState `shouldBe` 0
+      _tsRollingStats newState `shouldBe` Nothing
+
   describe "updateState with BenchmarkFinished" $ do
     it "sets finished flag" $ do
       now <- getCurrentTime

@@ -15,7 +15,7 @@ cliSpec = describe "Benchmark.CLI" $ do
   describe "commandParser" $ do
     it "parses benchmark-nway --config foo.json" $ do
       parse ["benchmark-nway", "--config", "foo.json"]
-        `shouldBe` Just (BenchmarkNway "foo.json" OutputTerminal)
+        `shouldBe` Just (BenchmarkNway "foo.json" NoBaseline OutputTerminal)
 
     it "parses benchmark-single --config foo.json" $ do
       parse ["benchmark-single", "--config", "foo.json"]
@@ -39,11 +39,23 @@ cliSpec = describe "Benchmark.CLI" $ do
 
     it "parses benchmark-nway with --output markdown" $ do
       parse ["benchmark-nway", "--config", "foo.json", "--output", "markdown"]
-        `shouldBe` Just (BenchmarkNway "foo.json" (OutputMarkdown "results/report.md"))
+        `shouldBe` Just (BenchmarkNway "foo.json" NoBaseline (OutputMarkdown "results/report.md"))
 
     it "parses --output markdown --report-path custom.md" $ do
       parse ["benchmark-nway", "--config", "foo.json", "--output", "markdown", "--report-path", "custom.md"]
-        `shouldBe` Just (BenchmarkNway "foo.json" (OutputMarkdown "custom.md"))
+        `shouldBe` Just (BenchmarkNway "foo.json" NoBaseline (OutputMarkdown "custom.md"))
+
+    it "parses benchmark-nway with --save-baseline" $ do
+      parse ["benchmark-nway", "--config", "test.json", "--save-baseline", "foo"]
+        `shouldBe` Just (BenchmarkNway "test.json" (SaveBaseline "foo") OutputTerminal)
+
+    it "parses benchmark-nway with --compare-baseline" $ do
+      parse ["benchmark-nway", "--config", "test.json", "--compare-baseline", "bar"]
+        `shouldBe` Just (BenchmarkNway "test.json" (CompareBaseline "bar") OutputTerminal)
+
+    it "parses benchmark-nway with --save-baseline and --compare-baseline" $ do
+      parse ["benchmark-nway", "--config", "t.json", "--save-baseline", "v2", "--compare-baseline", "v1"]
+        `shouldBe` Just (BenchmarkNway "t.json" (SaveAndCompare "v2" "v1") OutputTerminal)
 
     it "fails on missing --config" $ do
       parse ["benchmark-nway"] `shouldBe` Nothing

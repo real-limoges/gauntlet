@@ -59,6 +59,7 @@ data BenchmarkEvent
   | EndpointStarted Text Int Int
   | StatusMessage Text
   | PhaseStarted Int
+  | TargetStarted Text Int Int
   | BenchmarkFinished
   deriving (Show, Eq)
 
@@ -152,6 +153,19 @@ updateState now event state = case event of
   PhaseStarted total ->
     state
       { _tsCompleted = 0
+      , _tsIsTotal = total
+      , _tsSuccessCount = 0
+      , _tsErrorCount = 0
+      , _tsStartTime = Nothing
+      , _tsElapsedSecs = 0
+      , _tsRollingStats = Nothing
+      , _tsRecentDurations = Seq.empty
+      , _tsRecentRequests = Seq.empty
+      }
+  TargetStarted name _idx total ->
+    state
+      { _tsTarget = name
+      , _tsCompleted = 0
       , _tsIsTotal = total
       , _tsSuccessCount = 0
       , _tsErrorCount = 0

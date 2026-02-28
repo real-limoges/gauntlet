@@ -14,6 +14,7 @@ import FrequentistSpec (frequentistSpec)
 import Integration (integrationSpec)
 import LogSpec (logSpec)
 import MarkdownSpec (markdownSpec)
+import NwayIntegrationSpec (nwayIntegrationSpec)
 import NwaySpec (nwaySpec)
 import OutputSpec (outputSpec)
 import PropertySpec (propertySpec)
@@ -58,6 +59,7 @@ main = hspec $ do
   tracingClientSpec
   integrationSpec
   nwaySpec
+  nwayIntegrationSpec
   typesSpec
   reportSpec
   typesJsonSpec
