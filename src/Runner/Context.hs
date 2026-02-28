@@ -34,6 +34,8 @@ data RunContext = RunContext
   , rcTimestamp :: String
   , rcEventChan :: Maybe (TChan BenchmarkEvent)
   , rcLogger :: Logger
+  , rcTargetName :: Maybe Text
+  -- ^ Nothing for A/B runs, Just name for N-way runs
   }
 
 -- | Set up the git environment or exit with an error.
@@ -56,6 +58,7 @@ initContext setts csvFile timestamp eventChan = do
       , rcTimestamp = timestamp
       , rcEventChan = eventChan
       , rcLogger = logger
+      , rcTargetName = Nothing
       }
 
 -- | Current time as nanoseconds (wall clock).

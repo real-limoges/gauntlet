@@ -1,5 +1,6 @@
 module NwayIntegrationSpec (nwayIntegrationSpec) where
 
+import Benchmark.CLI (BaselineMode (..))
 import Benchmark.Types
 import Data.Text qualified as T
 import MockServer (mockJson)
@@ -18,7 +19,7 @@ nwayIntegrationSpec = describe "N-Way Integration" $ do
         mockJson "{}" $ \port1 ->
           mockJson "{}" $ \port2 -> do
             let cfg = makeTestNwayConfig tokenPath [port1, port2]
-            result <- runNway OutputTerminal cfg
+            result <- runNway NoBaseline OutputTerminal cfg
             result `shouldBe` RunSuccess
 
     it "returns RunSuccess with 3 targets" $
@@ -27,7 +28,7 @@ nwayIntegrationSpec = describe "N-Way Integration" $ do
           mockJson "{}" $ \port2 ->
             mockJson "{}" $ \port3 -> do
               let cfg = makeTestNwayConfig tokenPath [port1, port2, port3]
-              result <- runNway OutputTerminal cfg
+              result <- runNway NoBaseline OutputTerminal cfg
               result `shouldBe` RunSuccess
 
     it "stdout contains target names" $
@@ -36,7 +37,7 @@ nwayIntegrationSpec = describe "N-Way Integration" $ do
           mockJson "{}" $ \port2 -> do
             let cfg = makeTestNwayConfig tokenPath [port1, port2]
             output <- captureStdout $ do
-              _ <- runNway OutputTerminal cfg
+              _ <- runNway NoBaseline OutputTerminal cfg
               pure ()
             output `shouldContain` "target-1"
             output `shouldContain` "target-2"
@@ -47,7 +48,7 @@ nwayIntegrationSpec = describe "N-Way Integration" $ do
           mockJson "{}" $ \port2 -> do
             let cfg = makeTestNwayConfig tokenPath [port1, port2]
             output <- captureStdout $ do
-              _ <- runNway OutputTerminal cfg
+              _ <- runNway NoBaseline OutputTerminal cfg
               pure ()
             T.pack output `shouldSatisfy` T.isInfixOf "Ranking"
 
@@ -57,7 +58,7 @@ nwayIntegrationSpec = describe "N-Way Integration" $ do
           mockJson "{}" $ \port2 -> do
             let mdPath = "nway-report.md"
                 cfg = makeTestNwayConfig tokenPath [port1, port2]
-            result <- runNway (OutputMarkdown mdPath) cfg
+            result <- runNway NoBaseline (OutputMarkdown mdPath) cfg
             result `shouldBe` RunSuccess
             exists <- doesFileExist mdPath
             exists `shouldBe` True
@@ -70,7 +71,7 @@ nwayIntegrationSpec = describe "N-Way Integration" $ do
         mockJson "{}" $ \port1 ->
           mockJson "{}" $ \port2 -> do
             let cfg = makeTestNwayConfig tokenPath [port1, port2]
-            _ <- runNway OutputTerminal cfg
+            _ <- runNway NoBaseline OutputTerminal cfg
             exists <- doesDirectoryExist "results"
             exists `shouldBe` True
             files <- listDirectory "results"
@@ -82,7 +83,7 @@ nwayIntegrationSpec = describe "N-Way Integration" $ do
         mockJson "{}" $ \port1 ->
           mockJson "{}" $ \port2 -> do
             let cfg = makeTestNwayConfigWithMethod tokenPath [port1, port2] "POST"
-            result <- runNway OutputTerminal cfg
+            result <- runNway NoBaseline OutputTerminal cfg
             result `shouldBe` RunSuccess
 
     it "with no branches skips git setup" $
@@ -91,8 +92,50 @@ nwayIntegrationSpec = describe "N-Way Integration" $ do
           mockJson "{}" $ \port2 -> do
             let cfg = makeTestNwayConfig tokenPath [port1, port2]
             -- All targets have targetBranch = Nothing, so no git/docker side effects
-            result <- runNway OutputTerminal cfg
+            result <- runNway NoBaseline OutputTerminal cfg
             result `shouldBe` RunSuccess
+
+    it "CSV output contains target_name column header" $
+      withNwayEnv $ \tokenPath ->
+        mockJson "{}" $ \port1 ->
+          mockJson "{}" $ \port2 -> do
+            let cfg = makeTestNwayConfig tokenPath [port1, port2]
+            _ <- runNway NoBaseline OutputTerminal cfg
+            files <- listDirectory "results"
+            let csvFiles = filter (T.isInfixOf ".csv" . T.pack) files
+            csvFiles `shouldSatisfy` (not . null)
+            case csvFiles of
+              (f : _) -> do
+                csvContents <- readFile ("results/" ++ f)
+                case lines csvContents of
+                  (hdr : _) -> hdr `shouldBe` "target_name,payload_id,url,status_code,latency_ms"
+                  [] -> expectationFailure "CSV file is empty"
+              [] -> expectationFailure "No CSV files found"
+
+    it "CSV output contains target names in rows" $
+      withNwayEnv $ \tokenPath ->
+        mockJson "{}" $ \port1 ->
+          mockJson "{}" $ \port2 -> do
+            let cfg = makeTestNwayConfig tokenPath [port1, port2]
+            _ <- runNway NoBaseline OutputTerminal cfg
+            files <- listDirectory "results"
+            let csvFiles = filter (T.isInfixOf ".csv" . T.pack) files
+            case csvFiles of
+              (f : _) -> do
+                csvContents <- T.pack <$> readFile ("results/" ++ f)
+                T.isInfixOf "target-1" csvContents `shouldBe` True
+                T.isInfixOf "target-2" csvContents `shouldBe` True
+              [] -> expectationFailure "No CSV files found"
+
+    it "SaveBaseline creates per-target baseline files" $
+      withNwayEnv $ \tokenPath ->
+        mockJson "{}" $ \port1 ->
+          mockJson "{}" $ \port2 -> do
+            let cfg = makeTestNwayConfig tokenPath [port1, port2]
+            result <- runNway (SaveBaseline "test") OutputTerminal cfg
+            result `shouldBe` RunSuccess
+            doesFileExist "baselines/test--target-1.json" `shouldReturn` True
+            doesFileExist "baselines/test--target-2.json" `shouldReturn` True
 
 -- Helpers
 

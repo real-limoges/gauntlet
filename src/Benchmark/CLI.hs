@@ -30,6 +30,7 @@ data BaselineMode
 data Command
   = BenchmarkNway
       { configPath :: FilePath
+      , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
       }
   | BenchmarkSingle
@@ -124,7 +125,7 @@ outputFormatParser = do
 
 benchmarkNwayOptions :: Parser Command
 benchmarkNwayOptions =
-  BenchmarkNway <$> configOption <*> outputFormatParser
+  BenchmarkNway <$> configOption <*> baselineModeParser <*> outputFormatParser
 
 benchmarkSingleOptions :: Parser Command
 benchmarkSingleOptions =

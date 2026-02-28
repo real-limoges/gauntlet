@@ -5,7 +5,7 @@ Description : Endpoint benchmark loop with concurrency and validation
 module Runner.Loop (benchmarkEndpoints, runEndpointLoop) where
 
 import Benchmark.Network (addAuth, runBenchmark, runBenchmarkWithEvents)
-import Benchmark.Output (writeLatencies)
+import Benchmark.Output (writeLatencies, writeLatenciesWithTarget)
 import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types
   ( Endpoint (..)
@@ -57,7 +57,9 @@ runEndpointLoop RunContext {..} endpoints = do
       )
       indexedEndpoints
 
-  writeLatencies rcCsvFile results
+  case rcTargetName of
+    Nothing -> writeLatencies rcCsvFile results
+    Just name -> writeLatenciesWithTarget rcCsvFile name results
 
   let allResponses = concatMap (\(_, _, rs) -> rs) results
       summaries =

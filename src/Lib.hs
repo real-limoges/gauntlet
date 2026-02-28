@@ -29,9 +29,9 @@ run :: IO ()
 run = do
   cmd <- parseArgs
   result <- case cmd of
-    BenchmarkNway path fmt -> do
+    BenchmarkNway path baseline fmt -> do
       cfg <- loadAndValidateNwayConfig path
-      runNway fmt cfg
+      runNway baseline fmt cfg
     BenchmarkSingle path baseline fmt -> do
       cfg <- loadAndValidateConfig path
       runSingle baseline fmt cfg

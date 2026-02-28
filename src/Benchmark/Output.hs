@@ -7,7 +7,9 @@ Writes latency measurements to timestamped CSV files in the results directory.
 -}
 module Benchmark.Output
   ( initOutputFiles
+  , initNwayOutputFiles
   , writeLatencies
+  , writeLatenciesWithTarget
   , writeMarkdownReport
   , resultsDir
   , formatRow
@@ -53,6 +55,42 @@ formatRow :: Int -> Endpoint -> TestingResponse -> Builder
 formatRow idx ep r =
   mconcat
     [ B.fromString (show idx)
+    , B.singleton ','
+    , B.fromText (url ep)
+    , B.singleton ','
+    , B.fromString (show $ statusCode r)
+    , B.singleton ','
+    , B.fromString (show $ unNanoseconds $ durationNs r)
+    , B.singleton '\n'
+    ]
+
+-- | Create output files with N-way CSV header (includes target_name column).
+initNwayOutputFiles :: IO (FilePath, String)
+initNwayOutputFiles = do
+  createDirectoryIfMissing True resultsDir
+  timestamp <- formatTime defaultTimeLocale "%Y-%m-%dT%H-%M-%S" <$> getZonedTime
+  let csvFile = resultsDir ++ "/latencies-" ++ timestamp ++ ".csv"
+      logFile = resultsDir ++ "/failures-" ++ timestamp ++ ".log"
+  writeFile logFile ""
+  TIO.writeFile csvFile "target_name,payload_id,url,status_code,latency_ms\n"
+  return (csvFile, timestamp)
+
+-- | Write latencies with a target name prefix for N-way runs.
+writeLatenciesWithTarget :: FilePath -> Text -> [(Int, Endpoint, [TestingResponse])] -> IO ()
+writeLatenciesWithTarget csvFile targetName results = do
+  let builder = foldMap (formatResultWithTarget targetName) results
+  TLIO.appendFile csvFile (toLazyText builder)
+
+formatResultWithTarget :: Text -> (Int, Endpoint, [TestingResponse]) -> Builder
+formatResultWithTarget targetName (idx, ep, responses) =
+  foldMap (formatRowWithTarget targetName idx ep) responses
+
+formatRowWithTarget :: Text -> Int -> Endpoint -> TestingResponse -> Builder
+formatRowWithTarget targetName idx ep r =
+  mconcat
+    [ B.fromText targetName
+    , B.singleton ','
+    , B.fromString (show idx)
     , B.singleton ','
     , B.fromText (url ep)
     , B.singleton ','

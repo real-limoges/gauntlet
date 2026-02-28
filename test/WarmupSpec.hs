@@ -85,6 +85,7 @@ makeCtxWithWarmup _port iters = do
       , rcTimestamp = "test"
       , rcEventChan = Nothing
       , rcLogger = logger
+      , rcTargetName = Nothing
       }
 
 makeCtxWithWarmupAndLog :: Int -> Int -> IO (RunContext, IORef [(LogLevel, Text)])
