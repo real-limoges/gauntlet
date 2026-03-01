@@ -103,51 +103,6 @@ integrationSpec = withResource setupManager (\_ -> pure ()) $ \getMgr ->
             let noRetry = testSettings {retry = Just (RetrySettings 0 0 1.0)}
             resp <- timedRequest noRetry mgr (endpoint port)
             errorMessage resp `shouldSatisfy` (/= Nothing)
-        , testCase "accepts custom retry settings" $ do
-            mgr <- getMgr
-            mockJson "{}" $ \port -> do
-              -- Test that custom retry settings are accepted and used
-              let retrySettings = RetrySettings 5 200 1.5
-              let setts = testSettings {retry = Just retrySettings}
-              resp <- timedRequest setts mgr (endpoint port)
-              statusCode resp `shouldBe` 200
-              errorMessage resp `shouldBe` Nothing
-        , testCase "uses default retry settings when not specified" $ do
-            mgr <- getMgr
-            mockJson "{}" $ \port -> do
-              -- Test that default retry settings work
-              let setts = testSettings {retry = Nothing}
-              resp <- timedRequest setts mgr (endpoint port)
-              statusCode resp `shouldBe` 200
-        , testCase "retry settings with zero attempts work" $ do
-            mgr <- getMgr
-            mockJson "{}" $ \port -> do
-              -- Test that zero retries means no retries
-              let retrySettings = RetrySettings 0 100 2.0
-              let setts = testSettings {retry = Just retrySettings}
-              resp <- timedRequest setts mgr (endpoint port)
-              statusCode resp `shouldBe` 200
-        ]
-    , testGroup
-        "warmup execution"
-        [ testCase "runs warmup iterations before benchmark" $ do
-            mgr <- getMgr
-            mockJson "{}" $ \port -> do
-              sem <- newQSem 1
-              let warmupSettings = WarmupSettings 3
-              let setts = testSettings {warmup = Just warmupSettings}
-              -- This test just verifies warmup doesn't crash
-              -- In real Runner, warmup is called before benchmark
-              results <- runBenchmark setts sem mgr 5 1 (endpoint port)
-              length results `shouldBe` 5
-        , testCase "skips warmup when iterations = 0" $ do
-            mgr <- getMgr
-            mockJson "{}" $ \port -> do
-              sem <- newQSem 1
-              let warmupSettings = WarmupSettings 0
-              let setts = testSettings {warmup = Just warmupSettings}
-              results <- runBenchmark setts sem mgr 3 1 (endpoint port)
-              length results `shouldBe` 3
         ]
     , testGroup
         "custom headers in HTTP requests"

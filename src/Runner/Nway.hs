@@ -35,7 +35,6 @@ import Control.Exception (onException)
 import Control.Monad (forM, forM_)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Lens.Micro ((^.))
 import Log (Logger, logInfo)
 import Network.HTTP.Client (Manager)
 import Runner.Baseline (handleBaseline)
@@ -101,7 +100,7 @@ runNwayWithTUI baselineMode outFmt cfg csvFile timestamp setts perTargetRequests
 
   finalState <- runTUI eventChan tuiState
 
-  if not (finalState ^. tsFinished)
+  if not (tsFinished finalState)
     then do
       cancel benchmarkWork
       exitWithError $ EnvironmentSetupError "Benchmark cancelled by user"

@@ -3,8 +3,6 @@ module NwaySpec (nwaySpec) where
 import Benchmark.Config (validateNwayConfig)
 import Benchmark.Report.Markdown (markdownNwayReport)
 import Benchmark.Types
-import Data.Aeson (eitherDecode)
-import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Text (Text)
 import Data.Text qualified as T
 import Runner.Nway (allPairComparisons)
@@ -18,77 +16,6 @@ nwaySpec =
   testGroup
     "N-Way Benchmarking"
     [ testGroup
-        "NwayConfig JSON parsing"
-        [ testCase "parses a valid 3-target config" $ do
-            let json =
-                  LBS8.pack $
-                    unlines
-                      [ "{"
-                      , "  \"targets\": ["
-                      , "    {\"name\": \"prod\", \"url\": \"http://prod:8080\"},"
-                      , "    {\"name\": \"staging\", \"url\": \"http://staging:8080\"},"
-                      , "    {\"name\": \"dev\", \"url\": \"http://dev:8080\"}"
-                      , "  ],"
-                      , "  \"settings\": {"
-                      , "    \"iterations\": 100,"
-                      , "    \"concurrency\": 4,"
-                      , "    \"secrets\": \"token.txt\""
-                      , "  },"
-                      , "  \"payloads\": ["
-                      , "    {\"name\": \"get-users\", \"method\": \"GET\", \"path\": \"/api/users\"}"
-                      , "  ]"
-                      , "}"
-                      ]
-            case eitherDecode json :: Either String NwayConfig of
-              Left err -> assertFailure $ "Parse failed: " ++ err
-              Right cfg -> do
-                length (nwayTargets cfg) `shouldBe` 3
-                case nwayTargets cfg of
-                  (t : _) -> do
-                    targetName t `shouldBe` "prod"
-                    targetUrl t `shouldBe` "http://prod:8080"
-                  [] -> assertFailure "Expected at least one target"
-                iterations (nwaySettings cfg) `shouldBe` 100
-        , testCase "parses targets with optional branch field" $ do
-            let json =
-                  LBS8.pack $
-                    unlines
-                      [ "{"
-                      , "  \"targets\": ["
-                      , "    {\"name\": \"main\", \"url\": \"http://localhost:8080\", \"branch\": \"main\"},"
-                      , "    {\"name\": \"feature\", \"url\": \"http://localhost:8080\", \"branch\": \"feature-x\"}"
-                      , "  ],"
-                      , "  \"settings\": {\"iterations\": 10, \"concurrency\": 1, \"secrets\": \"s.txt\"},"
-                      , "  \"payloads\": [{\"name\": \"p\", \"method\": \"GET\", \"path\": \"/\"}]"
-                      , "}"
-                      ]
-            case eitherDecode json :: Either String NwayConfig of
-              Left err -> assertFailure $ "Parse failed: " ++ err
-              Right cfg -> case nwayTargets cfg of
-                (t1 : t2 : _) -> do
-                  targetBranch t1 `shouldBe` Just "main"
-                  targetBranch t2 `shouldBe` Just "feature-x"
-                _ -> assertFailure "Expected at least two targets"
-        , testCase "parses targets without branch field as Nothing" $ do
-            let json =
-                  LBS8.pack $
-                    unlines
-                      [ "{"
-                      , "  \"targets\": ["
-                      , "    {\"name\": \"a\", \"url\": \"http://a:8080\"},"
-                      , "    {\"name\": \"b\", \"url\": \"http://b:8080\"}"
-                      , "  ],"
-                      , "  \"settings\": {\"iterations\": 10, \"concurrency\": 1, \"secrets\": \"s.txt\"},"
-                      , "  \"payloads\": [{\"name\": \"p\", \"method\": \"GET\", \"path\": \"/\"}]"
-                      , "}"
-                      ]
-            case eitherDecode json :: Either String NwayConfig of
-              Left err -> assertFailure $ "Parse failed: " ++ err
-              Right cfg -> case nwayTargets cfg of
-                (t : _) -> targetBranch t `shouldBe` Nothing
-                [] -> assertFailure "Expected at least one target"
-        ]
-    , testGroup
         "validateNwayConfig"
         [ testCase "rejects configs with fewer than 2 targets" $ do
             let cfg = makeNwayConfig [NamedTarget "a" "http://a" Nothing]

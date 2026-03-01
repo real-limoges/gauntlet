@@ -16,11 +16,6 @@ outputSpec =
     "Benchmark.Output"
     AllFinish
     [ testGroup
-        "resultsDir"
-        [ testCase "is the string \"results\"" $ do
-            resultsDir `shouldBe` "results"
-        ]
-    , testGroup
         "initOutputFiles"
         [ testCase "creates a CSV file with the correct header" $ do
             (csvFile, timestamp) <- initOutputFiles

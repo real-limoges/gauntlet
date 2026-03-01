@@ -20,33 +20,11 @@ reportSpec =
             [ testCase "contains endpoint name" $ do
                 output <- captureStdout $ printSingleBenchmarkReport "my-endpoint" stats
                 output `shouldSatisfy` ("my-endpoint" `isInfixOf`)
-            , testCase "contains Mean stat" $ do
+            , testCase "contains all expected stat labels" $ do
                 output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("Mean:" `isInfixOf`)
-            , testCase "contains StdDev stat" $ do
-                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("StdDev:" `isInfixOf`)
-            , testCase "contains p50 stat" $ do
-                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("p50:" `isInfixOf`)
-            , testCase "contains p95 stat" $ do
-                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("p95:" `isInfixOf`)
-            , testCase "contains p99 stat" $ do
-                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("p99:" `isInfixOf`)
-            , testCase "contains ES(p99) stat" $ do
-                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("ES(p99):" `isInfixOf`)
-            , testCase "contains Min stat" $ do
-                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("Min:" `isInfixOf`)
-            , testCase "contains Max stat" $ do
-                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("Max:" `isInfixOf`)
-            , testCase "contains Success stat" $ do
-                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
-                output `shouldSatisfy` ("Success:" `isInfixOf`)
+                mapM_
+                  (\label -> output `shouldSatisfy` (label `isInfixOf`))
+                  ["Mean:", "StdDev:", "p50:", "p95:", "p99:", "ES(p99):", "Min:", "Max:", "Success:"]
             ]
     , let statsA = mockStats 50.0 5.0
           statsB = mockStats 45.0 4.0

@@ -14,6 +14,7 @@ module TestHelpers
 where
 
 import Benchmark.Types
+import Control.Monad (when)
 import Data.ByteString.Lazy qualified as LBS
 import Data.IORef
 import Data.Map.Strict qualified as Map
@@ -184,7 +185,5 @@ makeCapturingLogger minLevel ref =
   Logger
     { logLevel = minLevel
     , logAction = \(level, _, msg) ->
-        if level >= minLevel
-          then modifyIORef ref ((level, msg) :)
-          else pure ()
+        when (level >= minLevel) $ modifyIORef ref ((level, msg) :)
     }

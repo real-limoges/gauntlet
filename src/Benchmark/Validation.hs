@@ -91,9 +91,7 @@ checkField jsonVal (path, assertion) =
         -- FieldType: value must be the specified JSON type
         (Just actual, FieldType expected) ->
           let actualType = jsonTypeName actual
-           in if actualType == expected
-                then []
-                else [FieldValueMismatch path (String expected) (String actualType)]
+           in [FieldValueMismatch path (String expected) (String actualType) | actualType /= expected]
         -- FieldMatches: string value must match regex (POSIX ERE)
         (Just (String s), FieldMatches pat)
           | T.unpack s =~ T.unpack pat -> []
@@ -104,9 +102,7 @@ checkField jsonVal (path, assertion) =
         (Just (Number n), FieldRange mmin mmax) ->
           let tooLow = maybe False (n <) mmin
               tooHigh = maybe False (n >) mmax
-           in if tooLow || tooHigh
-                then [FieldValueMismatch path (rangeValue mmin mmax) (Number n)]
-                else []
+           in [FieldValueMismatch path (rangeValue mmin mmax) (Number n) | tooLow || tooHigh]
         (Just actual, FieldRange mmin mmax) ->
           [FieldValueMismatch path (rangeValue mmin mmax) actual]
         -- ArrayLength: array must have exactly N elements

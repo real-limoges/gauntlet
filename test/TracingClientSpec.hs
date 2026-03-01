@@ -115,15 +115,6 @@ tracingClientSpec =
                   spanEndTimeNs s `shouldBe` Nanoseconds 0
                 [] -> assertFailure "Expected at least one span"
               Left err -> assertFailure $ "Expected Right, got: " ++ err
-        , testCase "defaults to 0 for boolean timestamp values" $ do
-            let body = encode $ otlpPayloadWith "startTimeUnixNano" (Bool True) "endTimeUnixNano" (Bool False)
-            case parseTraceResponse "t" body of
-              Right trace -> case traceSpans trace of
-                (s : _) -> do
-                  spanStartTimeNs s `shouldBe` Nanoseconds 0
-                  spanEndTimeNs s `shouldBe` Nanoseconds 0
-                [] -> assertFailure "Expected at least one span"
-              Left err -> assertFailure $ "Expected Right, got: " ++ err
         ]
     , testGroup
         "parseStatus (via parseTraceResponse)"

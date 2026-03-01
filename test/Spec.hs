@@ -10,6 +10,7 @@ import CISpec (ciSpec)
 import CLISpec (cliSpec)
 import ConfigSpec (configSpec)
 import ContextSpec (contextSpec)
+import EnvSpec (envSpec)
 import EnvironmentSpec (environmentSpec)
 import FrequentistSpec (frequentistSpec)
 import Integration (integrationSpec)
@@ -47,6 +48,7 @@ main =
         , verifySpec
         , validationSpec
         , configSpec
+        , envSpec
         , tracingSpec
         , baselineSpec
         , tuiStateSpec

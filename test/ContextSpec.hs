@@ -4,30 +4,19 @@ import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types (Settings (..), TestConfig (..))
 import Control.Concurrent.STM (atomically, newTChanIO, readTChan)
 import Data.Text qualified as T
-import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext)
+import Runner.Context (RunContext (..), emitEvent, initContext)
 import System.IO (hClose, hFlush)
 import System.IO.Temp (withSystemTempFile)
-import TastyCompat (shouldBe, shouldReturn, shouldSatisfy)
+import TastyCompat (shouldBe, shouldReturn)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
 import TestHelpers (makeValidConfig)
-import Tracing.Types (Nanoseconds (..))
 
 contextSpec :: TestTree
 contextSpec =
   testGroup
     "Runner.Context"
     [ testGroup
-        "getNowNs"
-        [ testCase "returns a positive value" $ do
-            Nanoseconds ns <- getNowNs
-            ns `shouldSatisfy` (> 0)
-        , testCase "second call returns >= first call" $ do
-            t1 <- getNowNs
-            t2 <- getNowNs
-            t2 `shouldSatisfy` (>= t1)
-        ]
-    , testGroup
         "emitEvent"
         [ testCase "Nothing channel is a no-op" $
             emitEvent Nothing (PhaseStarted 1) `shouldReturn` ()

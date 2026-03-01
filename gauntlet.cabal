@@ -37,6 +37,7 @@ library
                           Benchmark.CI
                           Benchmark.CLI
                           Benchmark.Config
+                          Benchmark.Env
                           Benchmark.Environment
                           Benchmark.Network
                           Benchmark.Network.Auth
@@ -80,8 +81,6 @@ library
                           http-client-tls,
                           http-types,
                           math-functions,
-                          microlens,
-                          microlens-th,
                           optparse-applicative,
                           process,
                           statistics,
@@ -115,6 +114,7 @@ test-suite            gauntlet-test
                     , BaselineSpec
                     , CLISpec
                     , ContextSpec
+                    , EnvSpec
                     , EnvironmentSpec
                     , NwayIntegrationSpec
                     , NwaySpec

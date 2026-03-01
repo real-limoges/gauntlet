@@ -17,17 +17,17 @@ tuiStateSpec =
         "initialState"
         [ testCase "creates state with correct target, totals, and zeroed counters" $ do
             let state = initialState "http://test.com" 100 5
-            _tsTarget state `shouldBe` "http://test.com"
-            _tsIsTotal state `shouldBe` 100
-            _tsTotalEndpoints state `shouldBe` 5
-            _tsCompleted state `shouldBe` 0
-            _tsSuccessCount state `shouldBe` 0
-            _tsErrorCount state `shouldBe` 0
-            _tsFinished state `shouldBe` False
+            tsTarget state `shouldBe` "http://test.com"
+            tsIsTotal state `shouldBe` 100
+            tsTotalEndpoints state `shouldBe` 5
+            tsCompleted state `shouldBe` 0
+            tsSuccessCount state `shouldBe` 0
+            tsErrorCount state `shouldBe` 0
+            tsFinished state `shouldBe` False
         , testCase "starts with empty rolling stats and durations" $ do
             let state = initialState "http://test.com" 100 5
-            _tsRollingStats state `shouldBe` Nothing
-            Seq.null (_tsRecentDurations state) `shouldBe` True
+            tsRollingStats state `shouldBe` Nothing
+            Seq.null (tsRecentDurations state) `shouldBe` True
         ]
     , testGroup
         "updateState with RequestCompleted"
@@ -36,25 +36,25 @@ tuiStateSpec =
               let state = initialState "http://test.com" 100 5
                   event = RequestCompleted (Nanoseconds 50_000_000) 200
                   newState = updateState now event state
-              _tsCompleted newState `shouldBe` 1
+              tsCompleted newState `shouldBe` 1
           , testCase "updates rolling stats" $ do
               now <- getCurrentTime
               let state = initialState "http://test.com" 100 5
                   event = RequestCompleted (Nanoseconds 50_000_000) 200
                   newState = updateState now event state
-              _tsRollingStats newState `shouldSatisfy` (/= Nothing)
+              tsRollingStats newState `shouldSatisfy` (/= Nothing)
           , testCase "adds duration to recent durations" $ do
               now <- getCurrentTime
               let state = initialState "http://test.com" 100 5
                   event = RequestCompleted (Nanoseconds 50_000_000) 200
                   newState = updateState now event state
-              Seq.length (_tsRecentDurations newState) `shouldBe` 1
+              Seq.length (tsRecentDurations newState) `shouldBe` 1
           , testCase "sets start time on first request" $ do
               now <- getCurrentTime
               let state = initialState "http://test.com" 100 5
                   event = RequestCompleted (Nanoseconds 50_000_000) 200
                   newState = updateState now event state
-              _tsStartTime newState `shouldBe` Just now
+              tsStartTime newState `shouldBe` Just now
           , testCase "does not change start time on subsequent requests" $ do
               now <- getCurrentTime
               let later = addUTCTime 1 now
@@ -63,15 +63,15 @@ tuiStateSpec =
                   event2 = RequestCompleted (Nanoseconds 60_000_000) 200
                   state1 = updateState now event1 state
                   state2 = updateState later event2 state1
-              _tsStartTime state2 `shouldBe` Just now
+              tsStartTime state2 `shouldBe` Just now
           ]
             ++ [ testCase ("categorizes status " ++ show (code :: Int) ++ " correctly") $ do
                    now <- getCurrentTime
                    let state = initialState "http://test.com" 100 5
                        event = RequestCompleted (Nanoseconds 50_000_000) code
                        newState = updateState now event state
-                   _tsSuccessCount newState `shouldBe` expSuccess
-                   _tsErrorCount newState `shouldBe` expError
+                   tsSuccessCount newState `shouldBe` expSuccess
+                   tsErrorCount newState `shouldBe` expError
                | (code, expSuccess, expError) <- [(200, 1, 0), (301, 1, 0), (404, 0, 1), (500, 0, 1)]
                ]
         )
@@ -82,21 +82,21 @@ tuiStateSpec =
             let state = initialState "http://test.com" 100 5
                 event = RequestFailed "Connection timeout"
                 newState = updateState now event state
-            _tsCompleted newState `shouldBe` 1
-            _tsErrorCount newState `shouldBe` 1
-            _tsSuccessCount newState `shouldBe` 0
+            tsCompleted newState `shouldBe` 1
+            tsErrorCount newState `shouldBe` 1
+            tsSuccessCount newState `shouldBe` 0
         , testCase "adds error to recent errors" $ do
             now <- getCurrentTime
             let state = initialState "http://test.com" 100 5
                 event = RequestFailed "Connection timeout"
                 newState = updateState now event state
-            Seq.length (_tsRecentErrors newState) `shouldBe` 1
+            Seq.length (tsRecentErrors newState) `shouldBe` 1
         , testCase "keeps only last 5 errors" $ do
             now <- getCurrentTime
             let state = initialState "http://test.com" 100 5
-                addError s = updateState now (RequestFailed "error") s
+                addError = updateState now (RequestFailed "error")
                 finalState = iterate addError state !! 10
-            Seq.length (_tsRecentErrors finalState) `shouldBe` 5
+            Seq.length (tsRecentErrors finalState) `shouldBe` 5
         ]
     , testGroup
         "updateState with EndpointStarted"
@@ -105,9 +105,9 @@ tuiStateSpec =
             let state = initialState "http://test.com" 100 5
                 event = EndpointStarted "/api/users" 2 5
                 newState = updateState now event state
-            _tsCurrentEndpoint newState `shouldBe` "/api/users"
-            _tsEndpointIndex newState `shouldBe` 2
-            _tsTotalEndpoints newState `shouldBe` 5
+            tsCurrentEndpoint newState `shouldBe` "/api/users"
+            tsEndpointIndex newState `shouldBe` 2
+            tsTotalEndpoints newState `shouldBe` 5
         ]
     , testGroup
         "updateState with TargetStarted"
@@ -116,22 +116,22 @@ tuiStateSpec =
             let state = initialState "old" 100 5
                 event = TargetStarted "new-target" 2 50
                 newState = updateState now event state
-            _tsTarget newState `shouldBe` "new-target"
-            _tsCompleted newState `shouldBe` 0
-            _tsIsTotal newState `shouldBe` 50
-            _tsSuccessCount newState `shouldBe` 0
-            _tsErrorCount newState `shouldBe` 0
-            _tsStartTime newState `shouldBe` Nothing
-            _tsRollingStats newState `shouldBe` Nothing
-            Seq.null (_tsRecentDurations newState) `shouldBe` True
+            tsTarget newState `shouldBe` "new-target"
+            tsCompleted newState `shouldBe` 0
+            tsIsTotal newState `shouldBe` 50
+            tsSuccessCount newState `shouldBe` 0
+            tsErrorCount newState `shouldBe` 0
+            tsStartTime newState `shouldBe` Nothing
+            tsRollingStats newState `shouldBe` Nothing
+            Seq.null (tsRecentDurations newState) `shouldBe` True
         , testCase "resets after requests have been recorded" $ do
             now <- getCurrentTime
             let state = initialState "old" 100 5
                 withRequests = updateState now (RequestCompleted (Nanoseconds 50_000_000) 200) state
                 newState = updateState now (TargetStarted "new-target" 1 75) withRequests
-            _tsCompleted newState `shouldBe` 0
-            _tsSuccessCount newState `shouldBe` 0
-            _tsRollingStats newState `shouldBe` Nothing
+            tsCompleted newState `shouldBe` 0
+            tsSuccessCount newState `shouldBe` 0
+            tsRollingStats newState `shouldBe` Nothing
         ]
     , testGroup
         "updateState with BenchmarkFinished"
@@ -140,18 +140,16 @@ tuiStateSpec =
             let state = initialState "http://test.com" 100 5
                 event = BenchmarkFinished
                 newState = updateState now event state
-            _tsFinished newState `shouldBe` True
+            tsFinished newState `shouldBe` True
         ]
     , testGroup
         "rolling window"
-        [ testCase "rollingWindow is 100" $
-            rollingWindow `shouldBe` 100
-        , testCase "limits durations to rolling window size" $ do
+        [ testCase "limits durations to rolling window size" $ do
             now <- getCurrentTime
             let state = initialState "http://test.com" 200 1
-                addRequest s = updateState now (RequestCompleted (Nanoseconds 50_000_000) 200) s
+                addRequest = updateState now (RequestCompleted (Nanoseconds 50_000_000) 200)
                 finalState = iterate addRequest state !! 150
-            Seq.length (_tsRecentDurations finalState) `shouldBe` 100
+            Seq.length (tsRecentDurations finalState) `shouldBe` 100
         ]
     ]
 

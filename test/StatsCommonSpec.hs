@@ -58,6 +58,22 @@ statsCommonSpec =
             abs (stdDevList avg xs - stdDev (V.fromList xs)) `shouldSatisfy` (< 1e-10)
         ]
     , testGroup
+        "variance / varianceList consistency"
+        [ testCase "agree on sample variance for the same data" $ do
+            let xs = [10.0, 20.0, 30.0, 40.0, 50.0] :: [Double]
+            let avg = sum xs / fromIntegral (length xs)
+            let vecVar = variance (V.fromList xs)
+            let listVar = varianceList avg xs
+            abs (vecVar - listVar) `shouldSatisfy` (< 1e-10)
+        , testCase "both return 0 for a single element" $ do
+            let xs = [42.0] :: [Double]
+            variance (V.fromList xs) `shouldBe` 0
+            varianceList 42.0 xs `shouldBe` 0
+        , testCase "both return 0 for empty input" $ do
+            variance (V.fromList ([] :: [Double])) `shouldBe` 0
+            varianceList 0.0 [] `shouldBe` 0
+        ]
+    , testGroup
         "QuickCheck properties"
         [ testProperty "percentile is between min and max for non-empty vectors" $
             \(NonEmpty xs) -> ioProperty $ do

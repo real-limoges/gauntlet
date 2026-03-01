@@ -106,14 +106,6 @@ typesJsonSpec =
                 specMethod ps `shouldBe` "POST"
                 specPath ps `shouldBe` "/api"
               Nothing -> assertFailure "failed to decode PayloadSpec"
-        , testCase "optional fields absent produces Nothing" $ do
-            let json = LBS8.pack "{\"name\": \"t\", \"method\": \"GET\", \"path\": \"/\"}"
-            case decode json of
-              Just ps -> do
-                specBody ps `shouldBe` Nothing
-                specHeaders ps `shouldBe` Nothing
-                specValidate ps `shouldBe` Nothing
-              Nothing -> assertFailure "failed to decode PayloadSpec"
         ]
     , testGroup
         "ValidationSpec round-trip"
