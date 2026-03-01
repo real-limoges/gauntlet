@@ -180,6 +180,7 @@ progressSection state =
           , if elapsed > 0
               then withAttr (attrName "dim") $ txt $ "   " <> formatElapsed elapsed
               else emptyWidget
+          , rpsWidget state
           ]
       ]
   where
@@ -187,6 +188,28 @@ progressSection state =
     total = tsIsTotal state
     pct = if total > 0 then fromIntegral completed / fromIntegral total else 0 :: Float
     elapsed = tsElapsedSecs state
+
+rpsWidget :: TUIState -> Widget Name
+rpsWidget state = case (tsCurrentRps state, tsTargetRps state, tsCurrentStep state) of
+  (Just rps, Just target, Just step) ->
+    hBox
+      [ withAttr (attrName "dim") $ txt "   "
+      , withAttr (attrName "hi") $ txt $ formatRPS rps
+      , withAttr (attrName "dim") $ txt $ " / " <> formatRPS target
+      , withAttr (attrName "dim") $ txt $ "  [step " <> T.pack (show step) <> "]"
+      ]
+  (Just rps, Just target, Nothing) ->
+    hBox
+      [ withAttr (attrName "dim") $ txt "   "
+      , withAttr (attrName "hi") $ txt $ formatRPS rps
+      , withAttr (attrName "dim") $ txt $ " / " <> formatRPS target
+      ]
+  (Just rps, Nothing, _) ->
+    hBox
+      [ withAttr (attrName "dim") $ txt "   "
+      , withAttr (attrName "hi") $ txt $ formatRPS rps
+      ]
+  _ -> emptyWidget
 
 statsSection :: TUIState -> Widget Name
 statsSection state =

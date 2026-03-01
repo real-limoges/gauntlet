@@ -31,16 +31,7 @@ tracingSpec =
                   ]
             let aggs = aggregateBySpanName spans
             length aggs `shouldBe` 2
-        , testCase "calculates correct mean for grouped spans" $ do
-            let spans =
-                  [ makeSpan "test" 10_000_000
-                  , makeSpan "test" 20_000_000
-                  , makeSpan "test" 30_000_000
-                  ]
-            case aggregateBySpanName spans of
-              [agg] -> aggMeanMs agg `shouldBe` 20.0
-              _ -> assertFailure "Expected exactly one aggregation"
-        , testCase "calculates min and max correctly" $ do
+        , testCase "calculates correct mean, min, and max" $ do
             let spans =
                   [ makeSpan "test" 5_000_000
                   , makeSpan "test" 100_000_000
@@ -50,6 +41,8 @@ tracingSpec =
               [agg] -> do
                 aggMinMs agg `shouldBe` 5.0
                 aggMaxMs agg `shouldBe` 100.0
+                -- (5 + 100 + 25) / 3 ≈ 43.33
+                aggMeanMs agg `shouldSatisfy` (\x -> abs (x - 43.33) < 0.1)
               _ -> assertFailure "Expected exactly one aggregation"
         , testCase "calculates standard deviation" $ do
             let spans =

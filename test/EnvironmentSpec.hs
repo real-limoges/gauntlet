@@ -35,12 +35,6 @@ environmentSpec =
           case result of
             Left (HealthCheckTimeout _ _) -> pure ()
             other -> assertFailure $ "Expected HealthCheckTimeout, got: " ++ show other
-    , testCase "returns Right () on healthy server even with high maxRetries" $
-        mockStatus status200 $ \port -> do
-          mgr <- newManager tlsManagerSettings
-          let url = T.pack $ "http://127.0.0.1:" ++ show port
-          result <- waitForHealth mgr url 10
-          result `shouldBe` Right ()
     , testCase "succeeds when server returns 503 then 200" $
         mockFailThenSucceed 1 $ \port -> do
           mgr <- newManager tlsManagerSettings

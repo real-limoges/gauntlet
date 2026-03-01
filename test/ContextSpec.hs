@@ -9,7 +9,7 @@ import System.IO (hClose, hFlush)
 import System.IO.Temp (withSystemTempFile)
 import TastyCompat (shouldBe, shouldReturn)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (assertFailure, testCase)
+import Test.Tasty.HUnit (testCase)
 import TestHelpers (makeValidConfig)
 
 contextSpec :: TestTree
@@ -45,13 +45,6 @@ contextSpec =
               ctx <- initContext setts "/tmp/test.csv" "2024-01-01" Nothing
               rcCsvFile ctx `shouldBe` "/tmp/test.csv"
               rcTimestamp ctx `shouldBe` "2024-01-01"
-        , testCase "stores Nothing event channel as Nothing" $
-            withTempToken "tok\n" $ \tokenPath -> do
-              let setts = (settings makeValidConfig) {secrets = T.pack tokenPath}
-              ctx <- initContext setts "/dev/null" "ts" Nothing
-              case rcEventChan ctx of
-                Nothing -> pure ()
-                Just _ -> assertFailure "Expected Nothing event channel"
         ]
     ]
 

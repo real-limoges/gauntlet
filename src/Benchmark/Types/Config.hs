@@ -14,6 +14,13 @@ module Benchmark.Types.Config
   , LogLevel (..)
   , defaultLogLevel
 
+    -- * Load Control
+  , LoadMode (..)
+  , LoadStep (..)
+  , totalRequestsForMode
+  , isDurationBased
+  , loadModeDurationSecs
+
     -- * Output Format
   , OutputFormat (..)
   )
@@ -28,7 +35,12 @@ import Data.Aeson
   , defaultOptions
   , fieldLabelModifier
   , genericParseJSON
+  , genericToJSON
+  , withObject
+  , (.:)
   )
+import Data.Aeson qualified
+import Data.Aeson.Types (Parser)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.Generics (Generic)
@@ -143,6 +155,72 @@ instance ToJSON LogLevel where
 defaultLogLevel :: LogLevel
 defaultLogLevel = Info
 
+-- | A single step in a step-load profile.
+data LoadStep = LoadStep
+  { loadStepRps :: Double
+  -- ^ Target RPS for this step
+  , loadStepDurationSecs :: Double
+  -- ^ Duration of this step in seconds
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON LoadStep where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "loadStep"
+        }
+
+instance ToJSON LoadStep where
+  toJSON =
+    Data.Aeson.genericToJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "loadStep"
+        }
+
+-- | Load control mode for pacing request dispatch.
+data LoadMode
+  = -- | No throttling — fire as fast as concurrency allows (default)
+    LoadUnthrottled
+  | -- | Constant RPS — pace iterations at a fixed rate
+    LoadConstantRps Double
+  | -- | Ramp-up — linearly increase RPS from start to end over a duration
+    LoadRampUp Double Double Double
+  | -- | Step load — sequential steps, each with its own RPS and duration
+    LoadStepLoad [LoadStep]
+  deriving stock (Show, Eq)
+
+instance FromJSON LoadMode where
+  parseJSON = withObject "LoadMode" $ \o -> do
+    mode <- o .: "mode" :: Parser Text
+    case mode of
+      "unthrottled" -> pure LoadUnthrottled
+      "constantRps" -> LoadConstantRps <$> o .: "targetRps"
+      "rampUp" -> LoadRampUp <$> o .: "startRps" <*> o .: "endRps" <*> o .: "durationSecs"
+      "stepLoad" -> LoadStepLoad <$> o .: "steps"
+      _ -> fail $ "Unknown load mode: " ++ show mode
+
+-- | Compute total requests for a load mode given a fallback iteration count.
+totalRequestsForMode :: LoadMode -> Int -> Int
+totalRequestsForMode LoadUnthrottled fallback = fallback
+totalRequestsForMode (LoadConstantRps _) fallback = fallback
+totalRequestsForMode (LoadRampUp startRps endRps dur) _ =
+  round ((startRps + endRps) / 2 * dur)
+totalRequestsForMode (LoadStepLoad steps) _ =
+  sum [round (loadStepRps s * loadStepDurationSecs s) | s <- steps]
+
+-- | Whether the load mode is duration-based (ignores iterations).
+isDurationBased :: LoadMode -> Bool
+isDurationBased (LoadRampUp {}) = True
+isDurationBased (LoadStepLoad _) = True
+isDurationBased _ = False
+
+-- | Total duration in seconds for duration-based modes.
+loadModeDurationSecs :: LoadMode -> Double
+loadModeDurationSecs (LoadRampUp _ _ d) = d
+loadModeDurationSecs (LoadStepLoad steps) = sum (map loadStepDurationSecs steps)
+loadModeDurationSecs _ = 0
+
 data Settings = Settings
   { iterations :: Int
   , concurrency :: Int
@@ -170,6 +248,8 @@ data Settings = Settings
   -- ^ Keys stripped at any depth before comparison in verify mode (complement of compareFields)
   , verifyIterations :: Maybe Int
   -- ^ Number of request pairs to run per endpoint in verify mode (default: 1)
+  , loadMode :: Maybe LoadMode
+  -- ^ Load control mode (default: unthrottled)
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)

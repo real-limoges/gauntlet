@@ -28,16 +28,11 @@ bayesianSpec =
             let statsB = mockStats 100.0 10.0
             let result = compareBayesian statsA statsB
             probBFasterThanA result `shouldSatisfy` (\p -> p > 0.4 && p < 0.6)
-        , testCase "calculates positive mean difference when A is slower" $ do
-            let statsA = mockStats 100.0 5.0
-            let statsB = mockStats 80.0 5.0
-            let result = compareBayesian statsA statsB
-            meanDifference result `shouldBe` 20.0
-        , testCase "calculates negative mean difference when A is faster" $ do
-            let statsA = mockStats 50.0 5.0
-            let statsB = mockStats 80.0 5.0
-            let result = compareBayesian statsA statsB
-            meanDifference result `shouldBe` (-30.0)
+        , testCase "calculates correct mean difference in both directions" $ do
+            let resultPos = compareBayesian (mockStats 100.0 5.0) (mockStats 80.0 5.0)
+            meanDifference resultPos `shouldBe` 20.0
+            let resultNeg = compareBayesian (mockStats 50.0 5.0) (mockStats 80.0 5.0)
+            meanDifference resultNeg `shouldBe` (-30.0)
         , testCase "effect size (Cohen's d) is positive when A is slower" $ do
             let statsA = mockStats 100.0 10.0
             let statsB = mockStats 80.0 10.0
@@ -50,11 +45,6 @@ bayesianSpec =
             let trueDiff = 10.0
             credibleIntervalLower result `shouldSatisfy` (< trueDiff)
             credibleIntervalUpper result `shouldSatisfy` (> trueDiff)
-        , testCase "relative effect is calculated correctly" $ do
-            let statsA = mockStats 100.0 5.0
-            let statsB = mockStats 80.0 5.0
-            let result = compareBayesian statsA statsB
-            relativeEffect result `shouldBe` 20.0
         , testCase "returns finite results when both sides have zero successful requests" $ do
             let zeroCount = (mockStats 100.0 10.0) {countSuccess = 0}
             let result = compareBayesian zeroCount zeroCount

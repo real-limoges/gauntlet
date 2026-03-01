@@ -283,7 +283,8 @@ printValidationError BodyInvalidJSON =
 renderValue :: Value -> String
 renderValue = LBS8.unpack . encode
 
--- | Look up stats for a target by name.
--- INVARIANT: callers guarantee the key exists (constructed from the same target list).
+{-| Look up stats for a target by name.
+INVARIANT: callers guarantee the key exists (constructed from the same target list).
+-}
 lookupStats :: Text -> Map Text BenchmarkStats -> BenchmarkStats
 lookupStats name m = m Map.! name

@@ -46,32 +46,32 @@ outputSpec =
             contents `shouldSatisfy` T.isInfixOf "http://example.com/check"
         , testCase "CSV rows contain the status code" $ do
             (csvFile, _) <- initOutputFiles
-            let ep = testEndpoint "http://x.com"
+            let ep = testEndpoint "http://example.com"
             writeLatencies csvFile [(1, ep, [makeResp 404 100_000])]
             contents <- TIO.readFile csvFile
             contents `shouldSatisfy` T.isInfixOf "404"
         , testCase "handles multiple endpoints without crashing" $ do
             (csvFile, _) <- initOutputFiles
-            let ep1 = testEndpoint "http://a.com"
-                ep2 = testEndpoint "http://b.com"
+            let ep1 = testEndpoint "http://a.example.com"
+                ep2 = testEndpoint "http://b.example.com"
             writeLatencies
               csvFile
               [ (1, ep1, [makeResp 200 1_000_000])
               , (2, ep2, [makeResp 200 2_000_000])
               ]
             contents <- TIO.readFile csvFile
-            contents `shouldSatisfy` T.isInfixOf "http://a.com"
-            contents `shouldSatisfy` T.isInfixOf "http://b.com"
+            contents `shouldSatisfy` T.isInfixOf "http://a.example.com"
+            contents `shouldSatisfy` T.isInfixOf "http://b.example.com"
         , testCase "handles error response (status 0) without crashing" $ do
             (csvFile, _) <- initOutputFiles
-            let ep = testEndpoint "http://x.com"
+            let ep = testEndpoint "http://example.com"
             writeLatencies csvFile [(1, ep, [makeResp 0 0])]
             contents <- TIO.readFile csvFile
             -- Just check it doesn't crash and still has header
             contents `shouldSatisfy` T.isInfixOf "payload_id"
         , testCase "writes the correct payload_id in each row" $ do
             (csvFile, _) <- initOutputFiles
-            let ep = testEndpoint "http://x.com"
+            let ep = testEndpoint "http://example.com"
             writeLatencies csvFile [(42, ep, [makeResp 200 100_000])]
             contents <- TIO.readFile csvFile
             contents `shouldSatisfy` T.isInfixOf "42"
@@ -85,31 +85,30 @@ outputSpec =
                 fields = T.splitOn "," row
             length fields `shouldBe` 4
         , testCase "includes the payload index" $ do
-            let row = TL.toStrict $ toLazyText $ formatRow 42 (testEndpoint "http://x.com") (makeResp 200 100)
+            let row = TL.toStrict $ toLazyText $ formatRow 42 (testEndpoint "http://example.com") (makeResp 200 100)
             T.isPrefixOf "42," row `shouldBe` True
-        , testCase "includes the endpoint URL" $ do
-            let row = TL.toStrict $ toLazyText $ formatRow 1 (testEndpoint "http://my-service.com/path") (makeResp 200 100)
-            row `shouldSatisfy` T.isInfixOf "http://my-service.com/path"
-        , testCase "includes the status code" $ do
-            let row = TL.toStrict $ toLazyText $ formatRow 1 (testEndpoint "http://x.com") (makeResp 404 100)
+        , testCase "includes URL, status code, and nanosecond duration" $ do
+            let row =
+                  TL.toStrict $
+                    toLazyText $
+                      formatRow 1 (testEndpoint "http://service.example.com/path") (makeResp 404 1_500_000)
+            row `shouldSatisfy` T.isInfixOf "http://service.example.com/path"
             row `shouldSatisfy` T.isInfixOf "404"
-        , testCase "includes the raw nanosecond duration" $ do
-            let row = TL.toStrict $ toLazyText $ formatRow 1 (testEndpoint "http://x.com") (makeResp 200 1_500_000)
             row `shouldSatisfy` T.isInfixOf "1500000"
         , testCase "ends with a newline" $ do
-            let row = TL.toStrict $ toLazyText $ formatRow 1 (testEndpoint "http://x.com") (makeResp 200 100)
+            let row = TL.toStrict $ toLazyText $ formatRow 1 (testEndpoint "http://example.com") (makeResp 200 100)
             T.isSuffixOf "\n" row `shouldBe` True
         ]
     , testGroup
         "formatResultBuilder (pure Builder)"
         [ testCase "produces one row per response" $ do
-            let ep = testEndpoint "http://x.com"
+            let ep = testEndpoint "http://example.com"
                 responses = [makeResp 200 1_000, makeResp 200 2_000, makeResp 200 3_000]
                 output = TL.toStrict $ toLazyText $ formatResultBuilder (1, ep, responses)
                 rows = filter (not . T.null) (T.lines output)
             length rows `shouldBe` 3
         , testCase "produces empty output for empty responses" $ do
-            let output = TL.toStrict $ toLazyText $ formatResultBuilder (1, testEndpoint "http://x.com", [])
+            let output = TL.toStrict $ toLazyText $ formatResultBuilder (1, testEndpoint "http://example.com", [])
             output `shouldBe` ""
         ]
     ]

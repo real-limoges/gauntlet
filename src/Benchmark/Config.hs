@@ -32,7 +32,7 @@ loadConfig = loadConfigAs
 loadNwayConfig :: FilePath -> IO (Either String NwayConfig)
 loadNwayConfig = loadConfigAs
 
-loadConfigAs :: (FromJSON a) => FilePath -> IO (Either String a)
+loadConfigAs :: FromJSON a => FilePath -> IO (Either String a)
 loadConfigAs path = do
   result <- try (TIO.readFile path) :: IO (Either IOException Text)
   case result of
@@ -97,20 +97,47 @@ isValidMethod p = specMethod p `elem` ["GET", "POST", "PUT", "DELETE", "PATCH"]
 -- | Validate optional settings fields when present.
 validateSettings :: Settings -> Either PerfTestError ()
 validateSettings setts = do
-  check (requestTimeout setts) ((<= 0)) "requestTimeout must be greater than 0"
+  check (requestTimeout setts) (<= 0) "requestTimeout must be greater than 0"
   check (healthCheckTimeout setts) (<= 0) "healthCheckTimeout must be greater than 0"
   case retry setts of
     Nothing -> Right ()
     Just r -> do
       when (retryMaxAttempts r < 0) $
-        Left $ ConfigValidationError "retryMaxAttempts must not be negative"
+        Left $
+          ConfigValidationError "retryMaxAttempts must not be negative"
       when (retryInitialDelayMs r <= 0) $
-        Left $ ConfigValidationError "retryInitialDelayMs must be greater than 0"
+        Left $
+          ConfigValidationError "retryInitialDelayMs must be greater than 0"
       when (retryBackoffMultiplier r < 1.0) $
-        Left $ ConfigValidationError "retryBackoffMultiplier must be at least 1.0"
+        Left $
+          ConfigValidationError "retryBackoffMultiplier must be at least 1.0"
+  validateLoadMode (loadMode setts)
   where
     check :: Maybe Int -> (Int -> Bool) -> String -> Either PerfTestError ()
     check Nothing _ _ = Right ()
     check (Just v) predicate msg
       | predicate v = Left $ ConfigValidationError msg
+      | otherwise = Right ()
+
+-- | Validate load mode settings when present.
+validateLoadMode :: Maybe LoadMode -> Either PerfTestError ()
+validateLoadMode Nothing = Right ()
+validateLoadMode (Just LoadUnthrottled) = Right ()
+validateLoadMode (Just (LoadConstantRps rps))
+  | rps <= 0 = Left $ ConfigValidationError "loadMode constantRps: targetRps must be greater than 0"
+  | otherwise = Right ()
+validateLoadMode (Just (LoadRampUp startRps endRps dur))
+  | startRps <= 0 = Left $ ConfigValidationError "loadMode rampUp: startRps must be greater than 0"
+  | endRps <= 0 = Left $ ConfigValidationError "loadMode rampUp: endRps must be greater than 0"
+  | dur <= 0 = Left $ ConfigValidationError "loadMode rampUp: durationSecs must be greater than 0"
+  | otherwise = Right ()
+validateLoadMode (Just (LoadStepLoad [])) =
+  Left $ ConfigValidationError "loadMode stepLoad: steps must not be empty"
+validateLoadMode (Just (LoadStepLoad steps)) = mapM_ validateStep steps
+  where
+    validateStep s
+      | loadStepRps s <= 0 =
+          Left $ ConfigValidationError "loadMode stepLoad: each step rps must be greater than 0"
+      | loadStepDurationSecs s <= 0 =
+          Left $ ConfigValidationError "loadMode stepLoad: each step durationSecs must be greater than 0"
       | otherwise = Right ()

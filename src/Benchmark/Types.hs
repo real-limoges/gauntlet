@@ -49,6 +49,13 @@ module Benchmark.Types
   , LogLevel (..)
   , defaultLogLevel
 
+    -- * Load Control
+  , LoadMode (..)
+  , LoadStep (..)
+  , totalRequestsForMode
+  , isDurationBased
+  , loadModeDurationSecs
+
     -- * Baseline / CI
   , Baseline (..)
   , RegressionThresholds (..)

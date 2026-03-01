@@ -13,6 +13,8 @@ module Benchmark.Network
   ( initNetwork
   , runBenchmark
   , runBenchmarkWithEvents
+  , runBenchmarkDuration
+  , runBenchmarkDurationWithEvents
   , runComparison
   , timedRequest
   , addAuth
@@ -22,5 +24,11 @@ module Benchmark.Network
 where
 
 import Benchmark.Network.Auth (addAuth, readToken)
-import Benchmark.Network.Exec (runBenchmark, runBenchmarkWithEvents, runComparison)
+import Benchmark.Network.Exec
+  ( runBenchmark
+  , runBenchmarkDuration
+  , runBenchmarkDurationWithEvents
+  , runBenchmarkWithEvents
+  , runComparison
+  )
 import Benchmark.Network.Request (initNetwork, prepareRequest, timedRequest)
