@@ -16,21 +16,21 @@ cabal build            # Alternative build command
 
 ### Running Benchmarks
 ```bash
-make benchmark-multiple # Run multiple benchmarks (requires config.json)
+make benchmark-nway    # Run N-way comparison benchmark (requires config.json)
 make benchmark-single   # Run single benchmark (requires config.json)
 make verify            # Verify test configuration
 
 # Direct execution
-cabal run gauntlet-exe -- benchmark-multiple --config config.json
+cabal run gauntlet-exe -- benchmark-nway --config config.json
 ```
 
 ### Testing
 ```bash
-cabal test             # Run full test suite (hspec + QuickCheck)
+cabal test             # Run full test suite (Tasty + QuickCheck)
 cabal test --test-show-details=direct  # Verbose test output
 
 # Run specific test module
-cabal test --test-options="--match 'BayesianSpec'"
+cabal test --test-options="-p 'BayesianSpec'"
 ```
 
 ### Development
@@ -48,7 +48,7 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 
 **Key Components:**
 - `Types.hs` - Core data types: `Endpoint`, `BenchmarkStats`, `BayesianComparison`, `TestConfig`, `PerfTestError`
-- `Config.hs` - Loads YAML/JSON config, builds endpoint definitions from payloads
+- `Config.hs` - Loads YAML/JSON config, builds endpoint definitions from payloads; also exports `loadNwayConfig`, `validateNwayConfig`, `toEndpoint`
 - `Environment.hs` - Git branch switching, docker-compose orchestration, health-check polling
 - `Network.hs` - HTTP client facade; implementation split into sub-modules:
   - `Network/Auth.hs` - Token reading and auth header injection
@@ -60,9 +60,9 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 - `Validation.hs` - Per-response JSON field validation (status code + field assertions)
 - `Verify.hs` - Response body/status verification between primary and candidate
 - `TUI.hs` + `TUI/State.hs` + `TUI/Widgets.hs` - Real-time Brick-based terminal UI
-- `Report.hs` - Terminal output formatting
-- `Report/Markdown.hs` - Markdown report generation for CI artifacts
-- `Output.hs` - CSV/JSON serialization
+- `Report.hs` - Terminal output formatting; also exports `printNwayReport`
+- `Report/Markdown.hs` - Markdown report generation for CI artifacts; also exports `markdownNwayReport`
+- `Output.hs` - CSV/JSON serialization; also exports `initNwayOutputFiles`, `writeLatenciesWithTarget`
 - `CI.hs` - GitLab CI and GitHub Actions integration
 
 ### 2. Stats/ Module (Statistical Analysis)
@@ -95,11 +95,12 @@ Optional Grafana Tempo integration for analyzing distributed traces.
 Orchestrates the full benchmark lifecycle, split into sub-modules.
 
 **Key Components:**
-- `Runner.hs` - Top-level entry points: `runMultiple`, `runSingle`
+- `Runner.hs` - Top-level entry points: `runNway`, `runSingle`
 - `Runner/Context.hs` - `RunContext` record, `initContext`, `setupOrFail` (git switch + docker-compose)
 - `Runner/Loop.hs` - Concurrent benchmark loops with STM channels
 - `Runner/Warmup.hs` - Warmup request execution
 - `Runner/Tracing.hs` - Fetches and prints Tempo traces for the benchmark time window
+- `Runner/Nway.hs` - N-way comparison orchestration: `runNway`, `allPairComparisons`
 - `Runner/Baseline.hs` - Baseline save/compare and CI report emission
 
 ### Core Entry Points
@@ -130,7 +131,7 @@ Terminal/JSON/CSV/Markdown Output + Exit Code (0=success, 1=regression, 2=error)
 
 ## Testing Approach
 
-**Framework:** Hspec with QuickCheck for property-based testing
+**Framework:** Tasty with tasty-hunit and tasty-quickcheck for property-based testing
 
 **Test Types:**
 - **Unit Tests:** StatsSpec, BayesianSpec, ConfigSpec, VerifySpec, BaselineSpec, TracingSpec
@@ -160,6 +161,10 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 - `settings.tempo` - Optional tracing configuration (URL, service name, auth token)
 - `payloads[].headers` - Optional custom HTTP headers (Map Text Text)
 - `payloads[].validate` - Optional per-response validation (`status`, `fields` map of dot-path assertions)
+- `settings.floatTolerance` - Tolerance for floating-point comparison in verify mode (default: 0.0)
+- `settings.compareFields` - Optional whitelist of JSON keys to compare in verify mode
+- `settings.ignoreFields` - Optional JSON keys to strip before comparison in verify mode
+- `settings.verifyIterations` - Number of iterations for verify mode (default: 1)
 
 ## Important Architectural Decisions
 
@@ -198,7 +203,6 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 
 **High-Priority Features:**
 1. Load control modes: constant RPS, ramp-up, step load
-2. N-way comparison (`benchmark-nway`): replace `Targets{primary,candidate}` pair with `[NamedTarget]` list
 
 ## Exit Codes
 

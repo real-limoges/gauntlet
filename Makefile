@@ -3,8 +3,8 @@ EXE = $(shell cabal list-bin gauntlet-exe)
 build:
 	cabal build --enable-optimization=2 gauntlet-exe
 
-benchmark-multiple: build
-	$(EXE) benchmark-multiple --config config.json
+benchmark-nway: build
+	$(EXE) benchmark-nway --config config.json
 
 benchmark-single: build
 	$(EXE) benchmark-single --config config.json
