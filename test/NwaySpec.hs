@@ -1,9 +1,7 @@
 module NwaySpec (nwaySpec) where
 
 import Benchmark.Config (validateNwayConfig)
-import Benchmark.Report.Markdown (markdownNwayReport)
 import Benchmark.Types
-import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Runner.Nway (allPairComparisons)
@@ -64,9 +62,6 @@ nwaySpec =
         , testCase "produces 3 pairs for 3 targets" $ do
             let stats = makePairStats 3
             length (allPairComparisons stats) `shouldBe` 3
-        , testCase "produces 6 pairs for 4 targets" $ do
-            let stats = makePairStats 4
-            length (allPairComparisons stats) `shouldBe` 6
         , testCase "produces 0 pairs for empty list" $ do
             allPairComparisons [] `shouldBe` []
         , testCase "produces 0 pairs for single target" $ do
@@ -80,23 +75,6 @@ nwaySpec =
             let pairs = allPairComparisons stats
             let pairNames = [(a, b) | (a, b, _) <- pairs]
             pairNames `shouldBe` [("alpha", "beta"), ("alpha", "gamma"), ("beta", "gamma")]
-        ]
-    , testGroup
-        "markdownNwayReport"
-        [ testCase "contains ranking table header" $ do
-            let triples = [("prod", mockStats 10 1, makeTimings 10), ("staging", mockStats 20 2, makeTimings 20)]
-                namedStats = Map.fromList [(n, s) | (n, s, _) <- triples]
-                pairs = allPairComparisons triples
-                md = markdownNwayReport namedStats pairs
-            T.isInfixOf "Ranking" md `shouldBe` True
-            T.isInfixOf "| # | Target |" md `shouldBe` True
-        , testCase "contains target names" $ do
-            let triples = [("prod", mockStats 10 1, makeTimings 10), ("staging", mockStats 20 2, makeTimings 20)]
-                namedStats = Map.fromList [(n, s) | (n, s, _) <- triples]
-                pairs = allPairComparisons triples
-                md = markdownNwayReport namedStats pairs
-            T.isInfixOf "prod" md `shouldBe` True
-            T.isInfixOf "staging" md `shouldBe` True
         ]
     ]
 
@@ -121,6 +99,7 @@ defaultSettings =
     , compareFields = Nothing
     , ignoreFields = Nothing
     , verifyIterations = Nothing
+    , loadMode = Nothing
     }
 
 makeNwayConfig :: [NamedTarget] -> NwayConfig

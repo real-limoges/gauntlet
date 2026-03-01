@@ -67,7 +67,7 @@ nwayIntegrationSpec =
                   content <- readFile mdPath
                   content `shouldContain` "target-1"
                   content `shouldContain` "target-2"
-        , testCase "creates results directory with CSV output" $
+        , testCase "creates results directory with correct CSV output" $
             withNwayEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
@@ -78,6 +78,17 @@ nwayIntegrationSpec =
                   files <- listDirectory "results"
                   let csvFiles = filter (T.isInfixOf ".csv" . T.pack) files
                   csvFiles `shouldSatisfy` (not . null)
+                  case csvFiles of
+                    (f : _) -> do
+                      csvContents <- T.pack <$> readFile ("results/" ++ f)
+                      -- Check header
+                      case T.lines csvContents of
+                        (hdr : _) -> T.unpack hdr `shouldBe` "target_name,payload_id,url,status_code,latency_ms"
+                        [] -> assertFailure "CSV file is empty"
+                      -- Check target names in rows
+                      T.isInfixOf "target-1" csvContents `shouldBe` True
+                      T.isInfixOf "target-2" csvContents `shouldBe` True
+                    [] -> assertFailure "No CSV files found"
         , testCase "handles POST endpoints" $
             withNwayEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
@@ -85,44 +96,6 @@ nwayIntegrationSpec =
                   let cfg = makeTestNwayConfigWithMethod tokenPath [port1, port2] "POST"
                   result <- runNway NoBaseline OutputTerminal cfg
                   result `shouldBe` RunSuccess
-        , testCase "with no branches skips git setup" $
-            withNwayEnv $ \tokenPath ->
-              mockJson "{}" $ \port1 ->
-                mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  -- All targets have targetBranch = Nothing, so no git/docker side effects
-                  result <- runNway NoBaseline OutputTerminal cfg
-                  result `shouldBe` RunSuccess
-        , testCase "CSV output contains target_name column header" $
-            withNwayEnv $ \tokenPath ->
-              mockJson "{}" $ \port1 ->
-                mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  _ <- runNway NoBaseline OutputTerminal cfg
-                  files <- listDirectory "results"
-                  let csvFiles = filter (T.isInfixOf ".csv" . T.pack) files
-                  csvFiles `shouldSatisfy` (not . null)
-                  case csvFiles of
-                    (f : _) -> do
-                      csvContents <- readFile ("results/" ++ f)
-                      case lines csvContents of
-                        (hdr : _) -> hdr `shouldBe` "target_name,payload_id,url,status_code,latency_ms"
-                        [] -> assertFailure "CSV file is empty"
-                    [] -> assertFailure "No CSV files found"
-        , testCase "CSV output contains target names in rows" $
-            withNwayEnv $ \tokenPath ->
-              mockJson "{}" $ \port1 ->
-                mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  _ <- runNway NoBaseline OutputTerminal cfg
-                  files <- listDirectory "results"
-                  let csvFiles = filter (T.isInfixOf ".csv" . T.pack) files
-                  case csvFiles of
-                    (f : _) -> do
-                      csvContents <- T.pack <$> readFile ("results/" ++ f)
-                      T.isInfixOf "target-1" csvContents `shouldBe` True
-                      T.isInfixOf "target-2" csvContents `shouldBe` True
-                    [] -> assertFailure "No CSV files found"
         , testCase "SaveBaseline creates per-target baseline files" $
             withNwayEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
@@ -172,6 +145,7 @@ makeTestSettings tokenPath =
     , compareFields = Nothing
     , ignoreFields = Nothing
     , verifyIterations = Nothing
+    , loadMode = Nothing
     }
 
 makeTestNwayConfig :: FilePath -> [Int] -> NwayConfig

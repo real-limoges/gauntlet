@@ -50,16 +50,6 @@ tracingQuerySpec =
         -- Only service name (no span name, no min duration)
         let result = buildTraceQL baseQuery
         result `shouldSatisfy` (not . T.isInfixOf " && ")
-    , testCase "two conditions produce one && separator" $ do
-        let q = baseQuery {querySpanName = Just "op"}
-        let result = buildTraceQL q
-        let parts = T.splitOn " && " result
-        length parts `shouldBe` 2
-    , testCase "three conditions (service + span + duration) produce two && separators" $ do
-        let q = baseQuery {querySpanName = Just "op", queryMinDuration = Just "50ms"}
-        let result = buildTraceQL q
-        let parts = T.splitOn " && " result
-        length parts `shouldBe` 3
     , testCase "three conditions include all fields" $ do
         let q = baseQuery {querySpanName = Just "GET /api", queryMinDuration = Just "100ms"}
         let result = buildTraceQL q

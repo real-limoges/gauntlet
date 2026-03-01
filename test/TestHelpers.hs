@@ -100,6 +100,7 @@ makeValidConfig =
           , compareFields = Nothing
           , ignoreFields = Nothing
           , verifyIterations = Nothing
+          , loadMode = Nothing
           }
     , payloads =
         [ PayloadSpec

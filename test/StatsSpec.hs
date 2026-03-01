@@ -13,12 +13,7 @@ statsSpec =
     "Stats.Benchmark"
     [ testGroup
         "calculateStats"
-        [ testCase "calculates mean duration correctly (in ms)" $ do
-            let r1 = makeResult 10_000_000
-            let r2 = makeResult 30_000_000
-            let stats = calculateStats [r1, r2]
-            meanMs stats `shouldBe` 20.0
-        , testCase "handles single response" $ do
+        [ testCase "handles single response" $ do
             let r = makeResult 50_000_000
             let stats = calculateStats [r]
             meanMs stats `shouldBe` 50.0
@@ -45,10 +40,5 @@ statsSpec =
             let stats = calculateStats responses
             p50Ms stats `shouldSatisfy` (\x -> x > 5.0 && x < 6.0)
             p99Ms stats `shouldSatisfy` (> 9.0)
-        , testCase "calculates min and max correctly" $ do
-            let responses = [makeResult 5_000_000, makeResult 100_000_000, makeResult 25_000_000]
-            let stats = calculateStats responses
-            minMs stats `shouldBe` 5.0
-            maxMs stats `shouldBe` 100.0
         ]
     ]

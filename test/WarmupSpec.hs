@@ -21,18 +21,13 @@ warmupSpec =
     "Runner.Warmup"
     [ testGroup
         "runWarmup"
-        [ testCase "warmupIterations = 0 makes no requests" $
+        [ testCase "warmupIterations = 0 makes no requests and emits no logs" $
             mockCountedRequests status200 "{}" $ \port getCount -> do
-              ctx <- makeCtxWithWarmup port 0
+              (ctx, logRef) <- makeCtxWithWarmupAndLog port 0
               let ep = makeEndpoint port
               runWarmup ctx ep
               count <- getCount
               count `shouldBe` 0
-        , testCase "warmupIterations = 0 emits no log messages" $
-            mockCountedRequests status200 "{}" $ \port _getCount -> do
-              (ctx, logRef) <- makeCtxWithWarmupAndLog port 0
-              let ep = makeEndpoint port
-              runWarmup ctx ep
               msgs <- readIORef logRef
               msgs `shouldBe` []
         , testCase "warmupIterations = 1 makes 1 request and logs singular 'iteration'" $

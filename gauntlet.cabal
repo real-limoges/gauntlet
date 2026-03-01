@@ -44,6 +44,7 @@ library
                           Benchmark.Network.Exec
                           Benchmark.Network.Request
                           Benchmark.Output
+                          Benchmark.RateLimiter
                           Benchmark.Report
                           Benchmark.Report.Markdown
                           Benchmark.Types
@@ -123,8 +124,10 @@ test-suite            gauntlet-test
                     , ContextSpec
                     , EnvSpec
                     , EnvironmentSpec
+                    , LoadControlIntegrationSpec
                     , NwayIntegrationSpec
                     , NwaySpec
+                    , RateLimiterSpec
                     , BayesianSpec
                     , CISpec
                     , ConfigSpec

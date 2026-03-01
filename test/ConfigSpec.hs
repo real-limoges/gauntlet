@@ -2,6 +2,7 @@ module ConfigSpec (configSpec) where
 
 import Benchmark.Config
 import Benchmark.Types
+import Data.Aeson (eitherDecode)
 import Data.Map.Strict qualified as Map
 import TastyCompat (shouldBe, shouldContain, shouldNotContain)
 import Test.Tasty (TestTree, testGroup)
@@ -23,17 +24,12 @@ configSpec =
               Left (ConfigValidationError msg) ->
                 msg `shouldBe` "No payloads defined in config"
               _ -> assertFailure "Expected ConfigValidationError"
-        , testCase "rejects zero iterations" $ do
-            let cfg = makeValidConfig {settings = (settings makeValidConfig) {iterations = 0}}
-            case validateConfig cfg of
-              Left (ConfigValidationError msg) ->
-                msg `shouldBe` "iterations must be greater than 0"
-              _ -> assertFailure "Expected ConfigValidationError"
-        , testCase "rejects negative iterations" $ do
-            let cfg = makeValidConfig {settings = (settings makeValidConfig) {iterations = -5}}
-            case validateConfig cfg of
-              Left (ConfigValidationError _) -> pure ()
-              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects zero or negative iterations" $ do
+            let check n = case validateConfig (makeValidConfig {settings = (settings makeValidConfig) {iterations = n}}) of
+                  Left (ConfigValidationError _) -> pure ()
+                  _ -> assertFailure $ "Expected ConfigValidationError for iterations=" ++ show n
+            check 0
+            check (-5)
         , testCase "rejects zero concurrency" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {concurrency = 0}}
             case validateConfig cfg of
@@ -98,9 +94,6 @@ configSpec =
             let r = RetrySettings 3 1000 2.0
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {retry = Just r}}
             validateConfig cfg `shouldBe` Right cfg
-        , testCase "accepts missing optional settings" $ do
-            -- Default makeValidConfig has all optional fields as Nothing
-            validateConfig makeValidConfig `shouldBe` Right makeValidConfig
         ]
     , testGroup
         "buildEndpoints"
@@ -163,5 +156,86 @@ configSpec =
             case buildEndpoints (primary (targets cfg)) (payloads cfg) of
               [ep] -> headers ep `shouldBe` [("Content-Type", "application/json")]
               _ -> assertFailure "Expected exactly one endpoint"
+        ]
+    , testGroup
+        "loadMode JSON parsing"
+        [ testCase "parses constantRps" $ do
+            let json = "{\"mode\": \"constantRps\", \"targetRps\": 50.0}"
+            case eitherDecode json :: Either String LoadMode of
+              Right (LoadConstantRps rps) -> rps `shouldBe` 50.0
+              other -> assertFailure $ "Expected LoadConstantRps, got: " ++ show other
+        , testCase "parses rampUp" $ do
+            let json = "{\"mode\": \"rampUp\", \"startRps\": 10.0, \"endRps\": 100.0, \"durationSecs\": 60.0}"
+            case eitherDecode json :: Either String LoadMode of
+              Right (LoadRampUp s e d) -> do
+                s `shouldBe` 10.0
+                e `shouldBe` 100.0
+                d `shouldBe` 60.0
+              other -> assertFailure $ "Expected LoadRampUp, got: " ++ show other
+        , testCase "parses stepLoad" $ do
+            let json =
+                  "{\"mode\": \"stepLoad\", \"steps\": [{\"rps\": 20.0, \"durationSecs\": 30.0}, {\"rps\": 50.0, \"durationSecs\": 30.0}]}"
+            case eitherDecode json :: Either String LoadMode of
+              Right (LoadStepLoad steps) -> length steps `shouldBe` 2
+              other -> assertFailure $ "Expected LoadStepLoad, got: " ++ show other
+        , testCase "parses unthrottled" $ do
+            let json = "{\"mode\": \"unthrottled\"}"
+            eitherDecode json `shouldBe` Right LoadUnthrottled
+        , testCase "missing loadMode defaults to Nothing" $ do
+            -- makeValidConfig has loadMode = Nothing
+            let cfg = makeValidConfig
+            loadMode (settings cfg) `shouldBe` Nothing
+        , testCase "rejects unknown mode" $ do
+            let json = "{\"mode\": \"turbo\"}"
+            case eitherDecode json :: Either String LoadMode of
+              Left _ -> pure ()
+              Right _ -> assertFailure "Expected parse failure for unknown mode"
+        ]
+    , testGroup
+        "loadMode validation"
+        [ testCase "accepts valid constantRps" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadConstantRps 50)}}
+            validateConfig cfg `shouldBe` Right cfg
+        , testCase "rejects constantRps with rps=0" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadConstantRps 0)}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) -> msg `shouldContain` "targetRps"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects rampUp with startRps=0" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp 0 100 60)}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) -> msg `shouldContain` "startRps"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects rampUp with negative durationSecs" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp 10 100 (-1))}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) -> msg `shouldContain` "durationSecs"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects stepLoad with empty steps" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadStepLoad [])}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) -> msg `shouldContain` "steps must not be empty"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects stepLoad with zero rps" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 0 30])}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) -> msg `shouldContain` "step rps"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects stepLoad with zero durationSecs" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 50 0])}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) -> msg `shouldContain` "step durationSecs"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "accepts valid rampUp" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp 10 100 60)}}
+            validateConfig cfg `shouldBe` Right cfg
+        , testCase "accepts valid stepLoad" $ do
+            let cfg =
+                  makeValidConfig
+                    { settings = (settings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 20 30, LoadStep 50 30])}
+                    }
+            validateConfig cfg `shouldBe` Right cfg
+        , testCase "accepts Nothing loadMode (backwards compat)" $ do
+            validateConfig makeValidConfig `shouldBe` Right makeValidConfig
         ]
     ]

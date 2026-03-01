@@ -19,14 +19,13 @@ logSpec =
     "Log"
     [ testGroup
         "formatMessage"
-        [ testCase "contains [DEBUG] for Debug level" $
-            T.isInfixOf "[DEBUG]" (formatMessage Debug fixedTime "test") `shouldBe` True
-        , testCase "contains [INFO] for Info level" $
-            T.isInfixOf "[INFO]" (formatMessage Info fixedTime "test") `shouldBe` True
-        , testCase "contains [WARN] for Warning level" $
-            T.isInfixOf "[WARN]" (formatMessage Warning fixedTime "test") `shouldBe` True
-        , testCase "contains [ERROR] for Error level" $
-            T.isInfixOf "[ERROR]" (formatMessage Error fixedTime "test") `shouldBe` True
+        [ testCase "contains correct level tag for each log level" $ do
+            let check level tag =
+                  T.isInfixOf tag (formatMessage level fixedTime "test") `shouldBe` True
+            check Debug "[DEBUG]"
+            check Info "[INFO]"
+            check Warning "[WARN]"
+            check Error "[ERROR]"
         , testCase "contains the message text" $
             T.isInfixOf "hello world" (formatMessage Info fixedTime "hello world") `shouldBe` True
         , testCase "contains timestamp" $

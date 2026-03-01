@@ -37,25 +37,19 @@ ciSpec =
         ]
     , testGroup
         "formatForCI"
-        [ testCase "is a no-op for None mode" $ do
+        [ testCase "is a no-op for None mode regardless of result" $ do
             formatForCI None mockPassed `shouldReturn` ()
-        , testCase "is a no-op for None mode with failed result" $ do
             formatForCI None mockFailed `shouldReturn` ()
         ]
     , testGroup
         "writeArtifactReport"
-        [ testCase "writes regression markdown to specified file" $
+        [ testCase "writes regression markdown with PASSED for passing result" $
             withSystemTempFile "report.md" $ \path h -> do
               hClose h
               writeArtifactReport path mockPassed
               contents <- TIO.readFile path
               contents `shouldSatisfy` T.isInfixOf "Regression Check"
               contents `shouldSatisfy` T.isInfixOf "my-baseline"
-        , testCase "written file contains PASSED for passing result" $
-            withSystemTempFile "report.md" $ \path h -> do
-              hClose h
-              writeArtifactReport path mockPassed
-              contents <- TIO.readFile path
               contents `shouldSatisfy` T.isInfixOf "PASSED"
         , testCase "written file contains FAILED for regression result" $
             withSystemTempFile "report.md" $ \path h -> do

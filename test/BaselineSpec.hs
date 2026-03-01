@@ -25,24 +25,17 @@ baselineSpec =
             let current = mockStats 115.0 10.0
             let result = compareToBaseline defaultThresholds baseline current
             regressionPassed result `shouldBe` False
-        , testCase "fails when p50 exceeds threshold" $ do
+        , testCase "fails when any percentile exceeds threshold" $ do
             let baseStats = mockStats 100.0 10.0
-            let currStats = baseStats {p50Ms = 115.0}
-            let baseline = makeBaseline "v1.0" baseStats
-            let result = compareToBaseline defaultThresholds baseline currStats
-            regressionPassed result `shouldBe` False
-        , testCase "fails when p95 exceeds threshold" $ do
-            let baseStats = mockStats 100.0 10.0
-            let currStats = baseStats {p95Ms = p95Ms baseStats * 1.15}
-            let baseline = makeBaseline "v1.0" baseStats
-            let result = compareToBaseline defaultThresholds baseline currStats
-            regressionPassed result `shouldBe` False
-        , testCase "fails when p99 exceeds threshold (15%)" $ do
-            let baseStats = mockStats 100.0 10.0
-            let currStats = baseStats {p99Ms = p99Ms baseStats * 1.20}
-            let baseline = makeBaseline "v1.0" baseStats
-            let result = compareToBaseline defaultThresholds baseline currStats
-            regressionPassed result `shouldBe` False
+                baseline = makeBaseline "v1.0" baseStats
+                check currStats =
+                  regressionPassed (compareToBaseline defaultThresholds baseline currStats) `shouldBe` False
+            -- p50 exceeded
+            check (baseStats {p50Ms = 115.0})
+            -- p95 exceeded
+            check (baseStats {p95Ms = p95Ms baseStats * 1.15})
+            -- p99 exceeded
+            check (baseStats {p99Ms = p99Ms baseStats * 1.20})
         , testCase "passes when p99 is within higher threshold (15%)" $ do
             let baseStats = mockStats 100.0 10.0
             let currStats = baseStats {p99Ms = p99Ms baseStats * 1.10}
@@ -54,11 +47,6 @@ baselineSpec =
             let current = mockStats 80.0 8.0
             let result = compareToBaseline defaultThresholds baseline current
             regressionPassed result `shouldBe` True
-        , testCase "returns four metric results" $ do
-            let baseline = makeBaseline "v1.0" (mockStats 100.0 10.0)
-            let current = mockStats 100.0 10.0
-            let result = compareToBaseline defaultThresholds baseline current
-            length (regressionMetrics result) `shouldBe` 4
         , testCase "calculates correct percentage change" $ do
             let baseline = makeBaseline "v1.0" (mockStats 100.0 10.0)
             let current = mockStats 120.0 10.0

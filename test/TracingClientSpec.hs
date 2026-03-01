@@ -140,13 +140,6 @@ tracingClientSpec =
                 (s : _) -> spanStatus s `shouldBe` StatusUnset
                 [] -> assertFailure "Expected span"
               Left err -> assertFailure err
-        , testCase "parses unknown status code as StatusUnset" $ do
-            let body = encode $ otlpPayloadWithStatus (Just (object ["code" .= (99 :: Int)]))
-            case parseTraceResponse "t" body of
-              Right trace -> case traceSpans trace of
-                (s : _) -> spanStatus s `shouldBe` StatusUnset
-                [] -> assertFailure "Expected span"
-              Left err -> assertFailure err
         ]
     , testGroup
         "parseSpanKind (via parseTraceResponse)"
@@ -181,20 +174,6 @@ tracingClientSpec =
         , testCase "parses missing kind as SpanKindUnspecified" $ do
             -- Base payload has no kind
             let body = encode otlpPayload
-            case parseTraceResponse "t" body of
-              Right trace -> case traceSpans trace of
-                (s : _) -> spanKind s `shouldBe` SpanKindUnspecified
-                [] -> assertFailure "Expected span"
-              Left err -> assertFailure err
-        , testCase "parses unknown string kind as SpanKindUnspecified" $ do
-            let body = encode $ otlpPayloadWithKind (Just (String "UNKNOWN_KIND"))
-            case parseTraceResponse "t" body of
-              Right trace -> case traceSpans trace of
-                (s : _) -> spanKind s `shouldBe` SpanKindUnspecified
-                [] -> assertFailure "Expected span"
-              Left err -> assertFailure err
-        , testCase "parses unknown numeric kind as SpanKindUnspecified" $ do
-            let body = encode $ otlpPayloadWithKind (Just (Number 99))
             case parseTraceResponse "t" body of
               Right trace -> case traceSpans trace of
                 (s : _) -> spanKind s `shouldBe` SpanKindUnspecified

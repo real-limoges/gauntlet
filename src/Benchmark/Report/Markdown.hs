@@ -15,6 +15,7 @@ module Benchmark.Report.Markdown
   , markdownVerifyReport
   ) where
 
+import Benchmark.Report (lookupStats)
 import Benchmark.Types
   ( ADResult (..)
   , BayesianComparison (..)
@@ -30,7 +31,6 @@ import Benchmark.Types
   , ValidationSummary (..)
   , VerificationResult (..)
   )
-import Benchmark.Report (lookupStats)
 import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map

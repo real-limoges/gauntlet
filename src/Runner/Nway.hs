@@ -153,14 +153,15 @@ runAllTargets ctx cfg eventChan = do
     (timings, validSummaries) <- benchmarkEndpoints ctxWithTarget (T.unpack (targetName t)) targetEps
     endNs <- getNowNs
 
-    pure NwayResult
-      { nrName = targetName t
-      , nrStats = calculateStats timings
-      , nrResponses = timings
-      , nrValidations = validSummaries
-      , nrStartNs = startNs
-      , nrEndNs = endNs
-      }
+    pure
+      NwayResult
+        { nrName = targetName t
+        , nrStats = calculateStats timings
+        , nrResponses = timings
+        , nrValidations = validSummaries
+        , nrStartNs = startNs
+        , nrEndNs = endNs
+        }
 
   emitEvent eventChan BenchmarkFinished
   return results

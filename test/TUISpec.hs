@@ -16,8 +16,8 @@ tuiStateSpec =
     [ testGroup
         "initialState"
         [ testCase "creates state with correct target, totals, and zeroed counters" $ do
-            let state = initialState "http://test.com" 100 5
-            tsTarget state `shouldBe` "http://test.com"
+            let state = initialState "http://test.example.com" 100 5
+            tsTarget state `shouldBe` "http://test.example.com"
             tsIsTotal state `shouldBe` 100
             tsTotalEndpoints state `shouldBe` 5
             tsCompleted state `shouldBe` 0
@@ -25,7 +25,7 @@ tuiStateSpec =
             tsErrorCount state `shouldBe` 0
             tsFinished state `shouldBe` False
         , testCase "starts with empty rolling stats and durations" $ do
-            let state = initialState "http://test.com" 100 5
+            let state = initialState "http://test.example.com" 100 5
             tsRollingStats state `shouldBe` Nothing
             Seq.null (tsRecentDurations state) `shouldBe` True
         ]
@@ -33,32 +33,32 @@ tuiStateSpec =
         "updateState with RequestCompleted"
         ( [ testCase "increments completed count" $ do
               now <- getCurrentTime
-              let state = initialState "http://test.com" 100 5
+              let state = initialState "http://test.example.com" 100 5
                   event = RequestCompleted (Nanoseconds 50_000_000) 200
                   newState = updateState now event state
               tsCompleted newState `shouldBe` 1
           , testCase "updates rolling stats" $ do
               now <- getCurrentTime
-              let state = initialState "http://test.com" 100 5
+              let state = initialState "http://test.example.com" 100 5
                   event = RequestCompleted (Nanoseconds 50_000_000) 200
                   newState = updateState now event state
               tsRollingStats newState `shouldSatisfy` (/= Nothing)
           , testCase "adds duration to recent durations" $ do
               now <- getCurrentTime
-              let state = initialState "http://test.com" 100 5
+              let state = initialState "http://test.example.com" 100 5
                   event = RequestCompleted (Nanoseconds 50_000_000) 200
                   newState = updateState now event state
               Seq.length (tsRecentDurations newState) `shouldBe` 1
           , testCase "sets start time on first request" $ do
               now <- getCurrentTime
-              let state = initialState "http://test.com" 100 5
+              let state = initialState "http://test.example.com" 100 5
                   event = RequestCompleted (Nanoseconds 50_000_000) 200
                   newState = updateState now event state
               tsStartTime newState `shouldBe` Just now
           , testCase "does not change start time on subsequent requests" $ do
               now <- getCurrentTime
               let later = addUTCTime 1 now
-                  state = initialState "http://test.com" 100 5
+                  state = initialState "http://test.example.com" 100 5
                   event1 = RequestCompleted (Nanoseconds 50_000_000) 200
                   event2 = RequestCompleted (Nanoseconds 60_000_000) 200
                   state1 = updateState now event1 state
@@ -67,7 +67,7 @@ tuiStateSpec =
           ]
             ++ [ testCase ("categorizes status " ++ show (code :: Int) ++ " correctly") $ do
                    now <- getCurrentTime
-                   let state = initialState "http://test.com" 100 5
+                   let state = initialState "http://test.example.com" 100 5
                        event = RequestCompleted (Nanoseconds 50_000_000) code
                        newState = updateState now event state
                    tsSuccessCount newState `shouldBe` expSuccess
@@ -79,7 +79,7 @@ tuiStateSpec =
         "updateState with RequestFailed"
         [ testCase "increments completed and error count" $ do
             now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
+            let state = initialState "http://test.example.com" 100 5
                 event = RequestFailed "Connection timeout"
                 newState = updateState now event state
             tsCompleted newState `shouldBe` 1
@@ -87,13 +87,13 @@ tuiStateSpec =
             tsSuccessCount newState `shouldBe` 0
         , testCase "adds error to recent errors" $ do
             now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
+            let state = initialState "http://test.example.com" 100 5
                 event = RequestFailed "Connection timeout"
                 newState = updateState now event state
             Seq.length (tsRecentErrors newState) `shouldBe` 1
         , testCase "keeps only last 5 errors" $ do
             now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
+            let state = initialState "http://test.example.com" 100 5
                 addError = updateState now (RequestFailed "error")
                 finalState = iterate addError state !! 10
             Seq.length (tsRecentErrors finalState) `shouldBe` 5
@@ -102,7 +102,7 @@ tuiStateSpec =
         "updateState with EndpointStarted"
         [ testCase "updates current endpoint" $ do
             now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
+            let state = initialState "http://test.example.com" 100 5
                 event = EndpointStarted "/api/users" 2 5
                 newState = updateState now event state
             tsCurrentEndpoint newState `shouldBe` "/api/users"
@@ -134,10 +134,35 @@ tuiStateSpec =
             tsRollingStats newState `shouldBe` Nothing
         ]
     , testGroup
+        "updateState with CurrentRpsUpdated"
+        [ testCase "sets tsCurrentRps" $ do
+            now <- getCurrentTime
+            let state = initialState "http://test.example.com" 100 5
+                event = CurrentRpsUpdated 42.0
+                newState = updateState now event state
+            tsCurrentRps newState `shouldBe` Just 42.0
+        , testCase "overwrites previous RPS" $ do
+            now <- getCurrentTime
+            let state = initialState "http://test.example.com" 100 5
+                state1 = updateState now (CurrentRpsUpdated 10.0) state
+                state2 = updateState now (CurrentRpsUpdated 20.0) state1
+            tsCurrentRps state2 `shouldBe` Just 20.0
+        ]
+    , testGroup
+        "updateState with LoadStepChanged"
+        [ testCase "sets step and target rps" $ do
+            now <- getCurrentTime
+            let state = initialState "http://test.example.com" 100 5
+                event = LoadStepChanged 2 50.0
+                newState = updateState now event state
+            tsCurrentStep newState `shouldBe` Just 2
+            tsTargetRps newState `shouldBe` Just 50.0
+        ]
+    , testGroup
         "updateState with BenchmarkFinished"
         [ testCase "sets finished flag" $ do
             now <- getCurrentTime
-            let state = initialState "http://test.com" 100 5
+            let state = initialState "http://test.example.com" 100 5
                 event = BenchmarkFinished
                 newState = updateState now event state
             tsFinished newState `shouldBe` True
@@ -146,7 +171,7 @@ tuiStateSpec =
         "rolling window"
         [ testCase "limits durations to rolling window size" $ do
             now <- getCurrentTime
-            let state = initialState "http://test.com" 200 1
+            let state = initialState "http://test.example.com" 200 1
                 addRequest = updateState now (RequestCompleted (Nanoseconds 50_000_000) 200)
                 finalState = iterate addRequest state !! 150
             Seq.length (tsRecentDurations finalState) `shouldBe` 100

@@ -14,12 +14,14 @@ import EnvSpec (envSpec)
 import EnvironmentSpec (environmentSpec)
 import FrequentistSpec (frequentistSpec)
 import Integration (integrationSpec)
+import LoadControlIntegrationSpec (loadControlIntegrationSpec)
 import LogSpec (logSpec)
 import MarkdownSpec (markdownSpec)
 import NwayIntegrationSpec (nwayIntegrationSpec)
 import NwaySpec (nwaySpec)
 import OutputSpec (outputSpec)
 import PropertySpec (propertySpec)
+import RateLimiterSpec (rateLimiterSpec)
 import ReportSpec (reportSpec)
 import RunnerBaselineSpec (runnerBaselineSpec)
 import StatsCommonSpec (statsCommonSpec)
@@ -73,4 +75,6 @@ main =
         , environmentSpec
         , warmupSpec
         , runnerBaselineSpec
+        , rateLimiterSpec
+        , loadControlIntegrationSpec
         ]

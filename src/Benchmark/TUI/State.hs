@@ -31,6 +31,8 @@ data BenchmarkEvent
   | StatusMessage Text
   | PhaseStarted Int
   | TargetStarted Text Int Int
+  | CurrentRpsUpdated Double
+  | LoadStepChanged Int Double
   | BenchmarkFinished
   deriving (Show, Eq)
 
@@ -61,6 +63,9 @@ data TUIState = TUIState
   , tsFinished :: Bool
   , tsStatus :: Text
   , tsElapsedSecs :: Double
+  , tsCurrentRps :: Maybe Double
+  , tsTargetRps :: Maybe Double
+  , tsCurrentStep :: Maybe Int
   }
   deriving (Show, Eq)
 
@@ -83,6 +88,9 @@ initialState target total endpoints =
     , tsFinished = False
     , tsStatus = ""
     , tsElapsedSecs = 0
+    , tsCurrentRps = Nothing
+    , tsTargetRps = Nothing
+    , tsCurrentStep = Nothing
     }
 
 updateState :: UTCTime -> BenchmarkEvent -> TUIState -> TUIState
@@ -141,7 +149,14 @@ updateState now event state = case event of
       , tsRollingStats = Nothing
       , tsRecentDurations = Seq.empty
       , tsRecentRequests = Seq.empty
+      , tsCurrentRps = Nothing
+      , tsTargetRps = Nothing
+      , tsCurrentStep = Nothing
       }
+  CurrentRpsUpdated rps ->
+    state {tsCurrentRps = Just rps}
+  LoadStepChanged step rps ->
+    state {tsCurrentStep = Just step, tsTargetRps = Just rps}
   BenchmarkFinished ->
     state {tsFinished = True}
   where

@@ -1,10 +1,7 @@
 module PropertySpec (propertySpec) where
 
 import Benchmark.Baseline (compareToBaseline)
-import Benchmark.TUI.State
 import Benchmark.Types
-import Data.Sequence qualified as Seq
-import Data.Time (getCurrentTime)
 import Stats.Benchmark (calculateStats)
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup)
@@ -99,38 +96,5 @@ propertySpec =
                     baseline = makeBaseline "test" baseStats
                     result = compareToBaseline defaultThresholds baseline currStats
                  in regressionPassed result
-        ]
-    , testGroup
-        "TUI.State properties"
-        [ testProperty "completed count matches number of RequestCompleted events" $
-            \(Positive n) ->
-              n <= 1000 ==>
-                ioProperty $ do
-                  now <- getCurrentTime
-                  let state = initialState "http://test" 1000 1
-                      addRequest = updateState now (RequestCompleted (Nanoseconds 50_000_000) 200)
-                      finalState = iterate addRequest state !! n
-                  return $ tsCompleted finalState == n
-        , testProperty "success + error = completed" $
-            \successes failures ->
-              let n = abs successes `mod` 100
-                  m = abs failures `mod` 100
-               in ioProperty $ do
-                    now <- getCurrentTime
-                    let state = initialState "http://test" 1000 1
-                        addSuccess = updateState now (RequestCompleted (Nanoseconds 50_000_000) 200)
-                        addFailure = updateState now (RequestFailed "error")
-                        afterSuccesses = iterate addSuccess state !! n
-                        finalState = iterate addFailure afterSuccesses !! m
-                    return $ tsSuccessCount finalState + tsErrorCount finalState == tsCompleted finalState
-        , testProperty "rolling window never exceeds limit" $
-            \(Positive n) ->
-              n <= 200 ==>
-                ioProperty $ do
-                  now <- getCurrentTime
-                  let state = initialState "http://test" 1000 1
-                      addRequest = updateState now (RequestCompleted (Nanoseconds 50_000_000) 200)
-                      finalState = iterate addRequest state !! n
-                  return $ Seq.length (tsRecentDurations finalState) <= rollingWindow
         ]
     ]

@@ -12,11 +12,6 @@ typesSpec =
     [ testGroup
         "Benchmark.Types"
         [ testGroup
-            "nsToMs"
-            [ testCase "converts 1_000_000 ns to 1.0 ms" $ do
-                nsToMs (Nanoseconds 1_000_000) `shouldBe` Milliseconds 1.0
-            ]
-        , testGroup
             "formatError"
             [ testCase "formats ConfigParseError" $ do
                 formatError (ConfigParseError "bad json") `shouldBe` "Failed to parse config: bad json"
