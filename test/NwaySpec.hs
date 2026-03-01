@@ -3,6 +3,7 @@ module NwaySpec (nwaySpec) where
 import Benchmark.Config (validateNwayConfig)
 import Benchmark.Report.Markdown (markdownNwayReport)
 import Benchmark.Types
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Runner.Nway (allPairComparisons)
@@ -84,14 +85,14 @@ nwaySpec =
         "markdownNwayReport"
         [ testCase "contains ranking table header" $ do
             let triples = [("prod", mockStats 10 1, makeTimings 10), ("staging", mockStats 20 2, makeTimings 20)]
-                namedStats = [(n, s) | (n, s, _) <- triples]
+                namedStats = Map.fromList [(n, s) | (n, s, _) <- triples]
                 pairs = allPairComparisons triples
                 md = markdownNwayReport namedStats pairs
             T.isInfixOf "Ranking" md `shouldBe` True
             T.isInfixOf "| # | Target |" md `shouldBe` True
         , testCase "contains target names" $ do
             let triples = [("prod", mockStats 10 1, makeTimings 10), ("staging", mockStats 20 2, makeTimings 20)]
-                namedStats = [(n, s) | (n, s, _) <- triples]
+                namedStats = Map.fromList [(n, s) | (n, s, _) <- triples]
                 pairs = allPairComparisons triples
                 md = markdownNwayReport namedStats pairs
             T.isInfixOf "prod" md `shouldBe` True

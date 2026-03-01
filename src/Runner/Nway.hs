@@ -33,6 +33,8 @@ import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (TChan, newTChanIO)
 import Control.Exception (onException)
 import Control.Monad (forM, forM_)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Log (Logger, logInfo)
@@ -174,7 +176,7 @@ postAnalysis ::
   [NwayResult] ->
   IO RunResult
 postAnalysis logger mgr baselineMode outFmt setts timestamp results = do
-  let namedStats = [(nrName r, nrStats r) | r <- results]
+  let namedStats = Map.fromList [(nrName r, nrStats r) | r <- results]
       pairInput = [(nrName r, nrStats r, nrResponses r) | r <- results]
       pairs = allPairComparisons pairInput
       validAll = concatMap nrValidations results
@@ -192,10 +194,10 @@ postAnalysis logger mgr baselineMode outFmt setts timestamp results = do
   handleNwayBaseline logger baselineMode (T.pack timestamp) namedStats
 
 -- | Run baseline operations for each N-way target, aggregate results.
-handleNwayBaseline :: Logger -> BaselineMode -> Text -> [(Text, BenchmarkStats)] -> IO RunResult
+handleNwayBaseline :: Logger -> BaselineMode -> Text -> Map Text BenchmarkStats -> IO RunResult
 handleNwayBaseline _logger NoBaseline _timestamp _namedStats = return RunSuccess
 handleNwayBaseline logger mode timestamp namedStats = do
-  results <- forM namedStats $ \(name, stats) -> do
+  results <- forM (Map.toList namedStats) $ \(name, stats) -> do
     let qualifiedMode = qualifyBaselineMode name mode
     handleBaseline logger qualifiedMode timestamp stats
   if any isRegression results

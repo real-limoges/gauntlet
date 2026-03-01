@@ -8,7 +8,6 @@ Switches git branches and starts Docker containers for benchmark targets.
 module Benchmark.Environment
   ( setupEnvironment
   , waitForHealth
-  , trim
   ) where
 
 import Benchmark.Types (PerfTestError (..), Settings (..))
@@ -18,8 +17,7 @@ import Data.ByteString.Lazy qualified as LBS
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Network.HTTP.Client (Manager, Response, httpLbs, newManager, parseRequest, responseStatus)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
+import Network.HTTP.Client (Manager, Response, httpLbs, parseRequest, responseStatus)
 import Network.HTTP.Types.Status qualified as Status
 import System.Exit (ExitCode (..))
 import System.Process (proc, readCreateProcessWithExitCode)
@@ -34,8 +32,8 @@ For example, pass @Just ["--profile", "testing", "up", "-d"]@ for the candidate 
 Uses 'proc' instead of shell strings to prevent shell injection attacks
 from malicious branch names containing metacharacters.
 -}
-setupEnvironment :: Settings -> Text -> Text -> Maybe [String] -> IO (Either PerfTestError ())
-setupEnvironment setts branch serviceName composeArgs = do
+setupEnvironment :: Manager -> Settings -> Text -> Text -> Maybe [String] -> IO (Either PerfTestError ())
+setupEnvironment mgr setts branch serviceName composeArgs = do
   let hcPath = fromMaybe "/health" (healthCheckPath setts)
       hcTimeout = fromMaybe 60 (healthCheckTimeout setts)
 
@@ -47,7 +45,7 @@ setupEnvironment setts branch serviceName composeArgs = do
     Left ex ->
       return $ Left $ EnvironmentSetupError $ "Could not run git: " ++ show ex
     Right (ExitFailure _, _, gitStderr) ->
-      return $ Left $ EnvironmentSetupError $ "git switch " ++ T.unpack branch ++ " failed: " ++ trim gitStderr
+      return $ Left $ EnvironmentSetupError $ "git switch " ++ T.unpack branch ++ " failed: " ++ T.unpack (T.strip (T.pack gitStderr))
     Right (ExitSuccess, _, _) ->
       case composeArgs of
         Nothing -> return $ Right ()
@@ -63,9 +61,8 @@ setupEnvironment setts branch serviceName composeArgs = do
                   EnvironmentSetupError $
                     "Could not run docker-compose: " ++ show ex ++ "\nIs docker-compose installed and in your PATH?"
             Right (ExitFailure _, _, dockerStderr) ->
-              return $ Left $ EnvironmentSetupError $ "docker-compose up failed: " ++ trim dockerStderr
-            Right (ExitSuccess, _, _) -> do
-              mgr <- newManager tlsManagerSettings
+              return $ Left $ EnvironmentSetupError $ "docker-compose up failed: " ++ T.unpack (T.strip (T.pack dockerStderr))
+            Right (ExitSuccess, _, _) ->
               waitForHealth mgr (serviceName <> hcPath) hcTimeout
 
 -- | Poll health endpoint until successful or max retries reached.
@@ -88,7 +85,3 @@ waitForHealth mgr url maxRetries = loop 0
               threadDelay 1_000_000
               loop (count + 1)
 
-trim :: String -> String
-trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
-  where
-    isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'

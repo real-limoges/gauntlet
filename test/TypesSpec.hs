@@ -1,6 +1,5 @@
 module TypesSpec (typesSpec) where
 
-import Benchmark.Environment (trim)
 import Benchmark.Types
 import TastyCompat (shouldBe)
 import Test.Tasty (TestTree, testGroup)
@@ -35,12 +34,5 @@ typesSpec =
                 formatError (EnvironmentSetupError "git checkout failed")
                   `shouldBe` "Environment setup failed: git checkout failed"
             ]
-        ]
-    , testGroup
-        "Benchmark.Environment.trim"
-        [ testCase "strips leading and trailing spaces" $ do
-            trim "  hello  " `shouldBe` "hello"
-        , testCase "strips tabs and newlines" $ do
-            trim "\n\tfoo\r\n" `shouldBe` "foo"
         ]
     ]
