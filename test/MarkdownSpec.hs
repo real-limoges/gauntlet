@@ -3,11 +3,13 @@ module MarkdownSpec (markdownSpec) where
 import Benchmark.Report.Markdown
 import Benchmark.Types
 import Data.Aeson (toJSON)
+import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
+import Runner.Nway (allPairComparisons)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)
-import TestHelpers (mockBayesianComparison, mockStats)
+import TestHelpers (makeResult, mockBayesianComparison, mockStats)
 
 markdownSpec :: TestTree
 markdownSpec =
@@ -55,6 +57,35 @@ markdownSpec =
                 ]
         ]
     , testGroup
+        "markdownNwayReport"
+        [ testCase "renders 2-target report with ranking and pair" $ do
+            let triples = [("alpha", mockStats 10 1, makeTimings 10), ("beta", mockStats 20 2, makeTimings 20)]
+                namedStats = Map.fromList [(n, s) | (n, s, _) <- triples]
+                pairs = allPairComparisons triples
+                md = markdownNwayReport namedStats pairs
+            md `shouldSatisfy` T.isInfixOf "Ranking"
+            md `shouldSatisfy` T.isInfixOf "| # | Target |"
+            md `shouldSatisfy` T.isInfixOf "alpha"
+            md `shouldSatisfy` T.isInfixOf "beta"
+            md `shouldSatisfy` T.isInfixOf "Bayesian Analysis"
+        , testCase "renders 3-target report with all 3 pairs" $ do
+            let triples =
+                  [ ("fast", mockStats 10 1, makeTimings 10)
+                  , ("medium", mockStats 50 5, makeTimings 50)
+                  , ("slow", mockStats 100 10, makeTimings 100)
+                  ]
+                namedStats = Map.fromList [(n, s) | (n, s, _) <- triples]
+                pairs = allPairComparisons triples
+                md = markdownNwayReport namedStats pairs
+            -- All 3 target names present
+            md `shouldSatisfy` T.isInfixOf "fast"
+            md `shouldSatisfy` T.isInfixOf "medium"
+            md `shouldSatisfy` T.isInfixOf "slow"
+            -- Should have 3 pairwise comparison sections (each includes "---")
+            let separatorCount = length (filter (== "---") (T.lines md))
+            separatorCount `shouldBe` 3
+        ]
+    , testGroup
         "markdownRegressionReport"
         [ testCase "includes baseline name" $ do
             let result = mockRegressionResult "my-baseline" True []
@@ -80,6 +111,19 @@ markdownSpec =
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "PASS"
             report `shouldSatisfy` T.isInfixOf "FAIL"
+        , testCase "pass result contains 'All metrics within'" $ do
+            let mPass = MetricRegression "mean" 50.0 52.0 0.04 0.10 False
+            let result = mockRegressionResult "baseline" True [mPass]
+            let report = markdownRegressionReport result
+            report `shouldSatisfy` T.isInfixOf "All metrics within acceptable thresholds"
+        , testCase "fail result lists regressed metric names" $ do
+            let m1 = MetricRegression "p95" 80.0 100.0 0.25 0.10 True
+            let m2 = MetricRegression "p99" 100.0 140.0 0.40 0.15 True
+            let result = mockRegressionResult "baseline" False [m1, m2]
+            let report = markdownRegressionReport result
+            report `shouldSatisfy` T.isInfixOf "Regressed metrics:"
+            report `shouldSatisfy` T.isInfixOf "p95"
+            report `shouldSatisfy` T.isInfixOf "p99"
         ]
     , testGroup
         "markdownValidationReport"
@@ -119,6 +163,11 @@ markdownSpec =
             let s = ValidationSummary 5 1 [BodyInvalidJSON]
             let report = markdownValidationReport [s]
             report `shouldSatisfy` T.isInfixOf "not valid JSON"
+        , testCase "renders multiple validation summaries" $ do
+            let s1 = ValidationSummary 10 0 []
+                s2 = ValidationSummary 5 2 [FieldNotFound "$.x"]
+            let report = markdownValidationReport [s1, s2]
+            report `shouldSatisfy` T.isInfixOf "Field not found"
         ]
     , testGroup
         "markdownMultipleReport with frequentist results"
@@ -195,3 +244,6 @@ mockRegressionResult name passed metrics =
     , regressionPassed = passed
     , regressionMetrics = metrics
     }
+
+makeTimings :: Integer -> [TestingResponse]
+makeTimings baseNs = [makeResult (baseNs * 1_000_000 + offset) | offset <- [0, 100_000 .. 900_000]]
