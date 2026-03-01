@@ -12,6 +12,7 @@ module Benchmark.Report
   , printVerifyReport
   , printValidationSummary
   , printNwayReport
+  , lookupStats
   )
 where
 

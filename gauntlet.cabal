@@ -42,7 +42,6 @@ library
                           Benchmark.Network
                           Benchmark.Network.Auth
                           Benchmark.Network.Exec
-                          Benchmark.Network.Pool
                           Benchmark.Network.Request
                           Benchmark.Output
                           Benchmark.Report

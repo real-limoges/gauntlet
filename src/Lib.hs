@@ -51,15 +51,14 @@ exitWithResult (RunRegression _) = exitWith (ExitFailure 1)
 exitWithResult (RunError _) = exitWith (ExitFailure 2)
 
 loadAndValidateConfig :: FilePath -> IO TestConfig
-loadAndValidateConfig path = do
-  res <- loadConfig path
-  case res of
-    Left err -> exitWithError $ ConfigParseError err
-    Right cfg -> either exitWithError return (validateConfig cfg)
+loadAndValidateConfig = loadAndValidate loadConfig validateConfig
 
 loadAndValidateNwayConfig :: FilePath -> IO NwayConfig
-loadAndValidateNwayConfig path = do
-  res <- loadNwayConfig path
+loadAndValidateNwayConfig = loadAndValidate loadNwayConfig validateNwayConfig
+
+loadAndValidate :: (FilePath -> IO (Either String a)) -> (a -> Either PerfTestError a) -> FilePath -> IO a
+loadAndValidate load validate path = do
+  res <- load path
   case res of
     Left err -> exitWithError $ ConfigParseError err
-    Right cfg -> either exitWithError return (validateNwayConfig cfg)
+    Right cfg -> either exitWithError return (validate cfg)

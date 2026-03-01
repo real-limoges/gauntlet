@@ -30,6 +30,7 @@ import Benchmark.Types
   , ValidationSummary (..)
   , VerificationResult (..)
   )
+import Benchmark.Report (lookupStats)
 import Data.List (sortOn)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -103,10 +104,6 @@ markdownNwayReport namedStats pairs =
           statsB = lookupStats nameB namedStats
        in ["", "---", ""]
             ++ T.lines (markdownMultipleReport nameA nameB statsA statsB bayes)
-
-    lookupStats name xs = case lookup name xs of
-      Just s -> s
-      Nothing -> error $ "lookupStats: target not found: " ++ T.unpack name
 
 -- | Markdown report for a regression comparison against a saved baseline.
 markdownRegressionReport :: RegressionResult -> Text
