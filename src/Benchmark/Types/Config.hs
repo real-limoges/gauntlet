@@ -1,0 +1,215 @@
+module Benchmark.Types.Config
+  ( -- * Configuration
+    TestConfig (..)
+  , NwayConfig (..)
+  , Targets (..)
+  , NamedTarget (..)
+  , Settings (..)
+  , RetrySettings (..)
+  , defaultRetrySettings
+  , WarmupSettings (..)
+  , defaultWarmupSettings
+  , TempoSettings (..)
+  , PayloadSpec (..)
+  , LogLevel (..)
+  , defaultLogLevel
+
+    -- * Output Format
+  , OutputFormat (..)
+  )
+where
+
+import Benchmark.Types.Internal (dropFieldPrefix)
+import Benchmark.Types.Response (ValidationSpec)
+import Data.Aeson
+  ( FromJSON (..)
+  , ToJSON (..)
+  , Value
+  , defaultOptions
+  , fieldLabelModifier
+  , genericParseJSON
+  )
+import Data.Map.Strict (Map)
+import Data.Text (Text)
+import GHC.Generics (Generic)
+
+data TestConfig = TestConfig
+  { targets :: Targets
+  , git :: Targets
+  , settings :: Settings
+  , payloads :: [PayloadSpec]
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (FromJSON)
+
+data NwayConfig = NwayConfig
+  { nwayTargets :: [NamedTarget]
+  , nwaySettings :: Settings
+  , nwayPayloads :: [PayloadSpec]
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON NwayConfig where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "nway"
+        }
+
+-- | Primary and candidate target URLs or git branches.
+data Targets = Targets
+  { primary :: Text
+  , candidate :: Text
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (FromJSON)
+
+-- | Single named target in N-Way run
+data NamedTarget = NamedTarget
+  { targetName :: Text
+  , targetUrl :: Text
+  , targetBranch :: Maybe Text
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (ToJSON)
+
+instance FromJSON NamedTarget where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "target"
+        }
+
+-- | Retry configuration for failed requests.
+data RetrySettings = RetrySettings
+  { retryMaxAttempts :: Int
+  -- ^ Maximum retry attempts (default: 3)
+  , retryInitialDelayMs :: Int
+  -- ^ Initial delay in milliseconds (default: 1000)
+  , retryBackoffMultiplier :: Double
+  -- ^ Delay multiplier for exponential backoff (default: 2.0)
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+-- | Default retry settings: 3 attempts, 1s initial delay, 2x backoff.
+defaultRetrySettings :: RetrySettings
+defaultRetrySettings =
+  RetrySettings
+    { retryMaxAttempts = 3
+    , retryInitialDelayMs = 1000
+    , retryBackoffMultiplier = 2.0
+    }
+
+-- | Warmup configuration before benchmark runs.
+newtype WarmupSettings = WarmupSettings
+  { warmupIterations :: Int
+  -- ^ Number of warmup requests per endpoint (default: 1)
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
+-- | Default warmup settings: 1 iteration.
+defaultWarmupSettings :: WarmupSettings
+defaultWarmupSettings = WarmupSettings {warmupIterations = 1}
+
+-- | Log levels for controlling output verbosity.
+data LogLevel
+  = -- | Most verbose: all messages including detailed debug info
+    Debug
+  | -- | Normal: informational messages and above
+    Info
+  | -- | Warnings and errors only
+    Warning
+  | -- | Errors only
+    Error
+  deriving stock (Eq, Ord, Show, Generic)
+
+instance FromJSON LogLevel where
+  parseJSON = \case
+    "debug" -> pure Debug
+    "info" -> pure Info
+    "warning" -> pure Warning
+    "error" -> pure Error
+    other -> fail $ "Invalid log level: " ++ show other
+
+instance ToJSON LogLevel where
+  toJSON Debug = "debug"
+  toJSON Info = "info"
+  toJSON Warning = "warning"
+  toJSON Error = "error"
+
+-- | Default log level: Info
+defaultLogLevel :: LogLevel
+defaultLogLevel = Info
+
+data Settings = Settings
+  { iterations :: Int
+  , concurrency :: Int
+  , secrets :: Text
+  , maxConnections :: Maybe Int
+  , connIdleTimeout :: Maybe Int
+  , requestTimeout :: Maybe Int
+  -- ^ Request timeout in seconds (default: 30)
+  , retry :: Maybe RetrySettings
+  -- ^ Retry configuration (default: 3 attempts, 1s delay, 2x backoff)
+  , warmup :: Maybe WarmupSettings
+  -- ^ Warmup configuration (default: 1 iteration)
+  , logLevel :: Maybe LogLevel
+  -- ^ Logging verbosity (default: Info)
+  , tempo :: Maybe TempoSettings
+  , healthCheckPath :: Maybe Text
+  -- ^ Health check path appended to service URL (default: "/health")
+  , healthCheckTimeout :: Maybe Int
+  -- ^ Health check poll timeout in seconds (default: 60)
+  , floatTolerance :: Maybe Double
+  -- ^ Absolute tolerance for floating-point comparisons in verify mode (default: exact match)
+  , compareFields :: Maybe [Text]
+  -- ^ When set, only these keys (and their full subtrees) are compared in verify mode
+  , ignoreFields :: Maybe [Text]
+  -- ^ Keys stripped at any depth before comparison in verify mode (complement of compareFields)
+  , verifyIterations :: Maybe Int
+  -- ^ Number of request pairs to run per endpoint in verify mode (default: 1)
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (FromJSON)
+
+-- | Optional Tempo integration settings.
+data TempoSettings = TempoSettings
+  { tempoUrl :: Text
+  -- ^ Base URL (e.g., "http://tempo:3200")
+  , tempoServiceName :: Text
+  -- ^ Service name to filter traces
+  , tempoEnabled :: Maybe Bool
+  -- ^ Defaults to True if tempo section present
+  , tempoAuthToken :: Maybe Text
+  -- ^ Optional Bearer token
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (FromJSON)
+
+data PayloadSpec = PayloadSpec
+  { specName :: Text
+  , specMethod :: Text
+  , specPath :: Text
+  , specBody :: Maybe Value
+  , specHeaders :: Maybe (Map Text Text)
+  , specValidate :: Maybe ValidationSpec
+  -- ^ Optional validation rules for responses from this endpoint
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON PayloadSpec where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "spec"
+        }
+
+-- | Output format for benchmark reports.
+data OutputFormat
+  = -- | Terminal-only output (default)
+    OutputTerminal
+  | -- | Also write a markdown report to the given file path
+    OutputMarkdown FilePath
+  deriving stock (Show, Eq)
