@@ -50,6 +50,7 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [User Guide](#user-guide)
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Statistical Methodology](#statistical-methodology)
@@ -165,6 +166,12 @@ BAYESIAN COMPARISON
   Effect size (Cohen's d): 0.32 (small to medium)
   Earth Mover's Distance: 0.15
 ```
+
+---
+
+## User Guide
+
+For a comprehensive walkthrough of all features, configuration options (with explanations of *why* each setting exists), output interpretation, and example configs, see the **[User Guide](docs/USER_GUIDE.md)**.
 
 ---
 
