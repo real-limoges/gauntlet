@@ -10,49 +10,53 @@ import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types (status200)
 import Runner.Context (RunContext (..))
 import Runner.Warmup (runWarmup)
-import Test.Hspec
+import TastyCompat (shouldBe, shouldSatisfy)
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (testCase)
 import TestHelpers (makeCapturingLogger, makeValidConfig)
 
-warmupSpec :: Spec
-warmupSpec = describe "Runner.Warmup" $ do
-  describe "runWarmup" $ do
-    it "warmupIterations = 0 makes no requests" $
-      mockCountedRequests status200 "{}" $ \port getCount -> do
-        ctx <- makeCtxWithWarmup port 0
-        let ep = makeEndpoint port
-        runWarmup ctx ep
-        count <- getCount
-        count `shouldBe` 0
-
-    it "warmupIterations = 0 emits no log messages" $
-      mockCountedRequests status200 "{}" $ \port _getCount -> do
-        (ctx, logRef) <- makeCtxWithWarmupAndLog port 0
-        let ep = makeEndpoint port
-        runWarmup ctx ep
-        msgs <- readIORef logRef
-        msgs `shouldBe` []
-
-    it "warmupIterations = 1 makes 1 request and logs singular 'iteration'" $
-      mockCountedRequests status200 "{}" $ \port getCount -> do
-        (ctx, logRef) <- makeCtxWithWarmupAndLog port 1
-        let ep = makeEndpoint port
-        runWarmup ctx ep
-        count <- getCount
-        count `shouldBe` 1
-        msgs <- readIORef logRef
-        let logText = T.concat [msg | (_, msg) <- msgs]
-        logText `shouldSatisfy` T.isInfixOf "1 iteration"
-
-    it "warmupIterations = 3 makes 3 requests and logs plural 'iterations'" $
-      mockCountedRequests status200 "{}" $ \port getCount -> do
-        (ctx, logRef) <- makeCtxWithWarmupAndLog port 3
-        let ep = makeEndpoint port
-        runWarmup ctx ep
-        count <- getCount
-        count `shouldBe` 3
-        msgs <- readIORef logRef
-        let logText = T.concat [msg | (_, msg) <- msgs]
-        logText `shouldSatisfy` T.isInfixOf "3 iterations"
+warmupSpec :: TestTree
+warmupSpec =
+  testGroup
+    "Runner.Warmup"
+    [ testGroup
+        "runWarmup"
+        [ testCase "warmupIterations = 0 makes no requests" $
+            mockCountedRequests status200 "{}" $ \port getCount -> do
+              ctx <- makeCtxWithWarmup port 0
+              let ep = makeEndpoint port
+              runWarmup ctx ep
+              count <- getCount
+              count `shouldBe` 0
+        , testCase "warmupIterations = 0 emits no log messages" $
+            mockCountedRequests status200 "{}" $ \port _getCount -> do
+              (ctx, logRef) <- makeCtxWithWarmupAndLog port 0
+              let ep = makeEndpoint port
+              runWarmup ctx ep
+              msgs <- readIORef logRef
+              msgs `shouldBe` []
+        , testCase "warmupIterations = 1 makes 1 request and logs singular 'iteration'" $
+            mockCountedRequests status200 "{}" $ \port getCount -> do
+              (ctx, logRef) <- makeCtxWithWarmupAndLog port 1
+              let ep = makeEndpoint port
+              runWarmup ctx ep
+              count <- getCount
+              count `shouldBe` 1
+              msgs <- readIORef logRef
+              let logText = T.concat [msg | (_, msg) <- msgs]
+              logText `shouldSatisfy` T.isInfixOf "1 iteration"
+        , testCase "warmupIterations = 3 makes 3 requests and logs plural 'iterations'" $
+            mockCountedRequests status200 "{}" $ \port getCount -> do
+              (ctx, logRef) <- makeCtxWithWarmupAndLog port 3
+              let ep = makeEndpoint port
+              runWarmup ctx ep
+              count <- getCount
+              count `shouldBe` 3
+              msgs <- readIORef logRef
+              let logText = T.concat [msg | (_, msg) <- msgs]
+              logText `shouldSatisfy` T.isInfixOf "3 iterations"
+        ]
+    ]
 
 -- Helpers
 

@@ -14,171 +14,193 @@ import Network.HTTP.Types (status200, status404, status500)
 import Network.Socket qualified as Socket
 import System.Directory (removeFile)
 import System.IO.Error (catchIOError)
-import Test.Hspec
+import TastyCompat (shouldBe, shouldContain, shouldSatisfy)
+import Test.Tasty (TestTree, testGroup, withResource)
+import Test.Tasty.HUnit (assertFailure, testCase)
 
-integrationSpec :: Spec
-integrationSpec = describe "Integration Tests" $ beforeAll setupManager $ do
-  describe "timedRequest" $ do
-    it "makes successful HTTP request" $ \mgr ->
-      mockJson "{\"ok\":true}" $ \port -> do
-        resp <- timedRequest testSettings mgr (endpoint port)
-        statusCode resp `shouldBe` 200
-        errorMessage resp `shouldBe` Nothing
-        durationNs resp `shouldSatisfy` (> 0)
-
-    it "handles POST with body" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        let ep = (endpoint port) {method = "POST", body = Just (object ["k" .= ("v" :: Text)])}
-        resp <- timedRequest testSettings mgr ep
-        statusCode resp `shouldBe` 200
-
-  describe "runBenchmark" $ do
-    it "runs multiple iterations successfully" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        sem <- newQSem 4
-        results <- runBenchmark testSettings sem mgr 5 1 (endpoint port)
-        length results `shouldBe` 5
-        all ((== 200) . statusCode) results `shouldBe` True
-
-  describe "runComparison" $ do
-    it "compares two endpoints concurrently" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        (a, b) <- runComparison testSettings mgr (endpoint port) (endpoint port)
-        statusCode a `shouldBe` 200
-        statusCode b `shouldBe` 200
-
-  describe "verify" $ do
-    it "matches identical responses" $ \mgr ->
-      mockJson "{\"x\":1}" $ \port -> do
-        a <- timedRequest testSettings mgr (endpoint port)
-        b <- timedRequest testSettings mgr (endpoint port)
-        verify 0.0 Nothing Nothing a b `shouldBe` Match
-
-    it "detects status mismatch" $ \mgr ->
-      mockStatus status200 $ \p1 ->
-        mockStatus status404 $ \p2 -> do
-          a <- timedRequest testSettings mgr (endpoint p1)
-          b <- timedRequest testSettings mgr (endpoint p2)
-          case verify 0.0 Nothing Nothing a b of
-            StatusMismatch 200 404 -> pure ()
-            x -> expectationFailure $ "Expected StatusMismatch, got: " ++ show x
-
-  describe "error handling" $ do
-    it "handles HTTP 500" $ \mgr ->
-      mockStatus status500 $ \port -> do
-        resp <- timedRequest testSettings mgr (endpoint port)
-        statusCode resp `shouldBe` 500
-
-  describe "retry logic" $ do
-    it "does not retry on HTTP 500 (server receives exactly 1 request)" $ \mgr ->
-      mockCountedRequests status500 "{}" $ \port readCount -> do
-        resp <- timedRequest testSettings mgr (endpoint port)
-        count <- readCount
-        statusCode resp `shouldBe` 500
-        errorMessage resp `shouldBe` Nothing
-        count `shouldBe` 1
-
-    it "returns error result on connection failure" $ \mgr -> do
-      -- Bind to a free port then close without listening so the port is unreachable
-      sock <- Socket.socket Socket.AF_INET Socket.Stream Socket.defaultProtocol
-      Socket.bind sock (Socket.SockAddrInet 0 (Socket.tupleToHostAddress (127, 0, 0, 1)))
-      port <- fromIntegral <$> Socket.socketPort sock
-      Socket.close sock
-      let noRetry = testSettings {retry = Just (RetrySettings 0 0 1.0)}
-      resp <- timedRequest noRetry mgr (endpoint port)
-      errorMessage resp `shouldSatisfy` (/= Nothing)
-
-    it "accepts custom retry settings" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        -- Test that custom retry settings are accepted and used
-        let retrySettings = RetrySettings 5 200 1.5
-        let setts = testSettings {retry = Just retrySettings}
-        resp <- timedRequest setts mgr (endpoint port)
-        statusCode resp `shouldBe` 200
-        errorMessage resp `shouldBe` Nothing
-
-    it "uses default retry settings when not specified" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        -- Test that default retry settings work
-        let setts = testSettings {retry = Nothing}
-        resp <- timedRequest setts mgr (endpoint port)
-        statusCode resp `shouldBe` 200
-
-    it "retry settings with zero attempts work" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        -- Test that zero retries means no retries
-        let retrySettings = RetrySettings 0 100 2.0
-        let setts = testSettings {retry = Just retrySettings}
-        resp <- timedRequest setts mgr (endpoint port)
-        statusCode resp `shouldBe` 200
-
-  describe "warmup execution" $ do
-    it "runs warmup iterations before benchmark" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        sem <- newQSem 1
-        let warmupSettings = WarmupSettings 3
-        let setts = testSettings {warmup = Just warmupSettings}
-        -- This test just verifies warmup doesn't crash
-        -- In real Runner, warmup is called before benchmark
-        results <- runBenchmark setts sem mgr 5 1 (endpoint port)
-        length results `shouldBe` 5
-
-    it "skips warmup when iterations = 0" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        sem <- newQSem 1
-        let warmupSettings = WarmupSettings 0
-        let setts = testSettings {warmup = Just warmupSettings}
-        results <- runBenchmark setts sem mgr 3 1 (endpoint port)
-        length results `shouldBe` 3
-
-  describe "custom headers in HTTP requests" $ do
-    it "sends custom headers to server" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        let customHeaders = [("X-API-Key", "secret123"), ("X-Request-ID", "test-456")]
-        let ep = (endpoint port) {headers = customHeaders}
-        resp <- timedRequest testSettings mgr ep
-        statusCode resp `shouldBe` 200
-
-    it "overrides Content-Type with custom header" $ \mgr ->
-      mockJson "{}" $ \port -> do
-        let customHeaders = [("Content-Type", "text/xml")]
-        let ep = (endpoint port) {headers = customHeaders, method = "POST"}
-        resp <- timedRequest testSettings mgr ep
-        statusCode resp `shouldBe` 200
-  describe "baseline operations" $ do
-    it "saves and loads baseline correctly" $ \_ -> do
-      let stats = testBenchmarkStats
-      -- Save
-      saveResult <- saveBaseline "test-baseline" "2024-01-01T00:00:00" stats
-      case saveResult of
-        Left err -> expectationFailure $ "Save failed: " ++ err
-        Right path -> do
-          -- Load
-          loadResult <- loadBaseline "test-baseline"
-          case loadResult of
-            Left err -> expectationFailure $ "Load failed: " ++ err
-            Right baseline -> do
-              baselineStats baseline `shouldBe` stats
-              baselineName baseline `shouldBe` "test-baseline"
-          -- Cleanup
-          removeFile path `catchIOError` const (return ())
-
-    it "returns error for missing baseline" $ \_ -> do
-      result <- loadBaseline "nonexistent-baseline-xyz"
-      case result of
-        Left _ -> return () -- Expected
-        Right _ -> expectationFailure "Expected error for missing baseline"
-
-    it "lists saved baselines" $ \_ -> do
-      -- Create test baselines
-      _ <- saveBaseline "list-test-1" "2024-01-01" testBenchmarkStats
-      _ <- saveBaseline "list-test-2" "2024-01-02" testBenchmarkStats
-      baselines <- listBaselines
-      baselines `shouldContain` ["list-test-1"]
-      baselines `shouldContain` ["list-test-2"]
-      -- Cleanup
-      removeFile (baselineDir ++ "/list-test-1.json") `catchIOError` const (return ())
-      removeFile (baselineDir ++ "/list-test-2.json") `catchIOError` const (return ())
+integrationSpec :: TestTree
+integrationSpec = withResource setupManager (\_ -> pure ()) $ \getMgr ->
+  testGroup
+    "Integration Tests"
+    [ testGroup
+        "timedRequest"
+        [ testCase "makes successful HTTP request" $ do
+            mgr <- getMgr
+            mockJson "{\"ok\":true}" $ \port -> do
+              resp <- timedRequest testSettings mgr (endpoint port)
+              statusCode resp `shouldBe` 200
+              errorMessage resp `shouldBe` Nothing
+              durationNs resp `shouldSatisfy` (> 0)
+        , testCase "handles POST with body" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              let ep = (endpoint port) {method = "POST", body = Just (object ["k" .= ("v" :: Text)])}
+              resp <- timedRequest testSettings mgr ep
+              statusCode resp `shouldBe` 200
+        ]
+    , testGroup
+        "runBenchmark"
+        [ testCase "runs multiple iterations successfully" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              sem <- newQSem 4
+              results <- runBenchmark testSettings sem mgr 5 1 (endpoint port)
+              length results `shouldBe` 5
+              all ((== 200) . statusCode) results `shouldBe` True
+        ]
+    , testGroup
+        "runComparison"
+        [ testCase "compares two endpoints concurrently" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              (a, b) <- runComparison testSettings mgr (endpoint port) (endpoint port)
+              statusCode a `shouldBe` 200
+              statusCode b `shouldBe` 200
+        ]
+    , testGroup
+        "verify"
+        [ testCase "matches identical responses" $ do
+            mgr <- getMgr
+            mockJson "{\"x\":1}" $ \port -> do
+              a <- timedRequest testSettings mgr (endpoint port)
+              b <- timedRequest testSettings mgr (endpoint port)
+              verify 0.0 Nothing Nothing a b `shouldBe` Match
+        , testCase "detects status mismatch" $ do
+            mgr <- getMgr
+            mockStatus status200 $ \p1 ->
+              mockStatus status404 $ \p2 -> do
+                a <- timedRequest testSettings mgr (endpoint p1)
+                b <- timedRequest testSettings mgr (endpoint p2)
+                case verify 0.0 Nothing Nothing a b of
+                  StatusMismatch 200 404 -> pure ()
+                  x -> assertFailure $ "Expected StatusMismatch, got: " ++ show x
+        ]
+    , testGroup
+        "error handling"
+        [ testCase "handles HTTP 500" $ do
+            mgr <- getMgr
+            mockStatus status500 $ \port -> do
+              resp <- timedRequest testSettings mgr (endpoint port)
+              statusCode resp `shouldBe` 500
+        ]
+    , testGroup
+        "retry logic"
+        [ testCase "does not retry on HTTP 500 (server receives exactly 1 request)" $ do
+            mgr <- getMgr
+            mockCountedRequests status500 "{}" $ \port readCount -> do
+              resp <- timedRequest testSettings mgr (endpoint port)
+              count <- readCount
+              statusCode resp `shouldBe` 500
+              errorMessage resp `shouldBe` Nothing
+              count `shouldBe` 1
+        , testCase "returns error result on connection failure" $ do
+            mgr <- getMgr
+            -- Bind to a free port then close without listening so the port is unreachable
+            sock <- Socket.socket Socket.AF_INET Socket.Stream Socket.defaultProtocol
+            Socket.bind sock (Socket.SockAddrInet 0 (Socket.tupleToHostAddress (127, 0, 0, 1)))
+            port <- fromIntegral <$> Socket.socketPort sock
+            Socket.close sock
+            let noRetry = testSettings {retry = Just (RetrySettings 0 0 1.0)}
+            resp <- timedRequest noRetry mgr (endpoint port)
+            errorMessage resp `shouldSatisfy` (/= Nothing)
+        , testCase "accepts custom retry settings" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              -- Test that custom retry settings are accepted and used
+              let retrySettings = RetrySettings 5 200 1.5
+              let setts = testSettings {retry = Just retrySettings}
+              resp <- timedRequest setts mgr (endpoint port)
+              statusCode resp `shouldBe` 200
+              errorMessage resp `shouldBe` Nothing
+        , testCase "uses default retry settings when not specified" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              -- Test that default retry settings work
+              let setts = testSettings {retry = Nothing}
+              resp <- timedRequest setts mgr (endpoint port)
+              statusCode resp `shouldBe` 200
+        , testCase "retry settings with zero attempts work" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              -- Test that zero retries means no retries
+              let retrySettings = RetrySettings 0 100 2.0
+              let setts = testSettings {retry = Just retrySettings}
+              resp <- timedRequest setts mgr (endpoint port)
+              statusCode resp `shouldBe` 200
+        ]
+    , testGroup
+        "warmup execution"
+        [ testCase "runs warmup iterations before benchmark" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              sem <- newQSem 1
+              let warmupSettings = WarmupSettings 3
+              let setts = testSettings {warmup = Just warmupSettings}
+              -- This test just verifies warmup doesn't crash
+              -- In real Runner, warmup is called before benchmark
+              results <- runBenchmark setts sem mgr 5 1 (endpoint port)
+              length results `shouldBe` 5
+        , testCase "skips warmup when iterations = 0" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              sem <- newQSem 1
+              let warmupSettings = WarmupSettings 0
+              let setts = testSettings {warmup = Just warmupSettings}
+              results <- runBenchmark setts sem mgr 3 1 (endpoint port)
+              length results `shouldBe` 3
+        ]
+    , testGroup
+        "custom headers in HTTP requests"
+        [ testCase "sends custom headers to server" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              let customHeaders = [("X-API-Key", "secret123"), ("X-Request-ID", "test-456")]
+              let ep = (endpoint port) {headers = customHeaders}
+              resp <- timedRequest testSettings mgr ep
+              statusCode resp `shouldBe` 200
+        , testCase "overrides Content-Type with custom header" $ do
+            mgr <- getMgr
+            mockJson "{}" $ \port -> do
+              let customHeaders = [("Content-Type", "text/xml")]
+              let ep = (endpoint port) {headers = customHeaders, method = "POST"}
+              resp <- timedRequest testSettings mgr ep
+              statusCode resp `shouldBe` 200
+        ]
+    , testGroup
+        "baseline operations"
+        [ testCase "saves and loads baseline correctly" $ do
+            let stats = testBenchmarkStats
+            -- Save
+            saveResult <- saveBaseline "test-baseline" "2024-01-01T00:00:00" stats
+            case saveResult of
+              Left err -> assertFailure $ "Save failed: " ++ err
+              Right path -> do
+                -- Load
+                loadResult <- loadBaseline "test-baseline"
+                case loadResult of
+                  Left err -> assertFailure $ "Load failed: " ++ err
+                  Right baseline -> do
+                    baselineStats baseline `shouldBe` stats
+                    baselineName baseline `shouldBe` "test-baseline"
+                -- Cleanup
+                removeFile path `catchIOError` const (return ())
+        , testCase "returns error for missing baseline" $ do
+            result <- loadBaseline "nonexistent-baseline-xyz"
+            case result of
+              Left _ -> return () -- Expected
+              Right _ -> assertFailure "Expected error for missing baseline"
+        , testCase "lists saved baselines" $ do
+            -- Create test baselines
+            _ <- saveBaseline "list-test-1" "2024-01-01" testBenchmarkStats
+            _ <- saveBaseline "list-test-2" "2024-01-02" testBenchmarkStats
+            baselines <- listBaselines
+            baselines `shouldContain` ["list-test-1"]
+            baselines `shouldContain` ["list-test-2"]
+            -- Cleanup
+            removeFile (baselineDir ++ "/list-test-1.json") `catchIOError` const (return ())
+            removeFile (baselineDir ++ "/list-test-2.json") `catchIOError` const (return ())
+        ]
+    ]
 
 setupManager :: IO Manager
 setupManager = newManager defaultManagerSettings
