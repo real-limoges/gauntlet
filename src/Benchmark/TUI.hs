@@ -23,7 +23,6 @@ import Data.Time (diffUTCTime, getCurrentTime)
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Graphics.Vty qualified as V
 import Graphics.Vty.CrossPlatform (mkVty)
-import Lens.Micro ((^.))
 import System.Directory (getTemporaryDirectory, removeFile)
 import System.IO (hClose, hFlush, hPutStr, openTempFile, stderr)
 
@@ -99,9 +98,9 @@ handleEvent (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt
 handleEvent (VtyEvent (V.EvKey (V.KChar 'c') [V.MCtrl])) = halt
 handleEvent (AppEvent Tick) = do
   now <- liftIO getCurrentTime
-  modify $ \st -> case _tsStartTime st of
+  modify $ \st -> case tsStartTime st of
     Nothing -> st
-    Just start -> st {_tsElapsedSecs = realToFrac (diffUTCTime now start)}
+    Just start -> st {tsElapsedSecs = realToFrac (diffUTCTime now start)}
 handleEvent (AppEvent (BenchEvent event)) = do
   now <- liftIO getCurrentTime
   modify (updateState now event)
@@ -150,21 +149,21 @@ headerSection :: TUIState -> Widget Name
 headerSection state =
   padLeftRight 1 $
     vBox
-      [ row "Target  " $ withAttr (attrName "hi") $ txt (state ^. tsTarget)
+      [ row "Target  " $ withAttr (attrName "hi") $ txt (tsTarget state)
       , row "Phase   " $
           hBox
-            [ txt $ state ^. tsCurrentEndpoint
+            [ txt $ tsCurrentEndpoint state
             , withAttr (attrName "dim") $
                 txt $
                   "  ["
-                    <> T.pack (show (state ^. tsEndpointIndex))
+                    <> T.pack (show (tsEndpointIndex state))
                     <> "/"
-                    <> T.pack (show (state ^. tsTotalEndpoints))
+                    <> T.pack (show (tsTotalEndpoints state))
                     <> "]"
             ]
-      , if T.null (state ^. tsStatus)
+      , if T.null (tsStatus state)
           then emptyWidget
-          else row "Status  " $ withAttr (attrName "dim") $ txt (state ^. tsStatus)
+          else row "Status  " $ withAttr (attrName "dim") $ txt (tsStatus state)
       ]
   where
     row label w = hBox [withAttr (attrName "label") (txt label), w]
@@ -183,14 +182,14 @@ progressSection state =
           ]
       ]
   where
-    completed = state ^. tsCompleted
-    total = state ^. tsIsTotal
+    completed = tsCompleted state
+    total = tsIsTotal state
     pct = if total > 0 then fromIntegral completed / fromIntegral total else 0 :: Float
-    elapsed = state ^. tsElapsedSecs
+    elapsed = tsElapsedSecs state
 
 statsSection :: TUIState -> Widget Name
 statsSection state =
-  padLeftRight 1 $ case state ^. tsRollingStats of
+  padLeftRight 1 $ case tsRollingStats state of
     Nothing ->
       withAttr (attrName "dim") $ txt $ "Waiting for data...  (rolling last " <> T.pack (show rollingWindow) <> ")"
     Just stats ->
@@ -198,12 +197,12 @@ statsSection state =
         [ withAttr (attrName "dim") $ txt $ "Latency  (rolling last " <> T.pack (show rollingWindow) <> ")"
         , txt " "
         , hBox
-            [ statBox "Mean" (formatDuration $ stats ^. rsMeanMs)
-            , statBox "P50 " (formatDuration $ stats ^. rsP50Ms)
-            , statBox "P95 " (formatDuration $ stats ^. rsP95Ms)
-            , statBox "P99 " (formatDuration $ stats ^. rsP99Ms)
-            , statBox "Min " (formatDuration $ stats ^. rsMinMs)
-            , statBox "Max " (formatDuration $ stats ^. rsMaxMs)
+            [ statBox "Mean" (formatDuration $ rsMeanMs stats)
+            , statBox "P50 " (formatDuration $ rsP50Ms stats)
+            , statBox "P95 " (formatDuration $ rsP95Ms stats)
+            , statBox "P99 " (formatDuration $ rsP99Ms stats)
+            , statBox "Min " (formatDuration $ rsMinMs stats)
+            , statBox "Max " (formatDuration $ rsMaxMs stats)
             ]
         ]
   where
@@ -221,7 +220,7 @@ histogramSection state =
       then withAttr (attrName "dim") $ txt "Waiting for data..."
       else histogram (zip labels counts)
   where
-    durations = toList (state ^. tsRecentDurations)
+    durations = toList (tsRecentDurations state)
     lo = minimum durations
     hi = maximum durations
     nBuckets = 8 :: Int
@@ -237,12 +236,12 @@ requestTimelineSection :: TUIState -> Widget Name
 requestTimelineSection state =
   borderWithLabel (withAttr (attrName "label") $ txt " Requests ") $
     padLeftRight 1 $
-      if Seq.null (state ^. tsRecentRequests)
+      if Seq.null (tsRecentRequests state)
         then withAttr (attrName "dim") $ txt "Waiting..."
         else vBox [renderRow r | r <- rows]
   where
     cols = 10
-    reqs = toList (state ^. tsRecentRequests)
+    reqs = toList (tsRecentRequests state)
     padded = replicate (cols * 8 - length reqs) Nothing ++ map Just reqs
     rows = chunksOf cols padded
     chunksOf _ [] = []
@@ -257,20 +256,20 @@ errorsSection state =
   padLeftRight 1 $
     vBox
       [ hBox
-          [ withAttr (attrName "ok") $ txt $ "✓ " <> T.pack (show (state ^. tsSuccessCount)) <> " ok"
+          [ withAttr (attrName "ok") $ txt $ "✓ " <> T.pack (show (tsSuccessCount state)) <> " ok"
           , txt "   "
-          , withAttr (attrName "err") $ txt $ "✗ " <> T.pack (show (state ^. tsErrorCount)) <> " errors"
+          , withAttr (attrName "err") $ txt $ "✗ " <> T.pack (show (tsErrorCount state)) <> " errors"
           , if errorCount > 0 && total > 0
               then withAttr (attrName "dim") $ txt $ "  (" <> T.pack (show pct) <> "%)"
               else emptyWidget
           ]
-      , if Seq.null (state ^. tsRecentErrors)
+      , if Seq.null (tsRecentErrors state)
           then emptyWidget
-          else vBox $ map renderErr $ foldr (:) [] $ Seq.take 3 (state ^. tsRecentErrors)
+          else vBox $ map renderErr $ foldr (:) [] $ Seq.take 3 (tsRecentErrors state)
       ]
   where
-    errorCount = state ^. tsErrorCount
-    total = errorCount + state ^. tsSuccessCount
+    errorCount = tsErrorCount state
+    total = errorCount + tsSuccessCount state
     pct = if total > 0 then (errorCount * 100) `div` total else 0 :: Int
     renderErr (_, msg) = withAttr (attrName "err") $ txt $ "  " <> msg
 

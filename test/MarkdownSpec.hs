@@ -7,7 +7,7 @@ import Data.Text qualified as T
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)
-import TestHelpers (mockStats)
+import TestHelpers (mockBayesianComparison, mockStats)
 
 markdownSpec :: TestTree
 markdownSpec =
@@ -187,23 +187,6 @@ markdownSpec =
 -- ---------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------
-
-mockBayesianComparison :: BayesianComparison
-mockBayesianComparison =
-  BayesianComparison
-    { probBFasterThanA = 0.87
-    , probSingleRequestFaster = 0.72
-    , meanDifference = 20.0
-    , credibleIntervalLower = 15.0
-    , credibleIntervalUpper = 25.0
-    , effectSize = 0.5
-    , relativeEffect = 0.20
-    , p95Comparison = PercentileComparison 18.0 12.0 24.0 0.05
-    , p99Comparison = PercentileComparison 22.0 14.0 30.0 0.08
-    , mannWhitneyU = Nothing
-    , kolmogorovSmirnov = Nothing
-    , andersonDarling = Nothing
-    }
 
 mockRegressionResult :: T.Text -> Bool -> [MetricRegression] -> RegressionResult
 mockRegressionResult name passed metrics =

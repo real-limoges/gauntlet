@@ -28,7 +28,6 @@ import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (newTChanIO)
 import Control.Exception (onException)
 import Data.Text qualified as T
-import Lens.Micro ((^.))
 import Runner.Baseline (handleBaseline)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
@@ -70,7 +69,7 @@ runSingle baselineMode outFmt cfg = do
 
   finalState <- runTUI eventChan tuiState
 
-  if not (finalState ^. tsFinished)
+  if not (tsFinished finalState)
     then do
       cancel benchmarkWork
       exitWithError $ EnvironmentSetupError "Benchmark cancelled by user"

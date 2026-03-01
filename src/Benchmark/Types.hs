@@ -253,7 +253,7 @@ data PercentileComparison = PercentileComparison
   deriving anyclass (ToJSON)
 
 -- | Result of a Mann-Whitney U test between two samples.
-data MWUResult = MWUResult
+newtype MWUResult = MWUResult
   { mwuSignificant :: Bool
   -- ^ True if distributions differ significantly at p < 0.05
   }
@@ -429,7 +429,7 @@ defaultRetrySettings =
     }
 
 -- | Warmup configuration before benchmark runs.
-data WarmupSettings = WarmupSettings
+newtype WarmupSettings = WarmupSettings
   { warmupIterations :: Int
   -- ^ Number of warmup requests per endpoint (default: 1)
   }

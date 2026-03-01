@@ -1,8 +1,8 @@
 module LogSpec (logSpec) where
 
 import Benchmark.Types (LogLevel (..))
+import Control.Monad (when)
 import Data.IORef
-import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeOrError)
 import Log
@@ -35,17 +35,10 @@ logSpec =
     , testGroup
         "logging level filtering"
         [ testCase "makeLogger Warning: logAt Debug does NOT invoke action" $ do
-            ref <- newIORef ([] :: [(LogLevel, Text)])
-            let logger = Logger Warning (\(lvl, _, msg) -> modifyIORef ref ((lvl, msg) :))
-            logAt Debug logger "debug msg"
-            -- The default makeLogger filters, but our custom Logger doesn't filter itself.
-            -- Use makeLogger and override logAction to capture.
-            -- Actually, logAt delegates to logAction, which in makeLogger contains the filter.
-            -- Let's test via makeLogger's behavior by using a capturing logger.
-            ref2 <- newIORef (0 :: Int)
-            let warningLogger = makeLoggerWithCapture Warning ref2
+            ref <- newIORef (0 :: Int)
+            let warningLogger = makeLoggerWithCapture Warning ref
             logAt Debug warningLogger "debug msg"
-            count <- readIORef ref2
+            count <- readIORef ref
             count `shouldBe` 0
         , testCase "makeLogger Warning: logAt Warning DOES invoke action" $ do
             ref <- newIORef (0 :: Int)
@@ -70,7 +63,5 @@ makeLoggerWithCapture minLevel ref =
   Logger
     { logLevel = minLevel
     , logAction = \(level, _, _) ->
-        if level >= minLevel
-          then modifyIORef ref (+ 1)
-          else pure ()
+        when (level >= minLevel) $ modifyIORef ref (+ 1)
     }

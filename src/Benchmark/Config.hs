@@ -15,26 +15,37 @@ module Benchmark.Config
   )
 where
 
+import Benchmark.Env (interpolateEnv, loadEnvVars)
 import Benchmark.Types
 import Control.Exception (IOException, try)
 import Data.Aeson (eitherDecode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
+import Data.Text.Encoding (encodeUtf8)
+import Data.Text.IO qualified as TIO
 
 loadConfig :: FilePath -> IO (Either String TestConfig)
 loadConfig path = do
-  result <- try (LBS.readFile path) :: IO (Either IOException LBS.ByteString)
+  result <- try (TIO.readFile path) :: IO (Either IOException Text)
   case result of
     Left err -> return $ Left (show err)
-    Right content -> return $ eitherDecode content
+    Right content -> do
+      env <- loadEnvVars
+      case interpolateEnv env content of
+        Left err -> return $ Left err
+        Right interpolated -> return $ eitherDecode (LBS.fromStrict (encodeUtf8 interpolated))
 
 loadNwayConfig :: FilePath -> IO (Either String NwayConfig)
 loadNwayConfig path = do
-  result <- try (LBS.readFile path) :: IO (Either IOException LBS.ByteString)
+  result <- try (TIO.readFile path) :: IO (Either IOException Text)
   case result of
     Left err -> return $ Left (show err)
-    Right content -> return $ eitherDecode content
+    Right content -> do
+      env <- loadEnvVars
+      case interpolateEnv env content of
+        Left err -> return $ Left err
+        Right interpolated -> return $ eitherDecode (LBS.fromStrict (encodeUtf8 interpolated))
 
 {-| Build endpoint list from config, selecting primary or candidate target.
 When useCandidate is True, uses candidate target; otherwise uses primary.
@@ -47,9 +58,7 @@ toEndpoint baseUrl spec =
   let customHeaders = maybe [] Map.toList (specHeaders spec)
       -- Only add default Content-Type if not already specified
       defaultHeaders =
-        if any (\(k, _) -> k == "Content-Type") customHeaders
-          then []
-          else [("Content-Type", "application/json")]
+        [("Content-Type", "application/json") | not (any (\(k, _) -> k == "Content-Type") customHeaders)]
    in Endpoint
         { method = specMethod spec
         , url = baseUrl <> specPath spec

@@ -22,7 +22,7 @@ import Benchmark.Types
   , exitWithError
   )
 import Benchmark.Verify qualified as Verify
-import Control.Monad (forM, replicateM)
+import Control.Monad (forM, replicateM, when)
 import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
@@ -44,16 +44,14 @@ runVerify fmt cfg = do
 
   let lenA = length epsA
       lenB = length epsB
-  if lenA /= lenB
-    then
-      exitWithError $
-        ConfigValidationError $
-          "Endpoint list length mismatch: primary has "
-            <> show lenA
-            <> " endpoint(s), candidate has "
-            <> show lenB
-            <> " endpoint(s)"
-    else return ()
+  when (lenA /= lenB) $
+    exitWithError $
+      ConfigValidationError $
+        "Endpoint list length mismatch: primary has "
+          <> show lenA
+          <> " endpoint(s), candidate has "
+          <> show lenB
+          <> " endpoint(s)"
 
   let n = fromMaybe 1 (verifyIterations setts)
 

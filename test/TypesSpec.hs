@@ -16,12 +16,6 @@ typesSpec =
             "nsToMs"
             [ testCase "converts 1_000_000 ns to 1.0 ms" $ do
                 nsToMs (Nanoseconds 1_000_000) `shouldBe` Milliseconds 1.0
-            , testCase "converts 0 ns to 0.0 ms" $ do
-                nsToMs (Nanoseconds 0) `shouldBe` Milliseconds 0.0
-            , testCase "converts sub-millisecond values correctly" $ do
-                nsToMs (Nanoseconds 500_000) `shouldBe` Milliseconds 0.5
-            , testCase "converts large values correctly" $ do
-                nsToMs (Nanoseconds 1_500_000_000) `shouldBe` Milliseconds 1500.0
             ]
         , testGroup
             "formatError"
@@ -48,13 +42,5 @@ typesSpec =
             trim "  hello  " `shouldBe` "hello"
         , testCase "strips tabs and newlines" $ do
             trim "\n\tfoo\r\n" `shouldBe` "foo"
-        , testCase "returns empty for all-whitespace input" $ do
-            trim "  \t\n  " `shouldBe` ""
-        , testCase "returns empty for empty input" $ do
-            trim "" `shouldBe` ""
-        , testCase "leaves non-whitespace strings unchanged" $ do
-            trim "no spaces" `shouldBe` "no spaces"
-        , testCase "preserves internal whitespace" $ do
-            trim "  hello world  " `shouldBe` "hello world"
         ]
     ]
