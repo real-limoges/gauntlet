@@ -14,6 +14,7 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 
 ### 🎯 Core Capabilities
 - **A/B Comparison Testing** - Compare two API versions with statistical rigor
+- **N-Way Comparison Testing** - Compare multiple API targets simultaneously
 - **Bayesian Statistical Analysis** - Get probability distributions, not just p-values
 - **Nanosecond Precision** - High-resolution timing for accurate latency measurement
 - **Concurrent Execution** - Configurable concurrency with STM-based coordination
@@ -136,7 +137,7 @@ Save as `config.json`.
 ### 2. Run the benchmark
 
 ```bash
-cabal run gauntlet-exe -- benchmark-multiple --config config.json
+cabal run gauntlet-exe -- benchmark-nway --config config.json
 ```
 
 ### 3. View results
@@ -172,8 +173,8 @@ BAYESIAN COMPARISON
 ### Available Commands
 
 ```bash
-# Run A/B comparison benchmark
-cabal run gauntlet-exe -- benchmark-multiple --config config.json
+# Run N-way comparison benchmark (supports 2+ targets)
+cabal run gauntlet-exe -- benchmark-nway --config config.json
 
 # Run single endpoint benchmark
 cabal run gauntlet-exe -- benchmark-single --config config.json
@@ -207,7 +208,7 @@ cabal run gauntlet-exe -- verify --config config.json
 
 ## Configuration
 
-### Minimal Configuration
+### Minimal Configuration (A/B)
 
 ```json
 {
@@ -232,6 +233,32 @@ cabal run gauntlet-exe -- verify --config config.json
   ]
 }
 ```
+
+### N-Way Configuration
+
+```json
+{
+  "targets": [
+    { "name": "prod", "url": "http://prod.example.com:8080" },
+    { "name": "staging", "url": "http://staging.example.com:8080" },
+    { "name": "dev", "url": "http://dev.example.com:8080" }
+  ],
+  "settings": {
+    "iterations": 1000,
+    "concurrency": 10,
+    "secrets": ".secrets/token.txt"
+  },
+  "payloads": [
+    {
+      "name": "endpoint-name",
+      "method": "GET",
+      "path": "/api/endpoint"
+    }
+  ]
+}
+```
+
+N-way targets are an array of objects with `name`, `url`, and optional `branch` fields. All pairwise Bayesian comparisons are computed automatically.
 
 ### Full Configuration
 
@@ -322,6 +349,10 @@ cabal run gauntlet-exe -- verify --config config.json
 | `payloads[].headers` | object | - | Custom HTTP headers (key/value map) |
 | `payloads[].validate.status` | int | - | Expected HTTP status code |
 | `payloads[].validate.fields` | object | - | Dot-path field assertions (`present: true` or `eq: value`) |
+| `settings.floatTolerance` | double | 0.0 | Tolerance for floating-point comparison in verify mode |
+| `settings.compareFields` | [string] | - | Whitelist of JSON keys to compare in verify mode |
+| `settings.ignoreFields` | [string] | - | JSON keys to strip before comparison in verify mode |
+| `settings.verifyIterations` | int | 1 | Number of iterations for verify mode |
 
 See [`examples/`](examples/) directory for complete configuration examples.
 
@@ -389,14 +420,14 @@ Two distinct probability metrics are reported:
 ### Example 1: Simple Health Check
 
 ```bash
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config examples/minimal.json
 ```
 
 ### Example 2: A/B API Comparison with Markdown Report
 
 ```bash
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config examples/ab-comparison.json \
   --output markdown \
   --report-path results/report.md
@@ -406,12 +437,12 @@ cabal run gauntlet-exe -- benchmark-multiple \
 
 ```bash
 # Save baseline
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config examples/simple-benchmark.json \
   --save-baseline prod-baseline
 
 # Compare against baseline (exits 1 if regression detected)
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config examples/simple-benchmark.json \
   --compare-baseline prod-baseline
 ```
@@ -423,7 +454,7 @@ cabal run gauntlet-exe -- benchmark-multiple \
 mkdir -p .secrets
 echo "Bearer your-token-here" > .secrets/token.txt
 
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config examples/api-with-auth.json
 ```
 
@@ -437,7 +468,7 @@ See [`examples/README.md`](examples/README.md) for more examples.
 
 - **GHC 9.12+** with GHC2024 language standard
 - **Cabal 3.12+**
-- **ormolu** or **fourmolu** (for code formatting)
+- **fourmolu** (for code formatting)
 
 ### Setup
 
@@ -466,7 +497,7 @@ cabal build
 cabal test
 
 # Format code
-ormolu --mode inplace $(find src test -name '*.hs')
+fourmolu --mode inplace $(find src test -name '*.hs')
 
 # Or use Makefile
 make build
@@ -498,6 +529,7 @@ gauntlet/
 │   ├── Runner/             # Benchmark orchestration
 │   │   ├── Context.hs      # RunContext, initContext, setupOrFail
 │   │   ├── Loop.hs         # Concurrent benchmark loops
+│   │   ├── Nway.hs         # N-way comparison orchestration
 │   │   ├── Warmup.hs       # Warmup execution
 │   │   ├── Tracing.hs      # Tempo trace fetching
 │   │   └── Baseline.hs     # Baseline compare + CI emit
@@ -512,19 +544,28 @@ gauntlet/
 │   │   └── Report.hs       # Trace terminal output
 │   ├── Log.hs              # Structured logging
 │   ├── Runner.hs           # Top-level entry points
+│   ├── VerifyRunner.hs     # Response verification runner
 │   └── Lib.hs              # Main dispatcher
-├── test/                   # Test suite
-│   ├── ConfigSpec.hs       # Config parsing tests
+├── test/                   # Test suite (Tasty)
+│   ├── Spec.hs             # Test suite entry point
 │   ├── StatsSpec.hs        # Statistical tests
+│   ├── StatsCommonSpec.hs  # Common stats utilities
 │   ├── BayesianSpec.hs     # Bayesian analysis tests
+│   ├── FrequentistSpec.hs  # Frequentist tests and EMD
+│   ├── ConfigSpec.hs       # Config parsing tests
 │   ├── BaselineSpec.hs     # Baseline tests
-│   ├── TracingSpec.hs      # Tracing tests
-│   ├── Integration.hs      # End-to-end tests
+│   ├── NwaySpec.hs         # N-way comparison tests
+│   ├── NwayIntegrationSpec.hs  # N-way end-to-end tests
+│   ├── TracingSpec.hs      # Tracing analysis tests
+│   ├── TracingClientSpec.hs    # Tempo client tests
+│   ├── TracingQuerySpec.hs     # TraceQL query tests
+│   ├── TracingReportSpec.hs    # Trace report tests
+│   ├── Integration.hs      # HTTP execution tests
 │   ├── PropertySpec.hs     # QuickCheck properties
 │   ├── TUISpec.hs          # Brick widget tests
+│   ├── TestHelpers.hs      # Shared test fixtures
 │   └── MockServer.hs       # HTTP mock utilities
 ├── examples/               # Example configurations
-├── docs/                   # Documentation
 └── CLAUDE.md               # Architecture guide
 ```
 
@@ -542,7 +583,7 @@ cabal test
 
 ```bash
 # Run only unit tests
-cabal test --test-options="--match 'StatsSpec'"
+cabal test --test-options="-p 'StatsSpec'"
 
 # Run with verbose output
 cabal test --test-show-details=direct
@@ -557,7 +598,7 @@ cabal test --test-show-details=direct
 
 ### Test Framework
 
-- **Hspec** - BDD-style test specifications
+- **Tasty** - Test framework with `tasty-hunit` and `tasty-quickcheck`
 - **QuickCheck** - Property-based testing
 - **MockServer** - HTTP mock utilities for integration tests
 
@@ -617,7 +658,7 @@ performance-test:
   stage: test
   script:
     - cabal build
-    - cabal run gauntlet-exe -- benchmark-multiple \
+    - cabal run gauntlet-exe -- benchmark-nway \
         --config config.json \
         --compare-baseline prod-baseline
   artifacts:
@@ -651,7 +692,7 @@ jobs:
       - name: Run benchmark
         run: |
           cabal build
-          cabal run gauntlet-exe -- benchmark-multiple \
+          cabal run gauntlet-exe -- benchmark-nway \
             --config config.json \
             --compare-baseline prod-baseline \
             --output markdown \
@@ -669,7 +710,7 @@ jobs:
 Use `--output markdown` to write a full report covering stats, Bayesian analysis, and validation results:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config config.json \
   --output markdown \
   --report-path /tmp/report.md
@@ -689,14 +730,14 @@ The markdown report is written **in addition to** terminal output — it does no
 
 Contributions are welcome! Please follow these guidelines:
 
-1. **Code Style** - Format with `ormolu` before committing
+1. **Code Style** - Format with `fourmolu` before committing
 2. **Tests** - Add tests for new features
 3. **Documentation** - Update README and docs for user-facing changes
 4. **Commit Messages** - Use conventional commit format
 
 ```bash
 # Format code
-ormolu --mode inplace $(find src test -name '*.hs')
+fourmolu --mode inplace $(find src test -name '*.hs')
 
 # Run tests
 cabal test
@@ -704,10 +745,6 @@ cabal test
 # Build and verify
 cabal build -O2
 ```
-
-### Development Priorities
-
-See [`docs/TODO.md`](docs/TODO.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md) for planned features and implementation guides.
 
 ---
 
@@ -737,7 +774,6 @@ Statistical methodology inspired by Bayesian Data Analysis (Gelman et al.) and p
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/gauntlet/issues)
-- **Documentation**: See [`docs/`](docs/) directory
 - **Examples**: See [`examples/`](examples/) directory
 
 For questions or feature requests, please open an issue.

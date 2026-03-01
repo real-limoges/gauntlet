@@ -10,7 +10,7 @@ mkdir -p .secrets
 echo "your-bearer-token-here" > .secrets/token.txt
 
 # Run a simple benchmark
-cabal run gauntlet-exe -- benchmark-multiple --config examples/simple-benchmark.json
+cabal run gauntlet-exe -- benchmark-nway --config examples/simple-benchmark.json
 ```
 
 ## Example Files
@@ -66,6 +66,14 @@ Change `logLevel` to control output verbosity:
 - `"info"` - Normal output with progress updates (default)
 - `"warning"` - Only warnings and errors
 - `"error"` - Only critical errors
+
+### `nway-comparison.json`
+**N-way comparison** - Compare multiple API targets simultaneously.
+- 3 named targets: prod, staging, dev
+- All pairwise Bayesian comparisons computed automatically
+- Targets specified as an array of `{name, url}` objects
+
+**Use case:** Comparing performance across multiple environments or API versions.
 
 ## Configuration Reference
 
@@ -175,14 +183,14 @@ Integrates with Grafana Tempo for distributed trace analysis.
 Test one endpoint at a time:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-multiple --config examples/minimal.json
+cabal run gauntlet-exe -- benchmark-nway --config examples/minimal.json
 ```
 
 ### A/B Comparison
 Compare primary vs. candidate:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-multiple --config examples/ab-comparison.json
+cabal run gauntlet-exe -- benchmark-nway --config examples/ab-comparison.json
 ```
 
 ### With Baseline Comparison
@@ -190,12 +198,12 @@ Save a baseline for regression detection:
 
 ```bash
 # Save baseline
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config examples/simple-benchmark.json \
   --save-baseline my-baseline
 
 # Compare against baseline
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config examples/simple-benchmark.json \
   --compare-baseline my-baseline
 ```
@@ -204,7 +212,7 @@ cabal run gauntlet-exe -- benchmark-multiple \
 Write a full markdown report (stats, Bayesian analysis, validation) in addition to terminal output:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-multiple \
+cabal run gauntlet-exe -- benchmark-nway \
   --config examples/simple-benchmark.json \
   --output markdown \
   --report-path results/report.md
@@ -221,6 +229,4 @@ cabal run gauntlet-exe -- benchmark-multiple \
 
 ## See Also
 
-- [LOGGING.md](../docs/LOGGING.md) - Structured logging documentation
 - [CLAUDE.md](../CLAUDE.md) - Architecture and development guide
-- [TODO.md](../docs/TODO.md) - Roadmap and planned features
