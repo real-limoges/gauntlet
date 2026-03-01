@@ -56,6 +56,7 @@ runSingle baselineMode outFmt cfg = do
       startNs <- getNowNs
       emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
       setupOrFail
+        (rcManager ctx)
         setts
         (candidate $ git cfg)
         (candidate $ targets cfg)

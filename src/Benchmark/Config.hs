@@ -18,6 +18,7 @@ where
 import Benchmark.Env (interpolateEnv, loadEnvVars)
 import Benchmark.Types
 import Control.Exception (IOException, try)
+import Control.Monad (when)
 import Data.Aeson (FromJSON, eitherDecode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
@@ -72,6 +73,8 @@ validateConfig cfg
       Left $ ConfigValidationError "concurrency must be greater than 0"
   | not (all isValidMethod (payloads cfg)) =
       Left $ ConfigValidationError "Invalid HTTP method in payloads (must be GET, POST, PUT, DELETE, or PATCH)"
+  | Left err <- validateSettings (settings cfg) =
+      Left err
   | otherwise = Right cfg
 
 validateNwayConfig :: NwayConfig -> Either PerfTestError NwayConfig
@@ -84,7 +87,30 @@ validateNwayConfig cfg
       Left $ ConfigValidationError "Invalid HTTP method in payloads (must be GET, POST, PUT, DELETE, or PATCH)"
   | length (nwayTargets cfg) < 2 =
       Left $ ConfigValidationError "Must have at least 2 targets"
+  | Left err <- validateSettings (nwaySettings cfg) =
+      Left err
   | otherwise = Right cfg
 
 isValidMethod :: PayloadSpec -> Bool
 isValidMethod p = specMethod p `elem` ["GET", "POST", "PUT", "DELETE", "PATCH"]
+
+-- | Validate optional settings fields when present.
+validateSettings :: Settings -> Either PerfTestError ()
+validateSettings setts = do
+  check (requestTimeout setts) ((<= 0)) "requestTimeout must be greater than 0"
+  check (healthCheckTimeout setts) (<= 0) "healthCheckTimeout must be greater than 0"
+  case retry setts of
+    Nothing -> Right ()
+    Just r -> do
+      when (retryMaxAttempts r < 0) $
+        Left $ ConfigValidationError "retryMaxAttempts must not be negative"
+      when (retryInitialDelayMs r <= 0) $
+        Left $ ConfigValidationError "retryInitialDelayMs must be greater than 0"
+      when (retryBackoffMultiplier r < 1.0) $
+        Left $ ConfigValidationError "retryBackoffMultiplier must be at least 1.0"
+  where
+    check :: Maybe Int -> (Int -> Bool) -> String -> Either PerfTestError ()
+    check Nothing _ _ = Right ()
+    check (Just v) predicate msg
+      | predicate v = Left $ ConfigValidationError msg
+      | otherwise = Right ()

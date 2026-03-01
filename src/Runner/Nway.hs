@@ -143,7 +143,7 @@ runAllTargets ctx cfg eventChan = do
     case targetBranch t of
       Just branch | not (T.null branch) -> do
         emitEvent eventChan (StatusMessage $ "Setting up " <> branch <> "...")
-        setupOrFail setts branch (targetUrl t) Nothing
+        setupOrFail (rcManager ctx) setts branch (targetUrl t) Nothing
       _ -> return ()
 
     emitEvent eventChan (StatusMessage $ "Benchmarking " <> targetName t)
