@@ -42,10 +42,32 @@ initOutputFiles = do
   TIO.writeFile csvFile "payload_id,url,status_code,latency_ms\n"
   return (csvFile, timestamp)
 
+-- | Create output files with N-way CSV header (includes target_name column).
+initNwayOutputFiles :: IO (FilePath, String)
+initNwayOutputFiles = do
+  createDirectoryIfMissing True resultsDir
+  timestamp <- formatTime defaultTimeLocale "%Y-%m-%dT%H-%M-%S" <$> getZonedTime
+  let csvFile = resultsDir ++ "/latencies-" ++ timestamp ++ ".csv"
+      logFile = resultsDir ++ "/failures-" ++ timestamp ++ ".log"
+  writeFile logFile ""
+  TIO.writeFile csvFile "target_name,payload_id,url,status_code,latency_ms\n"
+  return (csvFile, timestamp)
+
 writeLatencies :: FilePath -> [(Int, Endpoint, [TestingResponse])] -> IO ()
 writeLatencies csvFile results = do
   let builder = foldMap formatResultBuilder results
   TLIO.appendFile csvFile (toLazyText builder)
+
+-- | Write latencies with a target name prefix for N-way runs.
+writeLatenciesWithTarget :: FilePath -> Text -> [(Int, Endpoint, [TestingResponse])] -> IO ()
+writeLatenciesWithTarget csvFile targetName results = do
+  let builder = foldMap (formatResultWithTarget targetName) results
+  TLIO.appendFile csvFile (toLazyText builder)
+
+-- | Write a markdown report to disk when 'OutputMarkdown' is requested.
+writeMarkdownReport :: OutputFormat -> Text -> IO ()
+writeMarkdownReport OutputTerminal _ = return ()
+writeMarkdownReport (OutputMarkdown path) content = TIO.writeFile path content
 
 formatResultBuilder :: (Int, Endpoint, [TestingResponse]) -> Builder
 formatResultBuilder (idx, ep, responses) =
@@ -63,23 +85,6 @@ formatRow idx ep r =
     , B.fromString (show $ unNanoseconds $ durationNs r)
     , B.singleton '\n'
     ]
-
--- | Create output files with N-way CSV header (includes target_name column).
-initNwayOutputFiles :: IO (FilePath, String)
-initNwayOutputFiles = do
-  createDirectoryIfMissing True resultsDir
-  timestamp <- formatTime defaultTimeLocale "%Y-%m-%dT%H-%M-%S" <$> getZonedTime
-  let csvFile = resultsDir ++ "/latencies-" ++ timestamp ++ ".csv"
-      logFile = resultsDir ++ "/failures-" ++ timestamp ++ ".log"
-  writeFile logFile ""
-  TIO.writeFile csvFile "target_name,payload_id,url,status_code,latency_ms\n"
-  return (csvFile, timestamp)
-
--- | Write latencies with a target name prefix for N-way runs.
-writeLatenciesWithTarget :: FilePath -> Text -> [(Int, Endpoint, [TestingResponse])] -> IO ()
-writeLatenciesWithTarget csvFile targetName results = do
-  let builder = foldMap (formatResultWithTarget targetName) results
-  TLIO.appendFile csvFile (toLazyText builder)
 
 formatResultWithTarget :: Text -> (Int, Endpoint, [TestingResponse]) -> Builder
 formatResultWithTarget targetName (idx, ep, responses) =
@@ -99,8 +104,3 @@ formatRowWithTarget targetName idx ep r =
     , B.fromString (show $ unNanoseconds $ durationNs r)
     , B.singleton '\n'
     ]
-
--- | Write a markdown report to disk when 'OutputMarkdown' is requested.
-writeMarkdownReport :: OutputFormat -> Text -> IO ()
-writeMarkdownReport OutputTerminal _ = return ()
-writeMarkdownReport (OutputMarkdown path) content = TIO.writeFile path content

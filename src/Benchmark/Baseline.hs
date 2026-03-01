@@ -62,13 +62,6 @@ loadBaseline name = do
         Left err -> return $ Left $ "Failed to parse baseline: " ++ err
         Right baseline -> return $ Right baseline
 
--- | List all available baseline names.
-listBaselines :: IO [Text]
-listBaselines = do
-  createDirectoryIfMissing True baselineDir
-  files <- listDirectory baselineDir
-  return $ map (T.pack . takeBaseName) files
-
 -- | Compare current stats against a baseline using given thresholds.
 compareToBaseline :: RegressionThresholds -> Baseline -> BenchmarkStats -> RegressionResult
 compareToBaseline thresholds baseline current =
@@ -85,6 +78,13 @@ compareToBaseline thresholds baseline current =
         , regressionMetrics = metrics
         , regressionPassed = passed
         }
+
+-- | List all available baseline names.
+listBaselines :: IO [Text]
+listBaselines = do
+  createDirectoryIfMissing True baselineDir
+  files <- listDirectory baselineDir
+  return $ map (T.pack . takeBaseName) files
 
 -- | Check if a single metric has regressed beyond threshold.
 checkMetric :: Text -> Double -> Double -> Double -> MetricRegression

@@ -32,6 +32,20 @@ import Text.Read (readMaybe)
 import Tracing.Query (buildTraceQL)
 import Tracing.Types
 
+-- | Search for traces and fetch full details for each match.
+fetchTracesForTimeRange ::
+  Manager ->
+  TempoConfig ->
+  TraceQuery ->
+  IO (Either String [Trace])
+fetchTracesForTimeRange mgr cfg query = do
+  searchResult <- searchTraces mgr cfg query
+  case searchResult of
+    Left err -> return $ Left err
+    Right resp -> do
+      traces <- mapM (fetchTrace mgr cfg . metaTraceID) (foundTraces resp)
+      return $ Right $ rights traces
+
 -- | Search for traces matching a TraceQL query within a time range.
 searchTraces :: Manager -> TempoConfig -> TraceQuery -> IO (Either String TempoSearchResponse)
 searchTraces mgr cfg query = do
@@ -63,20 +77,6 @@ fetchTrace mgr cfg traceId = do
   case result of
     Left err -> return $ Left err
     Right body -> return $ parseTraceResponse traceId body
-
--- | Search for traces and fetch full details for each match.
-fetchTracesForTimeRange ::
-  Manager ->
-  TempoConfig ->
-  TraceQuery ->
-  IO (Either String [Trace])
-fetchTracesForTimeRange mgr cfg query = do
-  searchResult <- searchTraces mgr cfg query
-  case searchResult of
-    Left err -> return $ Left err
-    Right resp -> do
-      traces <- mapM (fetchTrace mgr cfg . metaTraceID) (foundTraces resp)
-      return $ Right $ rights traces
 
 {-| Perform HTTP GET request with error handling.
 

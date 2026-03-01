@@ -21,16 +21,6 @@ import Data.Text qualified as T
 import Log (Logger, logInfo)
 import Text.Printf (printf)
 
--- | Run baseline comparison and return the 'RunResult'.
-doBaselineComparison :: Text -> BenchmarkStats -> Baseline -> IO RunResult
-doBaselineComparison timestamp stats baseline = do
-  let regression = compareToBaseline defaultThresholds baseline stats
-  printRegressionResult regression
-  emitCIOutput regression (T.unpack timestamp)
-  if regressionPassed regression
-    then return RunSuccess
-    else return $ RunRegression regression
-
 -- | Handle baseline save/compare operations per 'BaselineMode'.
 handleBaseline :: Logger -> BaselineMode -> Text -> BenchmarkStats -> IO RunResult
 handleBaseline logger mode timestamp stats = case mode of
@@ -62,6 +52,16 @@ handleBaseline logger mode timestamp stats = case mode of
         logInfo logger $ "Error: " <> T.pack err
         return RunSuccess
       Right baseline -> doBaselineComparison timestamp stats baseline
+
+-- | Run baseline comparison and return the 'RunResult'.
+doBaselineComparison :: Text -> BenchmarkStats -> Baseline -> IO RunResult
+doBaselineComparison timestamp stats baseline = do
+  let regression = compareToBaseline defaultThresholds baseline stats
+  printRegressionResult regression
+  emitCIOutput regression (T.unpack timestamp)
+  if regressionPassed regression
+    then return RunSuccess
+    else return $ RunRegression regression
 
 -- | Emit CI-specific output based on the detected CI environment.
 emitCIOutput :: RegressionResult -> String -> IO ()

@@ -90,6 +90,13 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
   printKS (kolmogorovSmirnov bayes)
   printAD (andersonDarling bayes)
 
+printSingleBenchmarkReport :: Text -> BenchmarkStats -> IO ()
+printSingleBenchmarkReport name stats = do
+  putStrLn ""
+
+  printf "(%s):" (T.unpack name)
+  printStats stats
+
 printVerifyReport :: [(Endpoint, [VerificationResult])] -> IO ()
 printVerifyReport results = do
   printHeader "Verification Report:"
@@ -108,82 +115,6 @@ printVerifyReport results = do
       putStrLn ""
       printHeader "FAILURE DETAILS"
       forM_ failures printMultiSampleFailure
-
-printSingleBenchmarkReport :: Text -> BenchmarkStats -> IO ()
-printSingleBenchmarkReport name stats = do
-  putStrLn ""
-
-  printf "(%s):" (T.unpack name)
-  printStats stats
-
-printMultiSampleFailure :: (Endpoint, [VerificationResult]) -> IO ()
-printMultiSampleFailure (ep, results) = do
-  let n = length results
-      passed = length (filter (== Match) results)
-  printf "[%s] %s" (T.unpack $ method ep) (T.unpack $ url ep)
-  if n > 1
-    then printf " (%d/%d samples passed)\n" passed n
-    else putStrLn ""
-  case filter (/= Match) results of
-    [] -> return ()
-    (firstFailure : _) -> printVerificationResult firstFailure
-  putStrLn ""
-
-printVerificationResult :: VerificationResult -> IO ()
-printVerificationResult Match = return ()
-printVerificationResult (StatusMismatch a b) = printf "  Status Mismatch: Expected %d, Got %d\n" a b
-printVerificationResult (InvalidJSON err) = printf "  JSON Error: %s\n" err
-printVerificationResult (NetworkError msg) = printf "  Network Error: %s\n" msg
-printVerificationResult (BodyMismatch diffs) = do
-  printf "  Body Mismatch (%d field(s) differ):\n" (length diffs)
-  mapM_
-    ( \d ->
-        printf
-          "    %-40s  primary=%-20s  candidate=%s\n"
-          (T.unpack $ jdPath d)
-          (T.unpack $ jdPrimary d)
-          (T.unpack $ jdCandidate d)
-    )
-    diffs
-
-printStats :: BenchmarkStats -> IO ()
-printStats stats = do
-  printf "  Mean:    %.2f ms\n" (meanMs stats)
-  printf "  StdDev:  %.2f ms\n" (stdDevMs stats)
-  printf "  p50:     %.2f ms\n" (p50Ms stats)
-  printf "  p95:     %.2f ms\n" (p95Ms stats)
-  printf "  p99:     %.2f ms\n" (p99Ms stats)
-  printf "  ES(p99): %.2f ms\n" (esMs stats)
-  printf "  Min:     %.2f ms\n" (minMs stats)
-  printf "  Max:     %.2f ms\n" (maxMs stats)
-  printf "  Success: %d / %d\n" (countSuccess stats) (totalRequests stats)
-
-printMWU :: Maybe MWUResult -> IO ()
-printMWU Nothing = putStrLn "Mann-Whitney U:      (sample too small)"
-printMWU (Just r)
-  | mwuSignificant r = putStrLn "Mann-Whitney U:      Significant — distributions differ (p < 0.05)"
-  | otherwise = putStrLn "Mann-Whitney U:      Not significant (p >= 0.05)"
-
-printKS :: Maybe KSResult -> IO ()
-printKS Nothing = putStrLn "Kolmogorov-Smirnov:  (sample too small)"
-printKS (Just r) =
-  printf
-    "Kolmogorov-Smirnov:  D = %.3f, p = %.3f (%s)\n"
-    (ksStatistic r)
-    (ksPValue r)
-    (if ksSignificant r then "significant" else "not significant" :: String)
-
-printAD :: Maybe ADResult -> IO ()
-printAD Nothing = putStrLn "Anderson-Darling:    (sample too small)"
-printAD (Just r) =
-  printf
-    "Anderson-Darling:    A² = %.3f, p ≈ %.3f (%s)\n"
-    (adStatistic r)
-    (adPValue r)
-    (if adSignificant r then "significant" else "not significant" :: String)
-
-printHeader :: String -> IO ()
-printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
 
 {-| Print validation results. Silently no-ops when the list is empty
 (i.e., no endpoints had a 'validate' block in their config).
@@ -209,23 +140,6 @@ printValidationSummary summaries = do
     forM_ displayErrors printValidationError
     when (length allErrors > 10) $
       printf "  ... and %d more unique error(s)\n" (length allErrors - 10)
-
-printValidationError :: ValidationError -> IO ()
-printValidationError (StatusCodeMismatch expected actual) =
-  printf "  [status]  expected %d, got %d\n" expected actual
-printValidationError (FieldNotFound path) =
-  printf "  [missing] %s\n" (T.unpack path)
-printValidationError (FieldValueMismatch path expected actual) = do
-  printf "  [value]   %s\n" (T.unpack path)
-  printf "    expected: %s\n" (renderValue expected)
-  printf "    actual:   %s\n" (renderValue actual)
-printValidationError BodyAbsent =
-  putStrLn "  [body]    response body absent"
-printValidationError BodyInvalidJSON =
-  putStrLn "  [body]    response body is not valid JSON"
-
-renderValue :: Value -> String
-renderValue = LBS8.unpack . encode
 
 -- | Print N-way comparison report: ranking table followed by per-pair comparisons.
 printNwayReport :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)] -> IO ()
@@ -275,6 +189,96 @@ printNwayReport namedStats pairs = do
         (lookupStats nameA namedStats)
         (lookupStats nameB namedStats)
         bayes
+
+-- ---------------------------------------------------------------------------
+-- Internal helpers
+-- ---------------------------------------------------------------------------
+
+printStats :: BenchmarkStats -> IO ()
+printStats stats = do
+  printf "  Mean:    %.2f ms\n" (meanMs stats)
+  printf "  StdDev:  %.2f ms\n" (stdDevMs stats)
+  printf "  p50:     %.2f ms\n" (p50Ms stats)
+  printf "  p95:     %.2f ms\n" (p95Ms stats)
+  printf "  p99:     %.2f ms\n" (p99Ms stats)
+  printf "  ES(p99): %.2f ms\n" (esMs stats)
+  printf "  Min:     %.2f ms\n" (minMs stats)
+  printf "  Max:     %.2f ms\n" (maxMs stats)
+  printf "  Success: %d / %d\n" (countSuccess stats) (totalRequests stats)
+
+printHeader :: String -> IO ()
+printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
+
+printMWU :: Maybe MWUResult -> IO ()
+printMWU Nothing = putStrLn "Mann-Whitney U:      (sample too small)"
+printMWU (Just r)
+  | mwuSignificant r = putStrLn "Mann-Whitney U:      Significant — distributions differ (p < 0.05)"
+  | otherwise = putStrLn "Mann-Whitney U:      Not significant (p >= 0.05)"
+
+printKS :: Maybe KSResult -> IO ()
+printKS Nothing = putStrLn "Kolmogorov-Smirnov:  (sample too small)"
+printKS (Just r) =
+  printf
+    "Kolmogorov-Smirnov:  D = %.3f, p = %.3f (%s)\n"
+    (ksStatistic r)
+    (ksPValue r)
+    (if ksSignificant r then "significant" else "not significant" :: String)
+
+printAD :: Maybe ADResult -> IO ()
+printAD Nothing = putStrLn "Anderson-Darling:    (sample too small)"
+printAD (Just r) =
+  printf
+    "Anderson-Darling:    A² = %.3f, p ≈ %.3f (%s)\n"
+    (adStatistic r)
+    (adPValue r)
+    (if adSignificant r then "significant" else "not significant" :: String)
+
+printMultiSampleFailure :: (Endpoint, [VerificationResult]) -> IO ()
+printMultiSampleFailure (ep, results) = do
+  let n = length results
+      passed = length (filter (== Match) results)
+  printf "[%s] %s" (T.unpack $ method ep) (T.unpack $ url ep)
+  if n > 1
+    then printf " (%d/%d samples passed)\n" passed n
+    else putStrLn ""
+  case filter (/= Match) results of
+    [] -> return ()
+    (firstFailure : _) -> printVerificationResult firstFailure
+  putStrLn ""
+
+printVerificationResult :: VerificationResult -> IO ()
+printVerificationResult Match = return ()
+printVerificationResult (StatusMismatch a b) = printf "  Status Mismatch: Expected %d, Got %d\n" a b
+printVerificationResult (InvalidJSON err) = printf "  JSON Error: %s\n" err
+printVerificationResult (NetworkError msg) = printf "  Network Error: %s\n" msg
+printVerificationResult (BodyMismatch diffs) = do
+  printf "  Body Mismatch (%d field(s) differ):\n" (length diffs)
+  mapM_
+    ( \d ->
+        printf
+          "    %-40s  primary=%-20s  candidate=%s\n"
+          (T.unpack $ jdPath d)
+          (T.unpack $ jdPrimary d)
+          (T.unpack $ jdCandidate d)
+    )
+    diffs
+
+printValidationError :: ValidationError -> IO ()
+printValidationError (StatusCodeMismatch expected actual) =
+  printf "  [status]  expected %d, got %d\n" expected actual
+printValidationError (FieldNotFound path) =
+  printf "  [missing] %s\n" (T.unpack path)
+printValidationError (FieldValueMismatch path expected actual) = do
+  printf "  [value]   %s\n" (T.unpack path)
+  printf "    expected: %s\n" (renderValue expected)
+  printf "    actual:   %s\n" (renderValue actual)
+printValidationError BodyAbsent =
+  putStrLn "  [body]    response body absent"
+printValidationError BodyInvalidJSON =
+  putStrLn "  [body]    response body is not valid JSON"
+
+renderValue :: Value -> String
+renderValue = LBS8.unpack . encode
 
 lookupStats :: Text -> [(Text, BenchmarkStats)] -> BenchmarkStats
 lookupStats name xs = case lookup name xs of

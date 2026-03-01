@@ -87,6 +87,27 @@ calculateStats results =
         , esMs = es
         }
 
+{-| Expected Shortfall: mean of the worst 1% of observations (E[X | X > p99]).
+Input must be sorted ascending. Returns the last value for very small samples.
+-}
+expectedShortfall :: V.Vector Double -> Double
+expectedShortfall sorted
+  | V.null sorted = 0
+  | otherwise =
+      let n = V.length sorted
+          threshold = floor (0.99 * (fromIntegral n :: Double))
+          tailVals = V.drop threshold sorted
+       in if V.null tailVals
+            then V.last sorted
+            else V.foldl' (+) 0 tailVals / fromIntegral (V.length tailVals)
+
+-- | Extract duration from response (Nothing if error).
+getDuration :: TestingResponse -> Maybe Double
+getDuration response =
+  case errorMessage response of
+    Just _ -> Nothing
+    Nothing -> Just $ unMilliseconds $ nsToMs (durationNs response)
+
 {-| Bayesian comparison of two benchmark results.
 
 Computes probability that B is faster than A, mean difference with
@@ -220,27 +241,6 @@ runKS a b
                 , ksPValue = p
                 , ksSignificant = p < 0.05
                 }
-
--- | Extract duration from response (Nothing if error).
-getDuration :: TestingResponse -> Maybe Double
-getDuration response =
-  case errorMessage response of
-    Just _ -> Nothing
-    Nothing -> Just $ unMilliseconds $ nsToMs (durationNs response)
-
-{-| Expected Shortfall: mean of the worst 1% of observations (E[X | X > p99]).
-Input must be sorted ascending. Returns the last value for very small samples.
--}
-expectedShortfall :: V.Vector Double -> Double
-expectedShortfall sorted
-  | V.null sorted = 0
-  | otherwise =
-      let n = V.length sorted
-          threshold = floor (0.99 * (fromIntegral n :: Double))
-          tailVals = V.drop threshold sorted
-       in if V.null tailVals
-            then V.last sorted
-            else V.foldl' (+) 0 tailVals / fromIntegral (V.length tailVals)
 
 {-| Run two-sample Anderson-Darling test (Scholz & Stephens 1987).
 More sensitive to tail differences than KS. Returns Nothing if either sample < 5.

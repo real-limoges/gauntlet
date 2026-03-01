@@ -33,6 +33,99 @@ data CustomEvent
 
 type Name = ()
 
+-- ── Runner ────────────────────────────────────────────────────────────────────
+
+runTUI :: TChan BenchmarkEvent -> TUIState -> IO TUIState
+runTUI eventChan initialSt = do
+  brickChan <- newBChan 1000
+
+  tid1 <- forkIO $ forever $ do
+    event <- atomically $ readTChan eventChan
+    writeBChan brickChan (BenchEvent event)
+
+  tid2 <- forkIO $ forever $ do
+    threadDelay 100_000
+    writeBChan brickChan Tick
+
+  let buildVty = mkVty V.defaultConfig
+  initialVty <- buildVty
+  result <-
+    withStderrBuffered $
+      customMain initialVty buildVty (Just brickChan) tuiApp initialSt
+  killThread tid1
+  killThread tid2
+  return result
+
+{-| Redirect stderr to a temp file for the duration of 'action', then replay
+any captured output to the real stderr afterwards. Prevents log/error lines
+from corrupting the Brick terminal while the TUI is active.
+-}
+withStderrBuffered :: IO a -> IO a
+withStderrBuffered action =
+  bracket acquire release (const action)
+  where
+    acquire = do
+      stderrSaved <- hDuplicate stderr
+      tmpDir <- getTemporaryDirectory
+      (tmpPath, tmpHandle) <- openTempFile tmpDir "gauntlet-stderr.tmp"
+      hDuplicateTo tmpHandle stderr
+      hClose tmpHandle
+      return (stderrSaved, tmpPath)
+    release (stderrSaved, tmpPath) = do
+      hFlush stderr
+      hDuplicateTo stderrSaved stderr
+      hClose stderrSaved
+      content <- try (readFile tmpPath) :: IO (Either SomeException String)
+      case content of
+        Right s -> unless (null s) $ hPutStr stderr s
+        Left _ -> return ()
+      _ <- try (removeFile tmpPath) :: IO (Either SomeException ())
+      return ()
+
+tuiApp :: App TUIState CustomEvent Name
+tuiApp =
+  App
+    { appDraw = drawUI
+    , appChooseCursor = neverShowCursor
+    , appHandleEvent = handleEvent
+    , appStartEvent = return ()
+    , appAttrMap = const theAttrMap
+    }
+
+-- ── Events ────────────────────────────────────────────────────────────────────
+
+handleEvent :: BrickEvent Name CustomEvent -> EventM Name TUIState ()
+handleEvent (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt
+handleEvent (VtyEvent (V.EvKey (V.KChar 'c') [V.MCtrl])) = halt
+handleEvent (AppEvent Tick) = do
+  now <- liftIO getCurrentTime
+  modify $ \st -> case _tsStartTime st of
+    Nothing -> st
+    Just start -> st {_tsElapsedSecs = realToFrac (diffUTCTime now start)}
+handleEvent (AppEvent (BenchEvent event)) = do
+  now <- liftIO getCurrentTime
+  modify (updateState now event)
+  case event of
+    BenchmarkFinished -> halt
+    _ -> return ()
+handleEvent _ = return ()
+
+-- ── Attributes ───────────────────────────────────────────────────────────────
+
+theAttrMap :: AttrMap
+theAttrMap =
+  attrMap
+    V.defAttr
+    [ (attrName "title", fg V.yellow)
+    , (attrName "label", fg V.yellow)
+    , (attrName "hi", fg V.cyan)
+    , (attrName "stat", V.withStyle V.defAttr V.bold)
+    , (attrName "ok", fg V.brightBlue)
+    , (attrName "err", fg V.red)
+    , (attrName "dim", fg V.brightBlack)
+    , (attrName "progress", fg V.blue)
+    ]
+
 -- ── Drawing ──────────────────────────────────────────────────────────────────
 
 drawUI :: TUIState -> [Widget Name]
@@ -183,96 +276,3 @@ errorsSection state =
 
 footerSection :: Widget Name
 footerSection = withAttr (attrName "dim") $ hCenter $ txt "q  quit    ctrl+c  quit"
-
--- ── Events ────────────────────────────────────────────────────────────────────
-
-handleEvent :: BrickEvent Name CustomEvent -> EventM Name TUIState ()
-handleEvent (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt
-handleEvent (VtyEvent (V.EvKey (V.KChar 'c') [V.MCtrl])) = halt
-handleEvent (AppEvent Tick) = do
-  now <- liftIO getCurrentTime
-  modify $ \st -> case _tsStartTime st of
-    Nothing -> st
-    Just start -> st {_tsElapsedSecs = realToFrac (diffUTCTime now start)}
-handleEvent (AppEvent (BenchEvent event)) = do
-  now <- liftIO getCurrentTime
-  modify (updateState now event)
-  case event of
-    BenchmarkFinished -> halt
-    _ -> return ()
-handleEvent _ = return ()
-
--- ── Attributes ───────────────────────────────────────────────────────────────
-
-theAttrMap :: AttrMap
-theAttrMap =
-  attrMap
-    V.defAttr
-    [ (attrName "title", fg V.yellow)
-    , (attrName "label", fg V.yellow)
-    , (attrName "hi", fg V.cyan)
-    , (attrName "stat", V.withStyle V.defAttr V.bold)
-    , (attrName "ok", fg V.brightBlue)
-    , (attrName "err", fg V.red)
-    , (attrName "dim", fg V.brightBlack)
-    , (attrName "progress", fg V.blue)
-    ]
-
-tuiApp :: App TUIState CustomEvent Name
-tuiApp =
-  App
-    { appDraw = drawUI
-    , appChooseCursor = neverShowCursor
-    , appHandleEvent = handleEvent
-    , appStartEvent = return ()
-    , appAttrMap = const theAttrMap
-    }
-
--- ── Runner ────────────────────────────────────────────────────────────────────
-
-{-| Redirect stderr to a temp file for the duration of 'action', then replay
-any captured output to the real stderr afterwards. Prevents log/error lines
-from corrupting the Brick terminal while the TUI is active.
--}
-withStderrBuffered :: IO a -> IO a
-withStderrBuffered action =
-  bracket acquire release (const action)
-  where
-    acquire = do
-      stderrSaved <- hDuplicate stderr
-      tmpDir <- getTemporaryDirectory
-      (tmpPath, tmpHandle) <- openTempFile tmpDir "gauntlet-stderr.tmp"
-      hDuplicateTo tmpHandle stderr
-      hClose tmpHandle
-      return (stderrSaved, tmpPath)
-    release (stderrSaved, tmpPath) = do
-      hFlush stderr
-      hDuplicateTo stderrSaved stderr
-      hClose stderrSaved
-      content <- try (readFile tmpPath) :: IO (Either SomeException String)
-      case content of
-        Right s -> unless (null s) $ hPutStr stderr s
-        Left _ -> return ()
-      _ <- try (removeFile tmpPath) :: IO (Either SomeException ())
-      return ()
-
-runTUI :: TChan BenchmarkEvent -> TUIState -> IO TUIState
-runTUI eventChan initialSt = do
-  brickChan <- newBChan 1000
-
-  tid1 <- forkIO $ forever $ do
-    event <- atomically $ readTChan eventChan
-    writeBChan brickChan (BenchEvent event)
-
-  tid2 <- forkIO $ forever $ do
-    threadDelay 100_000
-    writeBChan brickChan Tick
-
-  let buildVty = mkVty V.defaultConfig
-  initialVty <- buildVty
-  result <-
-    withStderrBuffered $
-      customMain initialVty buildVty (Just brickChan) tuiApp initialSt
-  killThread tid1
-  killThread tid2
-  return result
