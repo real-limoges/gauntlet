@@ -143,6 +143,7 @@ test-suite            gauntlet-test
                     , ValidationSpec
                     , VerifySpec
                     , WarmupSpec
+                    , TastyCompat
   default-extensions: OverloadedStrings
                     , NumericUnderscores
   build-depends:      base >= 4.20.0.0,
@@ -152,7 +153,9 @@ test-suite            gauntlet-test
                       containers,
                       directory,
                       filepath,
-                      hspec,
+                      tasty,
+                      tasty-hunit,
+                      tasty-quickcheck,
                       http-client,
                       http-client-tls,
                       http-types,

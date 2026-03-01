@@ -1,6 +1,7 @@
 module Main where
 
-import Test.Hspec
+import Test.Tasty
+import Test.Tasty.Runners (NumThreads (..))
 
 import AuthSpec (authSpec)
 import BaselineSpec (baselineSpec)
@@ -34,35 +35,40 @@ import VerifySpec (verifySpec)
 import WarmupSpec (warmupSpec)
 
 main :: IO ()
-main = hspec $ do
-  statsSpec
-  statsCommonSpec
-  bayesianSpec
-  frequentistSpec
-  verifySpec
-  validationSpec
-  configSpec
-  tracingSpec
-  baselineSpec
-  tuiStateSpec
-  tuiWidgetsSpec
-  propertySpec
-  markdownSpec
-  tracingQuerySpec
-  tracingReportSpec
-  authSpec
-  ciSpec
-  cliSpec
-  outputSpec
-  logSpec
-  contextSpec
-  tracingClientSpec
-  integrationSpec
-  nwaySpec
-  nwayIntegrationSpec
-  typesSpec
-  reportSpec
-  typesJsonSpec
-  environmentSpec
-  warmupSpec
-  runnerBaselineSpec
+main =
+  defaultMain $
+    localOption (NumThreads 1) $
+      testGroup
+        "gauntlet"
+        [ statsSpec
+        , statsCommonSpec
+        , bayesianSpec
+        , frequentistSpec
+        , verifySpec
+        , validationSpec
+        , configSpec
+        , tracingSpec
+        , baselineSpec
+        , tuiStateSpec
+        , tuiWidgetsSpec
+        , propertySpec
+        , markdownSpec
+        , tracingQuerySpec
+        , tracingReportSpec
+        , authSpec
+        , ciSpec
+        , cliSpec
+        , outputSpec
+        , logSpec
+        , contextSpec
+        , tracingClientSpec
+        , integrationSpec
+        , nwaySpec
+        , nwayIntegrationSpec
+        , typesSpec
+        , reportSpec
+        , typesJsonSpec
+        , environmentSpec
+        , warmupSpec
+        , runnerBaselineSpec
+        ]
