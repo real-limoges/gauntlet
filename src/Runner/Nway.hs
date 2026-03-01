@@ -64,6 +64,20 @@ runNway baselineMode outFmt cfg = do
     then runNwayWithTUI baselineMode outFmt cfg csvFile timestamp setts perTargetRequests numEndpoints
     else runNwayNoTUI baselineMode outFmt cfg csvFile timestamp setts
 
+-- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
+allPairComparisons :: [(Text, BenchmarkStats, [TestingResponse])] -> [(Text, Text, BayesianComparison)]
+allPairComparisons [] = []
+allPairComparisons ((nameA, statsA, timingsA) : rest) =
+  [ (nameA, nameB, comparison)
+  | (nameB, statsB, timingsB) <- rest
+  , let comparison =
+          addFrequentistTests
+            timingsA
+            timingsB
+            (compareBayesian statsA statsB)
+  ]
+    ++ allPairComparisons rest
+
 -- | Run N-way benchmarks with TUI display.
 runNwayWithTUI ::
   BaselineMode ->
@@ -164,20 +178,6 @@ postAnalysis logger mgr baselineMode outFmt setts timestamp results = do
     runTraceAnalysis logger mgr setts timestamp startNs endNs
 
   handleNwayBaseline logger baselineMode (T.pack timestamp) namedStats
-
--- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
-allPairComparisons :: [(Text, BenchmarkStats, [TestingResponse])] -> [(Text, Text, BayesianComparison)]
-allPairComparisons [] = []
-allPairComparisons ((nameA, statsA, timingsA) : rest) =
-  [ (nameA, nameB, comparison)
-  | (nameB, statsB, timingsB) <- rest
-  , let comparison =
-          addFrequentistTests
-            timingsA
-            timingsB
-            (compareBayesian statsA statsB)
-  ]
-    ++ allPairComparisons rest
 
 -- | Run baseline operations for each N-way target, aggregate results.
 handleNwayBaseline :: Logger -> BaselineMode -> Text -> [(Text, BenchmarkStats)] -> IO RunResult

@@ -71,6 +71,43 @@ markdownMultipleReport primaryLabel candidateLabel primary candidate bayes =
       ++ ["", "### Bayesian Analysis", ""]
       ++ bayesTable bayes
 
+-- | Markdown report for an N-way comparison with ranking and per-pair detail.
+markdownNwayReport :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)] -> Text
+markdownNwayReport namedStats pairs =
+  T.unlines $
+    [ "## N-Way Benchmark Report"
+    , ""
+    , "### Ranking (by mean latency)"
+    , ""
+    , "| # | Target | Mean | p50 | p95 | p99 |"
+    , "|---|--------|------|-----|-----|-----|"
+    ]
+      ++ zipWith rankRow [1 :: Int ..] ranked
+      ++ concatMap pairSection pairs
+  where
+    ranked = sortOn (meanMs . snd) namedStats
+
+    rankRow i (name, s) =
+      T.pack $
+        printf
+          "| %d | %s | %.2f ms | %.2f ms | %.2f ms | %.2f ms |"
+          i
+          (T.unpack name)
+          (meanMs s)
+          (p50Ms s)
+          (p95Ms s)
+          (p99Ms s)
+
+    pairSection (nameA, nameB, bayes) =
+      let statsA = lookupStats nameA namedStats
+          statsB = lookupStats nameB namedStats
+       in ["", "---", ""]
+            ++ T.lines (markdownMultipleReport nameA nameB statsA statsB bayes)
+
+    lookupStats name xs = case lookup name xs of
+      Just s -> s
+      Nothing -> error $ "lookupStats: target not found: " ++ T.unpack name
+
 -- | Markdown report for a regression comparison against a saved baseline.
 markdownRegressionReport :: RegressionResult -> Text
 markdownRegressionReport result =
@@ -211,43 +248,6 @@ markdownVerifyReport results =
                   (T.unpack $ jdCandidate d)
           )
           diffs
-
--- | Markdown report for an N-way comparison with ranking and per-pair detail.
-markdownNwayReport :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)] -> Text
-markdownNwayReport namedStats pairs =
-  T.unlines $
-    [ "## N-Way Benchmark Report"
-    , ""
-    , "### Ranking (by mean latency)"
-    , ""
-    , "| # | Target | Mean | p50 | p95 | p99 |"
-    , "|---|--------|------|-----|-----|-----|"
-    ]
-      ++ zipWith rankRow [1 :: Int ..] ranked
-      ++ concatMap pairSection pairs
-  where
-    ranked = sortOn (meanMs . snd) namedStats
-
-    rankRow i (name, s) =
-      T.pack $
-        printf
-          "| %d | %s | %.2f ms | %.2f ms | %.2f ms | %.2f ms |"
-          i
-          (T.unpack name)
-          (meanMs s)
-          (p50Ms s)
-          (p95Ms s)
-          (p99Ms s)
-
-    pairSection (nameA, nameB, bayes) =
-      let statsA = lookupStats nameA namedStats
-          statsB = lookupStats nameB namedStats
-       in ["", "---", ""]
-            ++ T.lines (markdownMultipleReport nameA nameB statsA statsB bayes)
-
-    lookupStats name xs = case lookup name xs of
-      Just s -> s
-      Nothing -> error $ "lookupStats: target not found: " ++ T.unpack name
 
 -- ---------------------------------------------------------------------------
 -- Internal helpers

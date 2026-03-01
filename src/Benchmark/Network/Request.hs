@@ -41,6 +41,14 @@ import Network.HTTP.Client qualified as Client
 import Network.HTTP.Types.Status qualified as Status
 import System.Clock (Clock (Monotonic), getTime, toNanoSecs)
 
+{-| Prepare and execute a single timed request.
+For multiple iterations, prefer 'runBenchmark' which amortises preparation cost.
+-}
+timedRequest :: Settings -> Manager -> Endpoint -> IO TestingResponse
+timedRequest settings mgr ep = do
+  req <- prepareRequest settings ep
+  timedRequestPrepared settings mgr req
+
 {-| Pre-parse URL and configure request for reuse across iterations.
 This avoids URL parsing overhead on each request.
 -}
@@ -103,11 +111,3 @@ timedRequestPrepared settings mgr req = do
           , respBody = Just body
           , errorMessage = Nothing
           }
-
-{-| Prepare and execute a single timed request.
-For multiple iterations, prefer 'runBenchmark' which amortises preparation cost.
--}
-timedRequest :: Settings -> Manager -> Endpoint -> IO TestingResponse
-timedRequest settings mgr ep = do
-  req <- prepareRequest settings ep
-  timedRequestPrepared settings mgr req

@@ -56,10 +56,6 @@ percentileList p sorted = percentileSorted p (V.fromList sorted)
 stdDev :: V.Vector Double -> Double
 stdDev vec = sqrt (variance vec)
 
--- | Sample standard deviation for a list, given the precomputed mean.
-stdDevList :: Double -> [Double] -> Double
-stdDevList avg xs = sqrt (varianceList avg xs)
-
 -- | Sample variance for a vector.
 variance :: V.Vector Double -> Double
 variance vec
@@ -69,6 +65,10 @@ variance vec
           avg = V.sum vec / fromIntegral n
           sumSq = V.sum $ V.map (\x -> (x - avg) ** 2) vec
        in sumSq / fromIntegral (n - 1) -- Sample variance (n-1)
+
+-- | Sample standard deviation for a list, given the precomputed mean.
+stdDevList :: Double -> [Double] -> Double
+stdDevList avg xs = sqrt (varianceList avg xs)
 
 -- | Sample variance for a list, given the precomputed mean.
 varianceList :: Double -> [Double] -> Double
