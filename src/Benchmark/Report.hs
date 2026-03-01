@@ -12,6 +12,7 @@ module Benchmark.Report
   , printVerifyReport
   , printValidationSummary
   , printNwayReport
+  , lookupStats
   )
 where
 
@@ -32,6 +33,8 @@ import Control.Monad (forM_, unless, when)
 import Data.Aeson (Value, encode)
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.List (nub, sortOn)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Text.Printf (printf)
@@ -142,7 +145,7 @@ printValidationSummary summaries = do
       printf "  ... and %d more unique error(s)\n" (length allErrors - 10)
 
 -- | Print N-way comparison report: ranking table followed by per-pair comparisons.
-printNwayReport :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)] -> IO ()
+printNwayReport :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> IO ()
 printNwayReport namedStats pairs = do
   putStrLn ""
   printHeader "N-Way Benchmark Report"
@@ -166,7 +169,7 @@ printNwayReport namedStats pairs = do
     ("----------" :: String)
     ("----------" :: String)
     ("----------" :: String)
-  let ranked = sortOn (meanMs . snd) namedStats
+  let ranked = sortOn (meanMs . snd) (Map.toList namedStats)
   forM_ (zip [1 :: Int ..] ranked) $ \(rank, (name, stats)) ->
     printf
       "%-4d  %-20s  %8.2f ms  %8.2f ms  %8.2f ms  %8.2f ms\n"
@@ -280,7 +283,7 @@ printValidationError BodyInvalidJSON =
 renderValue :: Value -> String
 renderValue = LBS8.unpack . encode
 
-lookupStats :: Text -> [(Text, BenchmarkStats)] -> BenchmarkStats
-lookupStats name xs = case lookup name xs of
-  Just s -> s
-  Nothing -> error $ "lookupStats: target not found: " ++ T.unpack name
+-- | Look up stats for a target by name.
+-- INVARIANT: callers guarantee the key exists (constructed from the same target list).
+lookupStats :: Text -> Map Text BenchmarkStats -> BenchmarkStats
+lookupStats name m = m Map.! name

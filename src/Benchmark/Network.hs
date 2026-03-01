@@ -5,9 +5,8 @@ Stability   : experimental
 
 Re-exports the full public API from the Network sub-modules:
 
-* "Benchmark.Network.Pool"    — transport handle and connection pool
 * "Benchmark.Network.Auth"    — token loading and Bearer auth injection
-* "Benchmark.Network.Request" — request preparation and timed execution
+* "Benchmark.Network.Request" — connection pool, request preparation, and timed execution
 * "Benchmark.Network.Exec"    — concurrent benchmark loops and A/B comparison
 -}
 module Benchmark.Network
@@ -24,5 +23,4 @@ where
 
 import Benchmark.Network.Auth (addAuth, readToken)
 import Benchmark.Network.Exec (runBenchmark, runBenchmarkWithEvents, runComparison)
-import Benchmark.Network.Pool (initNetwork)
-import Benchmark.Network.Request (prepareRequest, timedRequest)
+import Benchmark.Network.Request (initNetwork, prepareRequest, timedRequest)

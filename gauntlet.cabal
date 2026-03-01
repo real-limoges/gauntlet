@@ -42,12 +42,19 @@ library
                           Benchmark.Network
                           Benchmark.Network.Auth
                           Benchmark.Network.Exec
-                          Benchmark.Network.Pool
                           Benchmark.Network.Request
                           Benchmark.Output
                           Benchmark.Report
                           Benchmark.Report.Markdown
                           Benchmark.Types
+                          Benchmark.Types.Baseline
+                          Benchmark.Types.Config
+                          Benchmark.Types.Error
+                          Benchmark.Types.Internal
+                          Benchmark.Types.Response
+                          Benchmark.Types.Stats
+                          Benchmark.Types.Units
+                          Benchmark.Types.Verify
                           Benchmark.Validation
                           Benchmark.Verify
                           Benchmark.TUI

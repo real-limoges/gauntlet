@@ -33,6 +33,8 @@ import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (TChan, newTChanIO)
 import Control.Exception (onException)
 import Control.Monad (forM, forM_)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Log (Logger, logInfo)
@@ -45,8 +47,14 @@ import Stats.Benchmark (addFrequentistTests, calculateStats, compareBayesian)
 import System.IO (hIsTerminalDevice, stdin)
 import Tracing.Types qualified as TT
 
-type NwayResult =
-  (Text, BenchmarkStats, [TestingResponse], [ValidationSummary], TT.Nanoseconds, TT.Nanoseconds)
+data NwayResult = NwayResult
+  { nrName :: Text
+  , nrStats :: BenchmarkStats
+  , nrResponses :: [TestingResponse]
+  , nrValidations :: [ValidationSummary]
+  , nrStartNs :: TT.Nanoseconds
+  , nrEndNs :: TT.Nanoseconds
+  }
 
 -- | Run benchmarks against N named targets and compare all pairs.
 runNway :: BaselineMode -> OutputFormat -> NwayConfig -> IO RunResult
@@ -135,7 +143,7 @@ runAllTargets ctx cfg eventChan = do
     case targetBranch t of
       Just branch | not (T.null branch) -> do
         emitEvent eventChan (StatusMessage $ "Setting up " <> branch <> "...")
-        setupOrFail setts branch (targetUrl t) Nothing
+        setupOrFail (rcManager ctx) setts branch (targetUrl t) Nothing
       _ -> return ()
 
     emitEvent eventChan (StatusMessage $ "Benchmarking " <> targetName t)
@@ -145,7 +153,14 @@ runAllTargets ctx cfg eventChan = do
     (timings, validSummaries) <- benchmarkEndpoints ctxWithTarget (T.unpack (targetName t)) targetEps
     endNs <- getNowNs
 
-    pure (targetName t, calculateStats timings, timings, validSummaries, startNs, endNs)
+    pure NwayResult
+      { nrName = targetName t
+      , nrStats = calculateStats timings
+      , nrResponses = timings
+      , nrValidations = validSummaries
+      , nrStartNs = startNs
+      , nrEndNs = endNs
+      }
 
   emitEvent eventChan BenchmarkFinished
   return results
@@ -161,10 +176,10 @@ postAnalysis ::
   [NwayResult] ->
   IO RunResult
 postAnalysis logger mgr baselineMode outFmt setts timestamp results = do
-  let namedStats = [(name, stats) | (name, stats, _, _, _, _) <- results]
-      pairInput = [(name, stats, raw) | (name, stats, raw, _, _, _) <- results]
+  let namedStats = Map.fromList [(nrName r, nrStats r) | r <- results]
+      pairInput = [(nrName r, nrStats r, nrResponses r) | r <- results]
       pairs = allPairComparisons pairInput
-      validAll = concatMap (\(_, _, _, v, _, _) -> v) results
+      validAll = concatMap nrValidations results
 
   printNwayReport namedStats pairs
   printValidationSummary validAll
@@ -172,17 +187,17 @@ postAnalysis logger mgr baselineMode outFmt setts timestamp results = do
     markdownNwayReport namedStats pairs
       <> markdownValidationReport validAll
 
-  forM_ results $ \(name, _, _, _, startNs, endNs) -> do
-    logInfo logger $ "\n#----- Traces: " <> name <> " -----#"
-    runTraceAnalysis logger mgr setts timestamp startNs endNs
+  forM_ results $ \r -> do
+    logInfo logger $ "\n#----- Traces: " <> nrName r <> " -----#"
+    runTraceAnalysis logger mgr setts timestamp (nrStartNs r) (nrEndNs r)
 
   handleNwayBaseline logger baselineMode (T.pack timestamp) namedStats
 
 -- | Run baseline operations for each N-way target, aggregate results.
-handleNwayBaseline :: Logger -> BaselineMode -> Text -> [(Text, BenchmarkStats)] -> IO RunResult
+handleNwayBaseline :: Logger -> BaselineMode -> Text -> Map Text BenchmarkStats -> IO RunResult
 handleNwayBaseline _logger NoBaseline _timestamp _namedStats = return RunSuccess
 handleNwayBaseline logger mode timestamp namedStats = do
-  results <- forM namedStats $ \(name, stats) -> do
+  results <- forM (Map.toList namedStats) $ \(name, stats) -> do
     let qualifiedMode = qualifyBaselineMode name mode
     handleBaseline logger qualifiedMode timestamp stats
   if any isRegression results

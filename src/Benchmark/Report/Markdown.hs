@@ -30,7 +30,10 @@ import Benchmark.Types
   , ValidationSummary (..)
   , VerificationResult (..)
   )
+import Benchmark.Report (lookupStats)
 import Data.List (sortOn)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Text.Printf (printf)
@@ -72,7 +75,7 @@ markdownMultipleReport primaryLabel candidateLabel primary candidate bayes =
       ++ bayesTable bayes
 
 -- | Markdown report for an N-way comparison with ranking and per-pair detail.
-markdownNwayReport :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)] -> Text
+markdownNwayReport :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> Text
 markdownNwayReport namedStats pairs =
   T.unlines $
     [ "## N-Way Benchmark Report"
@@ -85,7 +88,7 @@ markdownNwayReport namedStats pairs =
       ++ zipWith rankRow [1 :: Int ..] ranked
       ++ concatMap pairSection pairs
   where
-    ranked = sortOn (meanMs . snd) namedStats
+    ranked = sortOn (meanMs . snd) (Map.toList namedStats)
 
     rankRow i (name, s) =
       T.pack $
@@ -103,10 +106,6 @@ markdownNwayReport namedStats pairs =
           statsB = lookupStats nameB namedStats
        in ["", "---", ""]
             ++ T.lines (markdownMultipleReport nameA nameB statsA statsB bayes)
-
-    lookupStats name xs = case lookup name xs of
-      Just s -> s
-      Nothing -> error $ "lookupStats: target not found: " ++ T.unpack name
 
 -- | Markdown report for a regression comparison against a saved baseline.
 markdownRegressionReport :: RegressionResult -> Text

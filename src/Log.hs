@@ -19,6 +19,7 @@ module Log
 where
 
 import Benchmark.Types (LogLevel (..))
+import Control.Monad (when)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
@@ -41,9 +42,6 @@ makeLogger minLevel =
           let formatted = "     " <> formatMessage level time msg
           TIO.hPutStrLn stderr formatted
     }
-  where
-    when True action = action
-    when False _ = pure ()
 
 logDebug, logInfo, logWarning, logError :: Logger -> Text -> IO ()
 logDebug = logAt Debug

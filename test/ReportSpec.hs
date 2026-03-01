@@ -3,6 +3,7 @@ module ReportSpec (reportSpec) where
 import Benchmark.Report
 import Benchmark.Types
 import Data.List (isInfixOf)
+import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)
@@ -116,7 +117,7 @@ reportSpec =
         ]
     , let statsA = mockStats 50.0 5.0
           statsB = mockStats 45.0 4.0
-          namedStats = [("target-a", statsA), ("target-b", statsB)]
+          namedStats = Map.fromList [("target-a", statsA), ("target-b", statsB)]
           pairs = [("target-a", "target-b", mockBayesianComparison)]
        in testGroup
             "printNwayReport"

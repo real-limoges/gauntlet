@@ -3,7 +3,8 @@ Module      : Benchmark.Network.Request
 Description : Request preparation and timed execution with retry logic
 -}
 module Benchmark.Network.Request
-  ( prepareRequest
+  ( initNetwork
+  , prepareRequest
   , timedRequest
   , timedRequestPrepared
   )
@@ -29,17 +30,30 @@ import Data.Text.Encoding (encodeUtf8)
 import Log (Logger, logWarning, makeLogger)
 import Network.HTTP.Client
   ( Manager
+  , ManagerSettings (..)
   , Request
   , RequestBody (RequestBodyLBS)
   , Response
   , httpLbs
+  , newManager
   , parseRequest
   , responseStatus
   , responseTimeoutMicro
   )
 import Network.HTTP.Client qualified as Client
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types.Status qualified as Status
 import System.Clock (Clock (Monotonic), getTime, toNanoSecs)
+
+-- | Create an HTTP manager with connection pooling configured from settings.
+initNetwork :: Settings -> IO Manager
+initNetwork settings =
+  newManager $
+    tlsManagerSettings
+      { managerConnCount = fromMaybe 10 (maxConnections settings)
+      , managerIdleConnectionCount = fromMaybe 10 (maxConnections settings)
+      , managerResponseTimeout = responseTimeoutMicro (fromMaybe 30 (Types.requestTimeout settings) * 1_000_000)
+      }
 
 {-| Prepare and execute a single timed request.
 For multiple iterations, prefer 'runBenchmark' which amortises preparation cost.

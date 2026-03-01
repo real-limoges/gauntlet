@@ -57,9 +57,9 @@ initContext setts csvFile timestamp eventChan = do
       }
 
 -- | Set up the git environment or exit with an error.
-setupOrFail :: Settings -> Text -> Text -> Maybe [String] -> IO ()
-setupOrFail setts branch target composeArgs =
-  setupEnvironment setts branch target composeArgs >>= either exitWithError return
+setupOrFail :: Manager -> Settings -> Text -> Text -> Maybe [String] -> IO ()
+setupOrFail mgr setts branch target composeArgs =
+  setupEnvironment mgr setts branch target composeArgs >>= either exitWithError return
 
 -- | Current time as nanoseconds (wall clock).
 getNowNs :: IO TT.Nanoseconds

@@ -5,7 +5,7 @@ Stability   : experimental
 
 Runs verification checks comparing responses from primary and candidate targets.
 -}
-module VerifyRunner where
+module VerifyRunner (runVerify) where
 
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Network (addAuth, initNetwork, readToken, runComparison)

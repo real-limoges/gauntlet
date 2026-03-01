@@ -38,22 +38,23 @@ runTUI :: TChan BenchmarkEvent -> TUIState -> IO TUIState
 runTUI eventChan initialSt = do
   brickChan <- newBChan 1000
 
-  tid1 <- forkIO $ forever $ do
-    event <- atomically $ readTChan eventChan
-    writeBChan brickChan (BenchEvent event)
-
-  tid2 <- forkIO $ forever $ do
-    threadDelay 100_000
-    writeBChan brickChan Tick
-
-  let buildVty = mkVty V.defaultConfig
-  initialVty <- buildVty
-  result <-
-    withStderrBuffered $
-      customMain initialVty buildVty (Just brickChan) tuiApp initialSt
-  killThread tid1
-  killThread tid2
-  return result
+  bracket
+    ( do
+        tid1 <- forkIO $ forever $ do
+          event <- atomically $ readTChan eventChan
+          writeBChan brickChan (BenchEvent event)
+        tid2 <- forkIO $ forever $ do
+          threadDelay 100_000
+          writeBChan brickChan Tick
+        return (tid1, tid2)
+    )
+    (\(tid1, tid2) -> killThread tid1 >> killThread tid2)
+    ( \_ -> do
+        let buildVty = mkVty V.defaultConfig
+        initialVty <- buildVty
+        withStderrBuffered $
+          customMain initialVty buildVty (Just brickChan) tuiApp initialSt
+    )
 
 {-| Redirect stderr to a temp file for the duration of 'action', then replay
 any captured output to the real stderr afterwards. Prevents log/error lines

@@ -52,6 +52,55 @@ configSpec =
             let mkPayload m = PayloadSpec "test" m "/path" Nothing Nothing Nothing
             let cfg = makeValidConfig {payloads = map mkPayload methods}
             validateConfig cfg `shouldBe` Right cfg
+        , testCase "rejects negative requestTimeout" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {requestTimeout = Just (-1)}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) ->
+                msg `shouldContain` "requestTimeout"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects zero requestTimeout" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {requestTimeout = Just 0}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) ->
+                msg `shouldContain` "requestTimeout"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "accepts positive requestTimeout" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {requestTimeout = Just 30}}
+            validateConfig cfg `shouldBe` Right cfg
+        , testCase "rejects zero healthCheckTimeout" $ do
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {healthCheckTimeout = Just 0}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) ->
+                msg `shouldContain` "healthCheckTimeout"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects retryBackoffMultiplier < 1.0" $ do
+            let r = RetrySettings 3 1000 0.5
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {retry = Just r}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) ->
+                msg `shouldContain` "retryBackoffMultiplier"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects negative retryMaxAttempts" $ do
+            let r = RetrySettings (-1) 1000 2.0
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {retry = Just r}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) ->
+                msg `shouldContain` "retryMaxAttempts"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "rejects zero retryInitialDelayMs" $ do
+            let r = RetrySettings 3 0 2.0
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {retry = Just r}}
+            case validateConfig cfg of
+              Left (ConfigValidationError msg) ->
+                msg `shouldContain` "retryInitialDelayMs"
+              _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "accepts valid retry settings" $ do
+            let r = RetrySettings 3 1000 2.0
+            let cfg = makeValidConfig {settings = (settings makeValidConfig) {retry = Just r}}
+            validateConfig cfg `shouldBe` Right cfg
+        , testCase "accepts missing optional settings" $ do
+            -- Default makeValidConfig has all optional fields as Nothing
+            validateConfig makeValidConfig `shouldBe` Right makeValidConfig
         ]
     , testGroup
         "buildEndpoints"
