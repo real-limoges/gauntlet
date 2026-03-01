@@ -9,25 +9,11 @@ on:
 jobs:
   build-and-test:
     name: Build & Test (GHC 9.12.2)
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
+    container: haskell:9.12.2
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libncurses-dev pkg-config curl
-
-      - name: Install GHC and cabal via GHCup
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | \
-            BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
-            BOOTSTRAP_HASKELL_GHC_VERSION=9.12.2 \
-            BOOTSTRAP_HASKELL_CABAL_VERSION=recommended \
-            BOOTSTRAP_HASKELL_INSTALL_NO_STACK=1 \
-            sh
-          echo "$HOME/.ghcup/bin" >> $GITHUB_PATH
 
       - name: Cache cabal store
         uses: actions/cache@v4
@@ -35,15 +21,15 @@ jobs:
           path: |
             ~/.cabal/store
             ~/.cabal/packages
-          key: ${{ runner.os }}-${{ runner.arch }}-ghc-9.12.2-store-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'cabal.project') }}
+          key: ${{ runner.os }}-ghc-9.12.2-store-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'cabal.project') }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-ghc-9.12.2-store-
+            ${{ runner.os }}-ghc-9.12.2-store-
 
       - name: Cache build artifacts
         uses: actions/cache@v4
         with:
           path: dist-newstyle
-          key: ${{ runner.os }}-${{ runner.arch }}-ghc-9.12.2-dist-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'src/**/*.hs', 'test/**/*.hs') }}
+          key: ${{ runner.os }}-ghc-9.12.2-dist-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'src/**/*.hs', 'test/**/*.hs') }}
 
       - name: Update cabal index
         run: cabal update
