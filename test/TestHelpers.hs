@@ -86,9 +86,8 @@ makeValidConfig =
         Settings
           { iterations = 10
           , concurrency = 2
-          , secrets = "secrets.txt"
+          , secrets = Just "secrets.txt"
           , maxConnections = Nothing
-          , connIdleTimeout = Nothing
           , requestTimeout = Nothing
           , retry = Nothing
           , warmup = Nothing

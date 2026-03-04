@@ -30,18 +30,18 @@ contextSpec =
         "initContext"
         [ testCase "reads token from secrets file" $
             withTempToken "my-secret-token\n" $ \tokenPath -> do
-              let setts = (settings makeValidConfig) {secrets = T.pack tokenPath}
+              let setts = (settings makeValidConfig) {secrets = Just (T.pack tokenPath)}
               ctx <- initContext setts "/dev/null" "ts" Nothing
               -- Token should have whitespace trimmed
               T.strip (rcToken ctx) `shouldBe` "my-secret-token"
         , testCase "stores settings verbatim" $
             withTempToken "tok\n" $ \tokenPath -> do
-              let setts = (settings makeValidConfig) {secrets = T.pack tokenPath, iterations = 42}
+              let setts = (settings makeValidConfig) {secrets = Just (T.pack tokenPath), iterations = 42}
               ctx <- initContext setts "/dev/null" "ts" Nothing
               iterations (rcSettings ctx) `shouldBe` 42
         , testCase "stores csvFile and timestamp" $
             withTempToken "tok\n" $ \tokenPath -> do
-              let setts = (settings makeValidConfig) {secrets = T.pack tokenPath}
+              let setts = (settings makeValidConfig) {secrets = Just (T.pack tokenPath)}
               ctx <- initContext setts "/tmp/test.csv" "2024-01-01" Nothing
               rcCsvFile ctx `shouldBe` "/tmp/test.csv"
               rcTimestamp ctx `shouldBe` "2024-01-01"
