@@ -186,8 +186,6 @@ cabal run gauntlet-exe -- benchmark-nway --config config.json
 # Run single endpoint benchmark
 cabal run gauntlet-exe -- benchmark-single --config config.json
 
-# Verify configuration and responses
-cabal run gauntlet-exe -- verify --config config.json
 ```
 
 ### Command-Line Options
@@ -283,7 +281,6 @@ N-way targets are an array of objects with `name`, `url`, and optional `branch` 
     "iterations": 10000,
     "concurrency": 100,
     "maxConnections": 50,
-    "connIdleTimeout": 30,
     "requestTimeout": 60,
     "logLevel": "info",
     "secrets": ".secrets/token.txt",
@@ -344,7 +341,6 @@ N-way targets are an array of objects with `name`, `url`, and optional `branch` 
 | `settings.concurrency` | int | required | Concurrent request limit |
 | `settings.secrets` | string | required | Path to file containing Bearer token |
 | `settings.maxConnections` | int | 10 | HTTP connection pool size |
-| `settings.connIdleTimeout` | int | 30 | Connection idle timeout (seconds) |
 | `settings.requestTimeout` | int | 30 | Request timeout (seconds) |
 | `settings.logLevel` | string | `"info"` | Log level: `debug`, `info`, `warning`, `error` |
 | `settings.healthCheckPath` | string | `"/health"` | Path appended to service URL for health polling |
@@ -356,10 +352,27 @@ N-way targets are an array of objects with `name`, `url`, and optional `branch` 
 | `payloads[].headers` | object | - | Custom HTTP headers (key/value map) |
 | `payloads[].validate.status` | int | - | Expected HTTP status code |
 | `payloads[].validate.fields` | object | - | Dot-path field assertions (`present: true` or `eq: value`) |
-| `settings.floatTolerance` | double | 0.0 | Tolerance for floating-point comparison in verify mode |
-| `settings.compareFields` | [string] | - | Whitelist of JSON keys to compare in verify mode |
-| `settings.ignoreFields` | [string] | - | JSON keys to strip before comparison in verify mode |
-| `settings.verifyIterations` | int | 1 | Number of iterations for verify mode |
+| `settings.loadMode` | object | `unthrottled` | Load control mode (see below) |
+
+**Load Control Modes:**
+
+```json
+// Unthrottled (default) — no rate limiting
+{"mode": "unthrottled"}
+
+// Constant RPS — steady request rate
+{"mode": "constantRps", "targetRps": 100}
+
+// Ramp Up — linearly increasing rate
+{"mode": "rampUp", "startRps": 10, "endRps": 200, "durationSecs": 60}
+
+// Step Load — discrete rate steps
+{"mode": "stepLoad", "steps": [
+  {"rps": 50, "durationSecs": 30},
+  {"rps": 100, "durationSecs": 30},
+  {"rps": 200, "durationSecs": 30}
+]}
+```
 
 **Environment variable expansion:** Any config value can contain `${VAR}` references, which are expanded before JSON parsing. Variables are resolved from (highest priority first): `.env.local`, `.env`, process environment. Missing variables fail fast with a clear error.
 
@@ -528,8 +541,7 @@ gauntlet/
 │   │   │   ├── Internal.hs # Internal types
 │   │   │   ├── Response.hs # Response types
 │   │   │   ├── Stats.hs    # Statistics types
-│   │   │   ├── Units.hs    # Nanoseconds/Milliseconds newtypes
-│   │   │   └── Verify.hs   # Verification types
+│   │   │   └── Units.hs    # Nanoseconds/Milliseconds newtypes
 │   │   ├── Config.hs       # Configuration parsing
 │   │   ├── Env.hs          # .env/.env.local loading, ${VAR} interpolation
 │   │   ├── Environment.hs  # Git switch + docker-compose + health check
@@ -537,13 +549,12 @@ gauntlet/
 │   │   ├── Network/        # Network sub-modules (Auth, Exec, Request)
 │   │   ├── CLI.hs          # Command-line interface
 │   │   ├── Baseline.hs     # Baseline save/load
-│   │   ├── RateLimiter.hs  # Rate limiting (partial: fixed concurrency only)
+│   │   ├── RateLimiter.hs  # Rate limiting (unthrottled, constant RPS, ramp-up, step-load)
 │   │   ├── Validation.hs   # Per-response JSON field validation
-│   │   ├── Verify.hs       # Response body/status verification
 │   │   ├── TUI.hs          # Real-time terminal UI
 │   │   ├── TUI/            # TUI sub-modules (State, Widgets)
 │   │   ├── Report.hs       # Terminal output
-│   │   ├── Report/         # Markdown report generation
+│   │   ├── Report/         # Report sub-modules (Formatting, Markdown)
 │   │   ├── Output.hs       # JSON/CSV serialization
 │   │   └── CI.hs           # GitLab CI / GitHub Actions integration
 │   ├── Runner/             # Benchmark orchestration
@@ -551,22 +562,18 @@ gauntlet/
 │   │   ├── Loop.hs         # Concurrent benchmark loops
 │   │   ├── Nway.hs         # N-way comparison orchestration
 │   │   ├── Warmup.hs       # Warmup execution
-│   │   ├── Tracing.hs      # Tempo trace fetching
-│   │   └── Baseline.hs     # Baseline compare + CI emit
+│   │   └── Tracing.hs      # Tempo trace fetching
 │   ├── Stats/              # Statistical analysis
 │   │   ├── Common.hs       # Percentiles, std dev
 │   │   └── Benchmark.hs    # Bayesian + frequentist comparison
 │   ├── Tracing/            # Grafana Tempo integration
 │   │   ├── Types.hs        # Trace data structures
-│   │   ├── Client.hs       # Tempo HTTP client
-│   │   ├── Query.hs        # TraceQL query construction
-│   │   ├── Analysis.hs     # Span aggregation
+│   │   ├── Client.hs       # Tempo HTTP client (query construction + execution)
 │   │   └── Report.hs       # Trace terminal output
 │   ├── Log.hs              # Structured logging
 │   ├── Runner.hs           # Top-level entry points
-│   ├── VerifyRunner.hs     # Response verification runner
 │   └── Lib.hs              # Main dispatcher
-├── test/                   # Test suite (Tasty, 37 files)
+├── test/                   # Test suite (Tasty, 35 files)
 │   ├── Spec.hs             # Test suite entry point
 │   ├── StatsSpec.hs        # Statistical tests
 │   ├── StatsCommonSpec.hs  # Common stats utilities
@@ -592,11 +599,9 @@ gauntlet/
 │   ├── OutputSpec.hs       # CSV/JSON output tests
 │   ├── RateLimiterSpec.hs  # Rate limiter tests
 │   ├── ReportSpec.hs       # Terminal report tests
-│   ├── RunnerBaselineSpec.hs   # Runner baseline tests
 │   ├── TypesJsonSpec.hs    # JSON serialization tests
 │   ├── TypesSpec.hs        # Type tests
 │   ├── ValidationSpec.hs   # Validation tests
-│   ├── VerifySpec.hs       # Verify tests
 │   ├── WarmupSpec.hs       # Warmup tests
 │   ├── Integration.hs      # HTTP execution tests
 │   ├── PropertySpec.hs     # QuickCheck properties
