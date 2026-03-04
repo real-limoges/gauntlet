@@ -39,7 +39,9 @@ runVerify fmt cfg = do
   let epsA = buildEndpoints (primary (targets cfg)) (payloads cfg)
       epsB = buildEndpoints (candidate (targets cfg)) (payloads cfg)
 
-  token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
+  token <- case secrets setts of
+    Nothing -> return T.empty
+    Just path -> readToken (T.unpack path) >>= either exitWithError return
   mgr <- initNetwork setts
 
   let lenA = length epsA

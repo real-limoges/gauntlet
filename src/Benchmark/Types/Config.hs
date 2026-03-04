@@ -224,9 +224,8 @@ loadModeDurationSecs _ = 0
 data Settings = Settings
   { iterations :: Int
   , concurrency :: Int
-  , secrets :: Text
+  , secrets :: Maybe Text
   , maxConnections :: Maybe Int
-  , connIdleTimeout :: Maybe Int
   , requestTimeout :: Maybe Int
   -- ^ Request timeout in seconds (default: 30)
   , retry :: Maybe RetrySettings

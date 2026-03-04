@@ -54,6 +54,33 @@ That's it. The rest of this guide explains every config option and what the outp
 
 The config has three top-level keys: `targets`, `settings`, and `payloads`.
 
+### Environment Variable Expansion
+
+Any config value can contain `${VAR}` references. Variables are expanded in the raw config text before JSON parsing.
+
+**Resolution order** (highest priority first):
+1. `.env.local` — gitignored, for local overrides and secrets
+2. `.env` — can be committed for non-secret defaults
+3. Process environment
+
+Missing variables fail fast with a clear error naming the undefined variable.
+
+```json
+{
+  "targets": {
+    "primary": "${PRIMARY_URL}",
+    "candidate": "${CANDIDATE_URL}"
+  },
+  "settings": {
+    "secrets": "${TOKEN_PATH}",
+    "iterations": 1000,
+    "concurrency": 10
+  }
+}
+```
+
+This keeps secrets and environment-specific URLs out of committed config files while allowing the same config to work across dev, staging, and CI.
+
 ### `targets` — What you're testing
 
 The structure depends on which mode you're using.
@@ -93,17 +120,17 @@ Number of requests per endpoint. More iterations produce tighter credible interv
 
 Maximum simultaneous in-flight requests. This simulates realistic load. Too low and you're sending serial requests that don't reflect production traffic patterns. Too high and you're benchmarking your client machine's limits (CPU, open file descriptors), not the server's performance.
 
-#### `secrets` (required)
+#### `secrets` (optional)
 
-Path to a file containing a Bearer token. The file is read once at startup and injected as `Authorization: Bearer <token>` on every request. It's kept in a separate file (not inline in the config) so configs can be committed to version control without leaking credentials. Put the secrets file in your `.gitignore`.
+Path to a file containing a Bearer token. When set, the token is read once at startup and injected as `Authorization: Bearer <token>` on every request. Omit this field entirely for public or internal APIs that don't require authentication. When present, keep the secrets file in your `.gitignore`.
 
 #### `requestTimeout` (default: 30s)
 
 Per-request timeout in seconds. Prevents hung requests from stalling the entire benchmark. If your endpoints are legitimately slow (e.g., complex analytics queries), increase this.
 
-#### `maxConnections` / `connIdleTimeout`
+#### `maxConnections`
 
-HTTP connection pool tuning. Gauntlet reuses connections via HTTP keep-alive for realistic performance. `maxConnections` caps the pool size; `connIdleTimeout` controls how long idle connections live before being closed. Defaults are usually fine unless your concurrency is very high, in which case you may want `maxConnections` >= `concurrency`.
+HTTP connection pool size cap. Gauntlet reuses connections via HTTP keep-alive for realistic performance. Defaults are usually fine unless your concurrency is very high, in which case you may want `maxConnections` >= `concurrency`.
 
 #### `logLevel` (default: `"info"`)
 
@@ -533,7 +560,6 @@ Everything enabled — high iteration count, connection pool tuning, debug loggi
     "concurrency": 100,
     "secrets": ".secrets/service-token.txt",
     "maxConnections": 200,
-    "connIdleTimeout": 30,
     "requestTimeout": 120,
     "logLevel": "debug",
     "warmup": {

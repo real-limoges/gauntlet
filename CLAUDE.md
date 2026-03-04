@@ -52,7 +52,6 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 - `Environment.hs` - Git branch switching, docker-compose orchestration, health-check polling
 - `Network.hs` - HTTP client facade; implementation split into sub-modules:
   - `Network/Auth.hs` - Token reading and auth header injection
-  - `Network/Pool.hs` - Connection pool initialisation
   - `Network/Exec.hs` - Request execution with retry logic
   - `Network/Request.hs` - Nanosecond-precision timed request wrapper
 - `CLI.hs` - Command-line argument parsing
@@ -64,6 +63,9 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 - `Report/Markdown.hs` - Markdown report generation for CI artifacts; also exports `markdownNwayReport`
 - `Output.hs` - CSV/JSON serialization; also exports `initNwayOutputFiles`, `writeLatenciesWithTarget`
 - `CI.hs` - GitLab CI and GitHub Actions integration
+- `Env.hs` - `.env` / `.env.local` loading and `${VAR}` interpolation in config JSON before decode
+- `RateLimiter.hs` - Rate limiting: unthrottled, constant RPS, ramp-up, and step-load modes
+- `Types/` - Type sub-modules: `Baseline.hs`, `Config.hs`, `Error.hs`, `Internal.hs`, `Response.hs`, `Stats.hs`, `Units.hs`, `Verify.hs`
 
 ### 2. Stats/ Module (Statistical Analysis)
 Shared statistical utilities used by both benchmark and trace analysis.
@@ -134,7 +136,7 @@ Terminal/JSON/CSV/Markdown Output + Exit Code (0=success, 1=regression, 2=error)
 **Framework:** Tasty with tasty-hunit and tasty-quickcheck for property-based testing
 
 **Test Types:**
-- **Unit Tests:** StatsSpec, BayesianSpec, ConfigSpec, VerifySpec, BaselineSpec, TracingSpec
+- **Unit Tests:** StatsSpec, BayesianSpec, ConfigSpec, VerifySpec, BaselineSpec, TracingSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, LogSpec, MarkdownSpec, OutputSpec, RateLimiterSpec, ReportSpec, RunnerBaselineSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
 - **Integration Tests:** Integration.hs uses `MockServer.hs` to test HTTP operations end-to-end
 - **Property Tests:** PropertySpec.hs verifies statistical invariants (percentile ordering, stat bounds)
 - **UI Tests:** TUISpec.hs for Brick widget/state testing
@@ -165,6 +167,7 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 - `settings.compareFields` - Optional whitelist of JSON keys to compare in verify mode
 - `settings.ignoreFields` - Optional JSON keys to strip before comparison in verify mode
 - `settings.verifyIterations` - Number of iterations for verify mode (default: 1)
+- Environment variable expansion: `${VAR}` in any config value, resolved from `.env.local` > `.env` > process env
 
 ## Important Architectural Decisions
 
@@ -199,11 +202,6 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 - **Headers:** Custom HTTP headers via `specHeaders` in PayloadSpec
 - **Health Check:** `healthCheckPath` and `healthCheckTimeout` in Settings
 
-## Roadmap Highlights
-
-**High-Priority Features:**
-1. Load control modes: constant RPS, ramp-up, step load
-
 ## Exit Codes
 
 - `0` - Success
@@ -213,6 +211,6 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 ## Language & Dependencies
 
 - **Language Standard:** GHC2024
-- **Required GHC:** 9.10+ (base >= 4.20.0.0)
+- **Required GHC:** 9.12+ (base >= 4.20.0.0)
 - **Key Dependencies:** aeson, http-client, http-client-tls, statistics, brick (TUI), vector, stm, async, process
 - **Default Extensions:** OverloadedStrings, NumericUnderscores, RecordWildCards, DeriveAnyClass, StrictData

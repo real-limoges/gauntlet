@@ -70,7 +70,7 @@ testSettings =
   (settings (makeValidConfig :: TestConfig))
     { iterations = 10
     , concurrency = 4
-    , secrets = ""
+    , secrets = Nothing
     , retry = Just (RetrySettings 0 100 1.0)
     , requestTimeout = Just 5
     }

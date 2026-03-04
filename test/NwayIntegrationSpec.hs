@@ -131,9 +131,8 @@ makeTestSettings tokenPath =
   Settings
     { iterations = 5
     , concurrency = 2
-    , secrets = T.pack tokenPath
+    , secrets = Just (T.pack tokenPath)
     , maxConnections = Nothing
-    , connIdleTimeout = Nothing
     , requestTimeout = Just 10
     , retry = Nothing
     , warmup = Nothing

@@ -72,7 +72,7 @@ makeCtxWithWarmup _port iters = do
   let setts =
         (settings (makeValidConfig :: TestConfig))
           { warmup = Just WarmupSettings {warmupIterations = iters}
-          , secrets = ""
+          , secrets = Nothing
           }
       logger = makeCapturingLogger Debug logRef
   pure

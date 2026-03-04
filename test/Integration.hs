@@ -165,9 +165,8 @@ testSettings =
   Settings
     10
     4
-    ""
+    Nothing
     (Just 10)
-    (Just 5)
     (Just 30)
     Nothing
     Nothing

@@ -361,6 +361,8 @@ N-way targets are an array of objects with `name`, `url`, and optional `branch` 
 | `settings.ignoreFields` | [string] | - | JSON keys to strip before comparison in verify mode |
 | `settings.verifyIterations` | int | 1 | Number of iterations for verify mode |
 
+**Environment variable expansion:** Any config value can contain `${VAR}` references, which are expanded before JSON parsing. Variables are resolved from (highest priority first): `.env.local`, `.env`, process environment. Missing variables fail fast with a clear error.
+
 See [`examples/`](examples/) directory for complete configuration examples.
 
 ---
@@ -518,13 +520,24 @@ make format
 gauntlet/
 ├── src/
 │   ├── Benchmark/          # HTTP benchmarking engine
-│   │   ├── Types.hs        # Core data types
+│   │   ├── Types.hs        # Core data types (re-exports Types/ sub-modules)
+│   │   ├── Types/          # Type sub-modules
+│   │   │   ├── Baseline.hs # Baseline data types
+│   │   │   ├── Config.hs   # Configuration types
+│   │   │   ├── Error.hs    # Error types
+│   │   │   ├── Internal.hs # Internal types
+│   │   │   ├── Response.hs # Response types
+│   │   │   ├── Stats.hs    # Statistics types
+│   │   │   ├── Units.hs    # Nanoseconds/Milliseconds newtypes
+│   │   │   └── Verify.hs   # Verification types
 │   │   ├── Config.hs       # Configuration parsing
+│   │   ├── Env.hs          # .env/.env.local loading, ${VAR} interpolation
 │   │   ├── Environment.hs  # Git switch + docker-compose + health check
-│   │   ├── Network.hs      # HTTP client facade
-│   │   ├── Network/        # Network sub-modules (Auth, Pool, Exec, Request)
+│   │   ├── Network.hs      # HTTP client facade + connection pool init
+│   │   ├── Network/        # Network sub-modules (Auth, Exec, Request)
 │   │   ├── CLI.hs          # Command-line interface
 │   │   ├── Baseline.hs     # Baseline save/load
+│   │   ├── RateLimiter.hs  # Rate limiting (partial: fixed concurrency only)
 │   │   ├── Validation.hs   # Per-response JSON field validation
 │   │   ├── Verify.hs       # Response body/status verification
 │   │   ├── TUI.hs          # Real-time terminal UI
@@ -553,7 +566,7 @@ gauntlet/
 │   ├── Runner.hs           # Top-level entry points
 │   ├── VerifyRunner.hs     # Response verification runner
 │   └── Lib.hs              # Main dispatcher
-├── test/                   # Test suite (Tasty)
+├── test/                   # Test suite (Tasty, 37 files)
 │   ├── Spec.hs             # Test suite entry point
 │   ├── StatsSpec.hs        # Statistical tests
 │   ├── StatsCommonSpec.hs  # Common stats utilities
@@ -567,10 +580,29 @@ gauntlet/
 │   ├── TracingClientSpec.hs    # Tempo client tests
 │   ├── TracingQuerySpec.hs     # TraceQL query tests
 │   ├── TracingReportSpec.hs    # Trace report tests
+│   ├── AuthSpec.hs         # Auth token tests
+│   ├── CISpec.hs           # CI integration tests
+│   ├── CLISpec.hs          # CLI parsing tests
+│   ├── ContextSpec.hs      # RunContext tests
+│   ├── EnvSpec.hs          # Env var expansion tests
+│   ├── EnvironmentSpec.hs  # Environment setup tests
+│   ├── LoadControlIntegrationSpec.hs  # Load control tests
+│   ├── LogSpec.hs          # Logging tests
+│   ├── MarkdownSpec.hs     # Markdown report tests
+│   ├── OutputSpec.hs       # CSV/JSON output tests
+│   ├── RateLimiterSpec.hs  # Rate limiter tests
+│   ├── ReportSpec.hs       # Terminal report tests
+│   ├── RunnerBaselineSpec.hs   # Runner baseline tests
+│   ├── TypesJsonSpec.hs    # JSON serialization tests
+│   ├── TypesSpec.hs        # Type tests
+│   ├── ValidationSpec.hs   # Validation tests
+│   ├── VerifySpec.hs       # Verify tests
+│   ├── WarmupSpec.hs       # Warmup tests
 │   ├── Integration.hs      # HTTP execution tests
 │   ├── PropertySpec.hs     # QuickCheck properties
 │   ├── TUISpec.hs          # Brick widget tests
 │   ├── TestHelpers.hs      # Shared test fixtures
+│   ├── TastyCompat.hs      # Test compatibility helpers
 │   └── MockServer.hs       # HTTP mock utilities
 ├── examples/               # Example configurations
 └── CLAUDE.md               # Architecture guide

@@ -41,7 +41,9 @@ data RunContext = RunContext
 -- | Initialise a 'RunContext' from benchmark settings.
 initContext :: Settings -> FilePath -> String -> Maybe (TChan BenchmarkEvent) -> IO RunContext
 initContext setts csvFile timestamp eventChan = do
-  token <- readToken (T.unpack $ secrets setts) >>= either exitWithError return
+  token <- case secrets setts of
+    Nothing -> return T.empty
+    Just path -> readToken (T.unpack path) >>= either exitWithError return
   mgr <- initNetwork setts
   let logger = makeLogger (fromMaybe PT.defaultLogLevel (PT.logLevel setts))
   return
