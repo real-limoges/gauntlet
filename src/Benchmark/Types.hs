@@ -24,10 +24,6 @@ module Benchmark.Types
   , KSResult (..)
   , ADResult (..)
 
-    -- * Verification
-  , JsonDiff (..)
-  , VerificationResult (..)
-
     -- * Validation
   , FieldAssertion (..)
   , ValidationSpec (..)
@@ -80,4 +76,3 @@ import Benchmark.Types.Error
 import Benchmark.Types.Response
 import Benchmark.Types.Stats
 import Benchmark.Types.Units
-import Benchmark.Types.Verify

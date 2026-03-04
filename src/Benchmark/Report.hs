@@ -3,35 +3,25 @@ Module      : Benchmark.Report
 Description : Terminal output formatting for benchmark results
 Stability   : experimental
 
-Formats and prints benchmark statistics, Bayesian comparisons,
-and verification results to the terminal.
+Formats and prints benchmark statistics and Bayesian comparisons to the terminal.
 -}
 module Benchmark.Report
   ( printMultipleBenchmarkReport
   , printSingleBenchmarkReport
-  , printVerifyReport
   , printValidationSummary
   , printNwayReport
   , lookupStats
   )
 where
 
+import Benchmark.Report.Formatting (formatAD, formatKS, formatMWU, formatValidationError)
 import Benchmark.Types
-  ( ADResult (..)
-  , BayesianComparison (..)
+  ( BayesianComparison (..)
   , BenchmarkStats (..)
-  , Endpoint (..)
-  , JsonDiff (..)
-  , KSResult (..)
-  , MWUResult (..)
   , PercentileComparison (..)
-  , ValidationError (..)
   , ValidationSummary (..)
-  , VerificationResult (..)
   )
 import Control.Monad (forM_, unless, when)
-import Data.Aeson (Value, encode)
-import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.List (nub, sortOn)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -100,25 +90,6 @@ printSingleBenchmarkReport name stats = do
   printf "(%s):" (T.unpack name)
   printStats stats
 
-printVerifyReport :: [(Endpoint, [VerificationResult])] -> IO ()
-printVerifyReport results = do
-  printHeader "Verification Report:"
-
-  let total = length results
-  let failures = filter (any (/= Match) . snd) results
-  let successes = total - length failures
-
-  putStrLn $ printf "Total Endpoints: %d" total
-  printf "Passed:          %d\n" successes
-
-  if null failures
-    then printf "VERIFICATION TESTS PASSED.\n"
-    else do
-      printf "Failed:          %d\n" (length failures)
-      putStrLn ""
-      printHeader "FAILURE DETAILS"
-      forM_ failures printMultiSampleFailure
-
 {-| Print validation results. Silently no-ops when the list is empty
 (i.e., no endpoints had a 'validate' block in their config).
 -}
@@ -140,7 +111,7 @@ printValidationSummary summaries = do
     putStrLn ""
     let allErrors = nub (concatMap validationErrors summaries)
         displayErrors = take 10 allErrors
-    forM_ displayErrors printValidationError
+    forM_ displayErrors (putStrLn . ("  " ++) . T.unpack . formatValidationError)
     when (length allErrors > 10) $
       printf "  ... and %d more unique error(s)\n" (length allErrors - 10)
 
@@ -212,76 +183,9 @@ printStats stats = do
 printHeader :: String -> IO ()
 printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
 
-printMWU :: Maybe MWUResult -> IO ()
-printMWU Nothing = putStrLn "Mann-Whitney U:      (sample too small)"
-printMWU (Just r)
-  | mwuSignificant r = putStrLn "Mann-Whitney U:      Significant — distributions differ (p < 0.05)"
-  | otherwise = putStrLn "Mann-Whitney U:      Not significant (p >= 0.05)"
-
-printKS :: Maybe KSResult -> IO ()
-printKS Nothing = putStrLn "Kolmogorov-Smirnov:  (sample too small)"
-printKS (Just r) =
-  printf
-    "Kolmogorov-Smirnov:  D = %.3f, p = %.3f (%s)\n"
-    (ksStatistic r)
-    (ksPValue r)
-    (if ksSignificant r then "significant" else "not significant" :: String)
-
-printAD :: Maybe ADResult -> IO ()
-printAD Nothing = putStrLn "Anderson-Darling:    (sample too small)"
-printAD (Just r) =
-  printf
-    "Anderson-Darling:    A² = %.3f, p ≈ %.3f (%s)\n"
-    (adStatistic r)
-    (adPValue r)
-    (if adSignificant r then "significant" else "not significant" :: String)
-
-printMultiSampleFailure :: (Endpoint, [VerificationResult]) -> IO ()
-printMultiSampleFailure (ep, results) = do
-  let n = length results
-      passed = length (filter (== Match) results)
-  printf "[%s] %s" (T.unpack $ method ep) (T.unpack $ url ep)
-  if n > 1
-    then printf " (%d/%d samples passed)\n" passed n
-    else putStrLn ""
-  case filter (/= Match) results of
-    [] -> return ()
-    (firstFailure : _) -> printVerificationResult firstFailure
-  putStrLn ""
-
-printVerificationResult :: VerificationResult -> IO ()
-printVerificationResult Match = return ()
-printVerificationResult (StatusMismatch a b) = printf "  Status Mismatch: Expected %d, Got %d\n" a b
-printVerificationResult (InvalidJSON err) = printf "  JSON Error: %s\n" err
-printVerificationResult (NetworkError msg) = printf "  Network Error: %s\n" msg
-printVerificationResult (BodyMismatch diffs) = do
-  printf "  Body Mismatch (%d field(s) differ):\n" (length diffs)
-  mapM_
-    ( \d ->
-        printf
-          "    %-40s  primary=%-20s  candidate=%s\n"
-          (T.unpack $ jdPath d)
-          (T.unpack $ jdPrimary d)
-          (T.unpack $ jdCandidate d)
-    )
-    diffs
-
-printValidationError :: ValidationError -> IO ()
-printValidationError (StatusCodeMismatch expected actual) =
-  printf "  [status]  expected %d, got %d\n" expected actual
-printValidationError (FieldNotFound path) =
-  printf "  [missing] %s\n" (T.unpack path)
-printValidationError (FieldValueMismatch path expected actual) = do
-  printf "  [value]   %s\n" (T.unpack path)
-  printf "    expected: %s\n" (renderValue expected)
-  printf "    actual:   %s\n" (renderValue actual)
-printValidationError BodyAbsent =
-  putStrLn "  [body]    response body absent"
-printValidationError BodyInvalidJSON =
-  putStrLn "  [body]    response body is not valid JSON"
-
-renderValue :: Value -> String
-renderValue = LBS8.unpack . encode
+printMWU mwu = printf "Mann-Whitney U:      %s\n" (formatMWU mwu)
+printKS ks = printf "Kolmogorov-Smirnov:  %s\n" (formatKS ks)
+printAD ad = printf "Anderson-Darling:    %s\n" (formatAD ad)
 
 {-| Look up stats for a target by name.
 INVARIANT: callers guarantee the key exists (constructed from the same target list).

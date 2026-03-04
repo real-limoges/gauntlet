@@ -7,7 +7,7 @@ import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 import TestHelpers
-import Tracing.Analysis (aggregateBySpanName)
+import Tracing.Report (aggregateBySpanName)
 import Tracing.Types (SpanAggregation (..))
 
 propertySpec :: TestTree

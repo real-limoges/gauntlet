@@ -94,10 +94,6 @@ defaultSettings =
     , tempo = Nothing
     , healthCheckPath = Nothing
     , healthCheckTimeout = Nothing
-    , floatTolerance = Nothing
-    , compareFields = Nothing
-    , ignoreFields = Nothing
-    , verifyIterations = Nothing
     , loadMode = Nothing
     }
 

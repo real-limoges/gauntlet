@@ -23,7 +23,6 @@ import OutputSpec (outputSpec)
 import PropertySpec (propertySpec)
 import RateLimiterSpec (rateLimiterSpec)
 import ReportSpec (reportSpec)
-import RunnerBaselineSpec (runnerBaselineSpec)
 import StatsCommonSpec (statsCommonSpec)
 import StatsSpec (statsSpec)
 import TUISpec (tuiStateSpec, tuiWidgetsSpec)
@@ -34,7 +33,6 @@ import TracingSpec (tracingSpec)
 import TypesJsonSpec (typesJsonSpec)
 import TypesSpec (typesSpec)
 import ValidationSpec (validationSpec)
-import VerifySpec (verifySpec)
 import WarmupSpec (warmupSpec)
 
 main :: IO ()
@@ -47,7 +45,6 @@ main =
         , statsCommonSpec
         , bayesianSpec
         , frequentistSpec
-        , verifySpec
         , validationSpec
         , configSpec
         , envSpec
@@ -74,7 +71,6 @@ main =
         , typesJsonSpec
         , environmentSpec
         , warmupSpec
-        , runnerBaselineSpec
         , rateLimiterSpec
         , loadControlIntegrationSpec
         ]

@@ -3,14 +3,13 @@ module Integration (integrationSpec) where
 import Benchmark.Baseline
 import Benchmark.Network
 import Benchmark.Types
-import Benchmark.Verify
 import Control.Concurrent.QSem (newQSem)
 import Data.Aeson (object, (.=))
 import Data.Text (Text)
 import Data.Text qualified as T
 import MockServer
 import Network.HTTP.Client (Manager, defaultManagerSettings, newManager)
-import Network.HTTP.Types (status200, status404, status500)
+import Network.HTTP.Types (status500)
 import Network.Socket qualified as Socket
 import System.Directory (removeFile)
 import System.IO.Error (catchIOError)
@@ -47,33 +46,6 @@ integrationSpec = withResource setupManager (\_ -> pure ()) $ \getMgr ->
               results <- runBenchmark testSettings sem mgr 5 1 (endpoint port) Nothing
               length results `shouldBe` 5
               all ((== 200) . statusCode) results `shouldBe` True
-        ]
-    , testGroup
-        "runComparison"
-        [ testCase "compares two endpoints concurrently" $ do
-            mgr <- getMgr
-            mockJson "{}" $ \port -> do
-              (a, b) <- runComparison testSettings mgr (endpoint port) (endpoint port)
-              statusCode a `shouldBe` 200
-              statusCode b `shouldBe` 200
-        ]
-    , testGroup
-        "verify"
-        [ testCase "matches identical responses" $ do
-            mgr <- getMgr
-            mockJson "{\"x\":1}" $ \port -> do
-              a <- timedRequest testSettings mgr (endpoint port)
-              b <- timedRequest testSettings mgr (endpoint port)
-              verify 0.0 Nothing Nothing a b `shouldBe` Match
-        , testCase "detects status mismatch" $ do
-            mgr <- getMgr
-            mockStatus status200 $ \p1 ->
-              mockStatus status404 $ \p2 -> do
-                a <- timedRequest testSettings mgr (endpoint p1)
-                b <- timedRequest testSettings mgr (endpoint p2)
-                case verify 0.0 Nothing Nothing a b of
-                  StatusMismatch 200 404 -> pure ()
-                  x -> assertFailure $ "Expected StatusMismatch, got: " ++ show x
         ]
     , testGroup
         "error handling"
@@ -168,10 +140,6 @@ testSettings =
     Nothing
     (Just 10)
     (Just 30)
-    Nothing
-    Nothing
-    Nothing
-    Nothing
     Nothing
     Nothing
     Nothing

@@ -12,6 +12,7 @@ module Tracing.Client
   , fetchTracesForTimeRange
   , parseSearchResponse
   , parseTraceResponse
+  , buildTraceQL
   ) where
 
 import Control.Applicative ((<|>))
@@ -21,7 +22,7 @@ import Data.Aeson.Types (Parser, parseEither, parseMaybe)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Either (rights)
 import Data.Map.Strict qualified as Map
-import Data.Maybe (fromMaybe, listToMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
@@ -29,7 +30,6 @@ import Network.HTTP.Client (Manager, Request, httpLbs, parseRequest, responseBod
 import Network.HTTP.Client qualified as Client
 import Network.HTTP.Types.Status (statusCode)
 import Text.Read (readMaybe)
-import Tracing.Query (buildTraceQL)
 import Tracing.Types
 
 -- | Search for traces and fetch full details for each match.
@@ -292,3 +292,14 @@ parseAttributes = Map.fromList . mapMaybe parseAttr
         <|> (T.pack . show <$> (vObj .: "doubleValue" :: Parser Double))
         <|> (T.pack . show <$> (vObj .: "boolValue" :: Parser Bool))
         <|> pure ""
+
+-- | Build a TraceQL query string from query parameters.
+buildTraceQL :: TraceQuery -> Text
+buildTraceQL tq =
+  let conditions =
+        catMaybes
+          [ Just $ "resource.service.name=\"" <> queryService tq <> "\""
+          , (\sn -> "name=\"" <> sn <> "\"") <$> querySpanName tq
+          , ("duration>" <>) <$> queryMinDuration tq
+          ]
+   in "{" <> T.intercalate " && " conditions <> "}"
