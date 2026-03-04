@@ -8,7 +8,6 @@
     "concurrency": 100,
     "secrets": ".secrets/service-token.txt",
     "maxConnections": 200,
-    "connIdleTimeout": 30,
     "requestTimeout": 120,
     "logLevel": "debug",
     "warmup": {
@@ -25,8 +24,10 @@
       "tempoEnabled": true,
       "tempoAuthToken": "optional-tempo-bearer-token"
     },
-    "floatTolerance": 0.001,
-    "compareFields": ["revenue", "orders", "region", "category"]
+    "loadMode": {
+      "mode": "constantRps",
+      "targetRps": 100
+    }
   },
   "payloads": [
     {

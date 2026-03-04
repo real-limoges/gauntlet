@@ -55,8 +55,9 @@ cabal run gauntlet-exe -- benchmark-nway --config examples/simple-benchmark.json
 - Grafana Tempo tracing integration
 - Complex POST bodies with nested JSON
 - Connection pooling tuning
+- Load control (constant RPS example)
 
-**Use case:** Production-grade benchmarking with distributed tracing.
+**Use case:** Production-grade benchmarking with distributed tracing and rate limiting.
 
 ### `log-levels.json`
 **Log verbosity examples** - Demonstrates different log levels.
@@ -105,8 +106,8 @@ Change `logLevel` to control output verbosity:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `maxConnections` | int | 10 | HTTP connection pool size |
-| `connIdleTimeout` | int | 30 | Connection idle timeout (seconds) |
 | `requestTimeout` | int | 30 | Request timeout (seconds) |
+| `loadMode` | object | `unthrottled` | Load control: `unthrottled`, `constantRps`, `rampUp`, `stepLoad` |
 | `logLevel` | string | `"info"` | Log verbosity: `"debug"`, `"info"`, `"warning"`, `"error"` |
 | `warmup` | object | `{"warmupIterations": 1}` | Warmup configuration |
 | `retry` | object | See below | Retry configuration |
