@@ -62,37 +62,6 @@ reportSpec =
                 output `shouldSatisfy` ("Not significant" `isInfixOf`)
             ]
     , testGroup
-        "printVerifyReport"
-        [ testCase "shows VERIFICATION TESTS PASSED when all pass" $ do
-            let ep = Endpoint "GET" "http://test/api" Nothing [] Nothing
-                results = [(ep, [Match, Match])]
-            output <- captureStdout $ printVerifyReport results
-            output `shouldSatisfy` ("VERIFICATION TESTS PASSED" `isInfixOf`)
-        , testCase "shows FAILURE DETAILS when there are failures" $ do
-            let ep = Endpoint "POST" "http://test/api" Nothing [] Nothing
-                results = [(ep, [StatusMismatch 200 500])]
-            output <- captureStdout $ printVerifyReport results
-            output `shouldSatisfy` ("FAILURE DETAILS" `isInfixOf`)
-        , testCase "shows endpoint method and url in failures" $ do
-            let ep = Endpoint "PUT" "http://test/resource" Nothing [] Nothing
-                results = [(ep, [StatusMismatch 200 404])]
-            output <- captureStdout $ printVerifyReport results
-            output `shouldSatisfy` ("PUT" `isInfixOf`)
-            output `shouldSatisfy` ("http://test/resource" `isInfixOf`)
-        , testCase "shows StatusMismatch text" $ do
-            let ep = Endpoint "GET" "http://test" Nothing [] Nothing
-                results = [(ep, [StatusMismatch 200 500])]
-            output <- captureStdout $ printVerifyReport results
-            output `shouldSatisfy` ("Status Mismatch" `isInfixOf`)
-        , testCase "shows Body Mismatch with field diffs" $ do
-            let ep = Endpoint "GET" "http://test" Nothing [] Nothing
-                diff = JsonDiff "data.id" "1" "2"
-                results = [(ep, [BodyMismatch [diff]])]
-            output <- captureStdout $ printVerifyReport results
-            output `shouldSatisfy` ("Body Mismatch" `isInfixOf`)
-            output `shouldSatisfy` ("data.id" `isInfixOf`)
-        ]
-    , testGroup
         "printValidationSummary"
         [ testCase "produces no output for empty list" $ do
             output <- captureStdout $ printValidationSummary []

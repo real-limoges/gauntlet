@@ -7,7 +7,6 @@ module Benchmark.Network.Exec
   , runBenchmarkWithEvents
   , runBenchmarkDuration
   , runBenchmarkDurationWithEvents
-  , runComparison
   )
 where
 
@@ -22,7 +21,7 @@ import Benchmark.Types
   )
 import Benchmark.Types qualified as Types
 import Control.Concurrent (QSem)
-import Control.Concurrent.Async (concurrently, replicateConcurrently)
+import Control.Concurrent.Async (replicateConcurrently)
 import Control.Concurrent.QSem (signalQSem, waitQSem)
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
 import Control.Exception (bracket_)
@@ -191,13 +190,6 @@ workerLoopWithEvents preparedReq deadline sem mgr settings limiter eventChan = g
                     Just err -> RequestFailed (T.pack err)
               atomically $ writeTChan eventChan event
               go (res : acc)
-
--- | Execute two endpoints concurrently for A/B comparison.
-runComparison :: Settings -> Manager -> Endpoint -> Endpoint -> IO (TestingResponse, TestingResponse)
-runComparison settings mgr epA epB = do
-  reqA <- prepareRequest settings epA
-  reqB <- prepareRequest settings epB
-  concurrently (timedRequestPrepared settings mgr reqA) (timedRequestPrepared settings mgr reqB)
 
 printProgressBar :: Logger -> Int -> Int -> Int -> IO ()
 printProgressBar logger idx c total = do

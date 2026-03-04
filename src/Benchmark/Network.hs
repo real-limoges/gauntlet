@@ -15,7 +15,6 @@ module Benchmark.Network
   , runBenchmarkWithEvents
   , runBenchmarkDuration
   , runBenchmarkDurationWithEvents
-  , runComparison
   , timedRequest
   , addAuth
   , readToken
@@ -29,6 +28,5 @@ import Benchmark.Network.Exec
   , runBenchmarkDuration
   , runBenchmarkDurationWithEvents
   , runBenchmarkWithEvents
-  , runComparison
   )
 import Benchmark.Network.Request (initNetwork, prepareRequest, timedRequest)

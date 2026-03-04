@@ -178,11 +178,11 @@ markdownSpec =
                 [ testCase "renders MWU significant result" $ do
                     let bayes = mockBayesianComparison {mannWhitneyU = Just (MWUResult True)}
                     let report = markdownMultipleReport "p" "c" primary candidate bayes
-                    report `shouldSatisfy` T.isInfixOf "significant (p < 0.05)"
+                    report `shouldSatisfy` T.isInfixOf "Significant (p < 0.05)"
                 , testCase "renders MWU not significant result" $ do
                     let bayes = mockBayesianComparison {mannWhitneyU = Just (MWUResult False)}
                     let report = markdownMultipleReport "p" "c" primary candidate bayes
-                    report `shouldSatisfy` T.isInfixOf "not significant (p >= 0.05)"
+                    report `shouldSatisfy` T.isInfixOf "Not significant (p >= 0.05)"
                 , testCase "renders KS test with D statistic" $ do
                     let bayes = mockBayesianComparison {kolmogorovSmirnov = Just (KSResult 0.42 0.03 True)}
                     let report = markdownMultipleReport "p" "c" primary candidate bayes
@@ -206,30 +206,6 @@ markdownSpec =
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "Regressed metrics:"
             report `shouldSatisfy` T.isInfixOf "p99"
-        ]
-    , testGroup
-        "markdownVerifyReport"
-        [ testCase "includes Verification Report heading" $ do
-            let ep = Endpoint "GET" "http://example.com/api" Nothing [] Nothing
-            let report = markdownVerifyReport [(ep, [Match])]
-            report `shouldSatisfy` T.isInfixOf "Verification Report"
-        , testCase "shows correct pass/fail counts" $ do
-            let ep = Endpoint "POST" "http://example.com/api" Nothing [] Nothing
-            let checks = [Match, Match, StatusMismatch 200 500]
-            let report = markdownVerifyReport [(ep, checks)]
-            report `shouldSatisfy` T.isInfixOf "3" -- samples
-            report `shouldSatisfy` T.isInfixOf "2" -- passed
-            report `shouldSatisfy` T.isInfixOf "1" -- failed
-        , testCase "renders body mismatch diffs" $ do
-            let ep = Endpoint "GET" "http://example.com" Nothing [] Nothing
-            let diff = JsonDiff "data.id" "123" "456"
-            let report = markdownVerifyReport [(ep, [BodyMismatch [diff]])]
-            report `shouldSatisfy` T.isInfixOf "data.id"
-            report `shouldSatisfy` T.isInfixOf "123"
-            report `shouldSatisfy` T.isInfixOf "456"
-        , testCase "renders empty results without crashing" $ do
-            let report = markdownVerifyReport []
-            report `shouldSatisfy` T.isInfixOf "Verification Report"
         ]
     ]
 

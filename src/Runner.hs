@@ -8,6 +8,7 @@ Delegates to sub-modules for context setup, warmup, looping, tracing, and baseli
 -}
 module Runner (runSingle) where
 
+import Benchmark.Baseline (handleBaseline)
 import Benchmark.CLI (BaselineMode)
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Output (initOutputFiles, writeMarkdownReport)
@@ -28,7 +29,6 @@ import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (newTChanIO)
 import Control.Exception (onException)
 import Data.Text qualified as T
-import Runner.Baseline (handleBaseline)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)

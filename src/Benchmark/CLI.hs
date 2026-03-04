@@ -3,7 +3,7 @@ Module      : Benchmark.CLI
 Description : Command-line argument parsing
 Stability   : experimental
 
-Parses CLI arguments for benchmark-multiple, benchmark-single, and verify commands.
+Parses CLI arguments for benchmark-multiple and benchmark-single commands.
 -}
 module Benchmark.CLI
   ( parseArgs
@@ -38,10 +38,6 @@ data Command
       , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
       }
-  | Verify
-      { configPath :: FilePath
-      , outputFormat :: OutputFormat
-      }
   deriving (Show, Eq)
 
 parseArgs :: IO Command
@@ -60,7 +56,6 @@ commandParser =
   subparser
     ( command "benchmark-nway" (info benchmarkNwayOptions (progDesc "Run N-way benchmark comparison"))
         <> command "benchmark-single" (info benchmarkSingleOptions (progDesc "Run single-target benchmark"))
-        <> command "verify" (info verifyOptions (progDesc "Verify response equality"))
     )
 
 configOption :: Parser FilePath
@@ -130,6 +125,3 @@ benchmarkNwayOptions =
 benchmarkSingleOptions :: Parser Command
 benchmarkSingleOptions =
   BenchmarkSingle <$> configOption <*> baselineModeParser <*> outputFormatParser
-
-verifyOptions :: Parser Command
-verifyOptions = Verify <$> configOption <*> outputFormatParser

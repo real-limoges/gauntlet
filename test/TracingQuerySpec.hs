@@ -4,7 +4,7 @@ import Data.Text qualified as T
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)
-import Tracing.Query (buildTraceQL)
+import Tracing.Client (buildTraceQL)
 import Tracing.Types (Nanoseconds (..), TraceQuery (..))
 
 tracingQuerySpec :: TestTree

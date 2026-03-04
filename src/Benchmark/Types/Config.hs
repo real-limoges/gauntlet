@@ -239,14 +239,6 @@ data Settings = Settings
   -- ^ Health check path appended to service URL (default: "/health")
   , healthCheckTimeout :: Maybe Int
   -- ^ Health check poll timeout in seconds (default: 60)
-  , floatTolerance :: Maybe Double
-  -- ^ Absolute tolerance for floating-point comparisons in verify mode (default: exact match)
-  , compareFields :: Maybe [Text]
-  -- ^ When set, only these keys (and their full subtrees) are compared in verify mode
-  , ignoreFields :: Maybe [Text]
-  -- ^ Keys stripped at any depth before comparison in verify mode (complement of compareFields)
-  , verifyIterations :: Maybe Int
-  -- ^ Number of request pairs to run per endpoint in verify mode (default: 1)
   , loadMode :: Maybe LoadMode
   -- ^ Load control mode (default: unthrottled)
   }

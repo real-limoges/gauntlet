@@ -24,13 +24,11 @@ library
   exposed-modules:        Lib
                           Log
                           Runner
-                          Runner.Baseline
                           Runner.Context
                           Runner.Loop
                           Runner.Nway
                           Runner.Tracing
                           Runner.Warmup
-                          VerifyRunner
                           Stats.Common
                           Stats.Benchmark
                           Benchmark.Baseline
@@ -46,6 +44,7 @@ library
                           Benchmark.Output
                           Benchmark.RateLimiter
                           Benchmark.Report
+                          Benchmark.Report.Formatting
                           Benchmark.Report.Markdown
                           Benchmark.Types
                           Benchmark.Types.Baseline
@@ -55,15 +54,11 @@ library
                           Benchmark.Types.Response
                           Benchmark.Types.Stats
                           Benchmark.Types.Units
-                          Benchmark.Types.Verify
                           Benchmark.Validation
-                          Benchmark.Verify
                           Benchmark.TUI
                           Benchmark.TUI.State
                           Benchmark.TUI.Widgets
-                          Tracing.Analysis
                           Tracing.Client
-                          Tracing.Query
                           Tracing.Report
                           Tracing.Types
 
@@ -78,7 +73,6 @@ library
   build-depends:          base >=4.20.0.0 && <5,
                           aeson,
                           async,
-                          brick,
                           bytestring,
                           case-insensitive,
                           clock,
@@ -97,10 +91,11 @@ library
                           time,
                           regex-tdfa,
                           scientific,
+                          brick,
+                          vty,
+                          vty-crossplatform,
                           vector,
                           vector-algorithms,
-                          vty,
-                          vty-crossplatform
 
 executable            gauntlet-exe
   import:             warnings
@@ -139,7 +134,6 @@ test-suite            gauntlet-test
                     , OutputSpec
                     , PropertySpec
                     , ReportSpec
-                    , RunnerBaselineSpec
                     , StatsCommonSpec
                     , StatsSpec
                     , TestHelpers
@@ -151,7 +145,6 @@ test-suite            gauntlet-test
                     , TypesJsonSpec
                     , TypesSpec
                     , ValidationSpec
-                    , VerifySpec
                     , WarmupSpec
                     , TastyCompat
   default-extensions: OverloadedStrings

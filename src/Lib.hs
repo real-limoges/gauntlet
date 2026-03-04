@@ -5,7 +5,7 @@ Module      : Lib
 Description : Main entry point
 Stability   : experimental
 
-CLI dispatch for benchmark and verification commands.
+CLI dispatch for benchmark commands.
 -}
 module Lib (run) where
 
@@ -16,14 +16,12 @@ import Benchmark.Config (loadConfig, loadNwayConfig, validateConfig, validateNwa
 import Benchmark.Types
   ( NwayConfig
   , PerfTestError (..)
-  , RegressionResult (..)
   , RunResult (..)
   , TestConfig
   , exitWithError
   )
 import Runner (runSingle)
 import Runner.Nway (runNway)
-import VerifyRunner (runVerify)
 
 run :: IO ()
 run = do
@@ -35,11 +33,6 @@ run = do
     BenchmarkSingle path baseline fmt -> do
       cfg <- loadAndValidateConfig path
       runSingle baseline fmt cfg
-    Verify {configPath = path, outputFormat = fmt} -> do
-      cfg <- loadAndValidateConfig path
-      passed <- runVerify fmt cfg
-      return $ if passed then RunSuccess else RunRegression (RegressionResult "verify" [] False)
-
   exitWithResult result
 
 {-| Exit with appropriate code based on run result.

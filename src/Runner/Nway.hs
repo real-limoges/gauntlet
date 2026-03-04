@@ -8,6 +8,7 @@ Bayesian comparisons. Integrates TUI, tracing, baseline, and CSV output.
 -}
 module Runner.Nway (runNway, allPairComparisons) where
 
+import Benchmark.Baseline (handleBaseline)
 import Benchmark.CLI (BaselineMode (..))
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Output (initNwayOutputFiles, writeMarkdownReport)
@@ -39,7 +40,6 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Log (Logger, logInfo)
 import Network.HTTP.Client (Manager)
-import Runner.Baseline (handleBaseline)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)

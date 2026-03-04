@@ -33,9 +33,6 @@ cliSpec =
         , testCase "parses benchmark-single with --save-baseline and --compare-baseline" $ do
             parse ["benchmark-single", "--config", "f.json", "--save-baseline", "v2", "--compare-baseline", "v1"]
               `shouldBe` Just (BenchmarkSingle "f.json" (SaveAndCompare "v2" "v1") OutputTerminal)
-        , testCase "parses verify --config foo.json" $ do
-            parse ["verify", "--config", "foo.json"]
-              `shouldBe` Just (Verify "foo.json" OutputTerminal)
         , testCase "parses benchmark-nway with --output markdown" $ do
             parse ["benchmark-nway", "--config", "foo.json", "--output", "markdown"]
               `shouldBe` Just (BenchmarkNway "foo.json" NoBaseline (OutputMarkdown "results/report.md"))
