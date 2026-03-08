@@ -18,8 +18,6 @@ cabal build            # Alternative build command
 ```bash
 make benchmark-nway    # Run N-way comparison benchmark (requires config.json)
 make benchmark-single   # Run single benchmark (requires config.json)
-make verify            # Verify test configuration
-
 # Direct execution
 cabal run gauntlet-exe -- benchmark-nway --config config.json
 ```
@@ -57,15 +55,15 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 - `CLI.hs` - Command-line argument parsing
 - `Baseline.hs` - Saves/loads baselines, regression detection with configurable thresholds
 - `Validation.hs` - Per-response JSON field validation (status code + field assertions)
-- `Verify.hs` - Response body/status verification between primary and candidate
 - `TUI.hs` + `TUI/State.hs` + `TUI/Widgets.hs` - Real-time Brick-based terminal UI
 - `Report.hs` - Terminal output formatting; also exports `printNwayReport`
+- `Report/Formatting.hs` - Statistical test formatting (formatMWU, formatKS, formatAD)
 - `Report/Markdown.hs` - Markdown report generation for CI artifacts; also exports `markdownNwayReport`
 - `Output.hs` - CSV/JSON serialization; also exports `initNwayOutputFiles`, `writeLatenciesWithTarget`
 - `CI.hs` - GitLab CI and GitHub Actions integration
 - `Env.hs` - `.env` / `.env.local` loading and `${VAR}` interpolation in config JSON before decode
 - `RateLimiter.hs` - Rate limiting: unthrottled, constant RPS, ramp-up, and step-load modes
-- `Types/` - Type sub-modules: `Baseline.hs`, `Config.hs`, `Error.hs`, `Internal.hs`, `Response.hs`, `Stats.hs`, `Units.hs`, `Verify.hs`
+- `Types/` - Type sub-modules: `Baseline.hs`, `Config.hs`, `Error.hs`, `Internal.hs`, `Response.hs`, `Stats.hs`, `Units.hs`
 
 ### 2. Stats/ Module (Statistical Analysis)
 Shared statistical utilities used by both benchmark and trace analysis.
@@ -88,9 +86,7 @@ Optional Grafana Tempo integration for analyzing distributed traces.
 
 **Key Components:**
 - `Types.hs` - Tempo config, trace/span data structures (re-exports `Nanoseconds`/`Milliseconds` from `Benchmark.Types`)
-- `Client.hs` - Grafana Tempo HTTP client, TraceQL query execution
-- `Query.hs` - TraceQL query string construction
-- `Analysis.hs` - Aggregates spans by name, computes duration statistics
+- `Client.hs` - Grafana Tempo HTTP client, TraceQL query construction and execution, span aggregation
 - `Report.hs` - Terminal output formatting for trace analysis
 
 ### 4. Runner/ Module (Benchmark Orchestration)
@@ -103,11 +99,9 @@ Orchestrates the full benchmark lifecycle, split into sub-modules.
 - `Runner/Warmup.hs` - Warmup request execution
 - `Runner/Tracing.hs` - Fetches and prints Tempo traces for the benchmark time window
 - `Runner/Nway.hs` - N-way comparison orchestration: `runNway`, `allPairComparisons`
-- `Runner/Baseline.hs` - Baseline save/compare and CI report emission
 
 ### Core Entry Points
-- `Lib.hs` - Main dispatcher: parses CLI, loads config, routes to Runner/VerifyRunner
-- `VerifyRunner.hs` - Response verification against expected results
+- `Lib.hs` - Main dispatcher: parses CLI, loads config, routes to Runner
 
 ## Data Flow (A/B Benchmark)
 
@@ -136,7 +130,7 @@ Terminal/JSON/CSV/Markdown Output + Exit Code (0=success, 1=regression, 2=error)
 **Framework:** Tasty with tasty-hunit and tasty-quickcheck for property-based testing
 
 **Test Types:**
-- **Unit Tests:** StatsSpec, BayesianSpec, ConfigSpec, VerifySpec, BaselineSpec, TracingSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, LogSpec, MarkdownSpec, OutputSpec, RateLimiterSpec, ReportSpec, RunnerBaselineSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
+- **Unit Tests:** StatsSpec, BayesianSpec, FrequentistSpec, ConfigSpec, BaselineSpec, TracingSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, LogSpec, MarkdownSpec, NwaySpec, OutputSpec, RateLimiterSpec, ReportSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
 - **Integration Tests:** Integration.hs uses `MockServer.hs` to test HTTP operations end-to-end
 - **Property Tests:** PropertySpec.hs verifies statistical invariants (percentile ordering, stat bounds)
 - **UI Tests:** TUISpec.hs for Brick widget/state testing
@@ -163,10 +157,9 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 - `settings.tempo` - Optional tracing configuration (URL, service name, auth token)
 - `payloads[].headers` - Optional custom HTTP headers (Map Text Text)
 - `payloads[].validate` - Optional per-response validation (`status`, `fields` map of dot-path assertions)
-- `settings.floatTolerance` - Tolerance for floating-point comparison in verify mode (default: 0.0)
-- `settings.compareFields` - Optional whitelist of JSON keys to compare in verify mode
-- `settings.ignoreFields` - Optional JSON keys to strip before comparison in verify mode
-- `settings.verifyIterations` - Number of iterations for verify mode (default: 1)
+- `settings.loadMode` - Load control mode: `unthrottled` (default), `constantRps`, `rampUp`, `stepLoad`
+- `settings.maxConnections` - HTTP connection pool size (default: 10)
+- `settings.requestTimeout` - Per-request timeout in seconds (default: 30)
 - Environment variable expansion: `${VAR}` in any config value, resolved from `.env.local` > `.env` > process env
 
 ## Important Architectural Decisions

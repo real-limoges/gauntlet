@@ -4,11 +4,10 @@
 
 Gauntlet is an HTTP performance benchmarking tool. It sends real HTTP requests to your services, measures latency at nanosecond precision, and uses Bayesian statistics to give you direct probability answers like "there is a 94% chance the candidate is faster." No more squinting at averages and hoping the difference is real.
 
-Gauntlet supports three modes:
+Gauntlet supports two modes:
 
 - **N-way comparison** (`benchmark-nway`) — benchmark 2+ services side-by-side with all-pairs statistical comparison
 - **Single benchmark** (`benchmark-single`) — benchmark one service, optionally compare to a saved baseline
-- **Response verification** (`verify`) — confirm two services return identical responses
 
 ## Quick Start
 
@@ -43,9 +42,6 @@ gauntlet benchmark-nway --config config.json
 
 # Single-target benchmark (useful with baselines)
 gauntlet benchmark-single --config config.json
-
-# Verify two services return identical responses
-gauntlet verify --config config.json
 ```
 
 That's it. The rest of this guide explains every config option and what the output means.
@@ -158,6 +154,39 @@ Sends N requests before timing begins. This lets the server warm up JIT compiler
 
 Retries transient failures with exponential backoff (1s, 2s, 4s with the defaults above). Prevents a single network hiccup from registering as a failed request. Keep attempts low — excessive retries mask real problems. If you're seeing many retries, the service likely has a genuine issue.
 
+#### `loadMode`
+
+Controls the rate at which requests are sent. Defaults to `unthrottled` (as fast as concurrency allows).
+
+**Unthrottled** (default) — no rate limiting, requests sent as fast as possible:
+```json
+"loadMode": {"mode": "unthrottled"}
+```
+
+**Constant RPS** — steady request rate:
+```json
+"loadMode": {"mode": "constantRps", "targetRps": 100}
+```
+
+**Ramp Up** — linearly increasing rate over a duration:
+```json
+"loadMode": {"mode": "rampUp", "startRps": 10, "endRps": 200, "durationSecs": 60}
+```
+
+**Step Load** — discrete rate steps:
+```json
+"loadMode": {
+  "mode": "stepLoad",
+  "steps": [
+    {"rps": 50, "durationSecs": 30},
+    {"rps": 100, "durationSecs": 30},
+    {"rps": 200, "durationSecs": 30}
+  ]
+}
+```
+
+When using `constantRps`, `rampUp`, or `stepLoad`, the `iterations` setting controls how many total requests are sent — the benchmark ends when either the iteration count is reached or the load duration expires, whichever comes first.
+
 #### `healthCheckPath` / `healthCheckTimeout`
 
 After environment setup (git switch + docker-compose, if configured), gauntlet polls `<target-url><healthCheckPath>` every second until it gets HTTP 200, up to `healthCheckTimeout` seconds. This ensures the service is fully ready before benchmarking begins, so you don't measure startup time as request latency.
@@ -176,40 +205,6 @@ Defaults: `healthCheckPath` = `"/health"`, `healthCheckTimeout` = `60` seconds.
 ```
 
 Optional Grafana Tempo integration. When enabled, gauntlet fetches distributed traces from the benchmark time window after benchmarking completes and aggregates span-level statistics. See [Distributed Tracing](#distributed-tracing-grafana-tempo) for details.
-
-### Verify-mode settings
-
-These settings only apply when running `gauntlet verify`.
-
-#### `floatTolerance` (default: 0.0 = exact match)
-
-When comparing JSON responses, floating-point values within this tolerance are treated as equal. Useful when services compute floats on different hardware or runtimes that produce slightly different results.
-
-#### `compareFields`
-
-Whitelist of JSON keys to compare. Everything else is ignored.
-
-```json
-"compareFields": ["id", "results", "total", "status"]
-```
-
-Use when responses contain volatile fields (timestamps, request IDs, trace headers) alongside the data you care about.
-
-#### `ignoreFields`
-
-Blacklist of JSON keys stripped before comparison.
-
-```json
-"ignoreFields": ["requestId", "timestamp", "traceId"]
-```
-
-Alternative to `compareFields` when most fields should match and you just need to exclude a few volatile ones.
-
-Why both `compareFields` and `ignoreFields`? Whitelist (`compareFields`) is better when you care about a few specific fields in a large response. Blacklist (`ignoreFields`) is better when most fields should match and you just need to exclude a handful. Use whichever requires less configuration for your case.
-
-#### `verifyIterations` (default: 1)
-
-Number of request pairs per endpoint. Values greater than 1 help catch intermittent differences — responses that match most of the time but occasionally diverge.
 
 ### `payloads` — What requests to send
 
@@ -497,7 +492,7 @@ Compare three environments against each other:
 
 ### A/B comparison with warmup and retry
 
-Production-grade config with warmup, retry, and verify-mode field filtering:
+Production-grade config with warmup and retry:
 
 ```json
 {
@@ -518,8 +513,7 @@ Production-grade config with warmup, retry, and verify-mode field filtering:
       "retryMaxAttempts": 3,
       "retryInitialDelayMs": 1000,
       "retryBackoffMultiplier": 2.0
-    },
-    "compareFields": ["id", "results", "total", "status"]
+    }
   },
   "payloads": [
     {
@@ -576,8 +570,10 @@ Everything enabled — high iteration count, connection pool tuning, debug loggi
       "tempoEnabled": true,
       "tempoAuthToken": "optional-tempo-bearer-token"
     },
-    "floatTolerance": 0.001,
-    "compareFields": ["revenue", "orders", "region", "category"]
+    "loadMode": {
+      "mode": "constantRps",
+      "targetRps": 100
+    }
   },
   "payloads": [
     {
@@ -631,5 +627,5 @@ Everything enabled — high iteration count, connection pool tuning, debug loggi
 | Code | Meaning |
 |---|---|
 | 0 | Success — benchmark completed, no regressions detected |
-| 1 | Regression detected (baseline comparison) or verify mismatch |
+| 1 | Regression detected (baseline comparison) |
 | 2 | Error — bad config, environment setup failure, connectivity issue, etc. |
