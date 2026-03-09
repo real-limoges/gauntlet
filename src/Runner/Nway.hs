@@ -12,10 +12,9 @@ import Benchmark.Baseline (handleBaseline)
 import Benchmark.CLI (BaselineMode (..))
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Output (initNwayOutputFiles, writeMarkdownReport)
-import Benchmark.Report (printNwayReport, printValidationSummary)
 import Benchmark.Report.Markdown (markdownNwayReport, markdownValidationReport)
 import Benchmark.TUI (runTUI)
-import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsFinished)
+import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
 import Benchmark.Types
   ( BayesianComparison
   , BenchmarkStats
@@ -32,8 +31,8 @@ import Benchmark.Types
   )
 import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (TChan, newTChanIO)
-import Control.Exception (onException)
-import Control.Monad (forM, forM_)
+import Control.Exception (SomeAsyncException, SomeException, catch, fromException, throwIO, try)
+import Control.Monad (forM, forM_, void)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
@@ -101,18 +100,28 @@ runNwayWithTUI baselineMode outFmt cfg csvFile timestamp setts perTargetRequests
   let tuiState = initialState "Starting..." perTargetRequests numEndpoints
   ctx <- initContext setts csvFile timestamp (Just eventChan)
 
-  benchmarkWork <-
-    async $
-      (`onException` emitEvent (Just eventChan) BenchmarkFinished) $
-        runAllTargets ctx cfg (Just eventChan)
+  benchmarkWork <- async $ do
+    result <- (try (runAllTargets ctx cfg (Just eventChan)) :: IO (Either SomeException [NwayResult]))
+    case result of
+      Right val -> do
+        emitEvent (Just eventChan) BenchmarkFinished
+        return val
+      Left ex
+        | Just (_ :: SomeAsyncException) <- fromException ex -> throwIO ex
+        | otherwise -> do
+            emitEvent (Just eventChan) (BenchmarkFailed (T.pack (show ex)))
+            throwIO ex
 
   finalState <- runTUI eventChan tuiState
 
-  if not (tsFinished finalState)
-    then do
+  case (tsFinished finalState, tsError finalState) of
+    (False, _) -> do
       cancel benchmarkWork
-      exitWithError $ EnvironmentSetupError "Benchmark cancelled by user"
-    else do
+      exitWithError BenchmarkCancelled
+    (True, Just errMsg) -> do
+      void (wait benchmarkWork) `catch` \(_ :: SomeException) -> return ()
+      exitWithError (BenchmarkError (T.unpack errMsg))
+    (True, Nothing) -> do
       results <- wait benchmarkWork
       postAnalysis (rcLogger ctx) (rcManager ctx) baselineMode outFmt setts timestamp results
 
@@ -134,16 +143,16 @@ runNwayNoTUI baselineMode outFmt cfg csvFile timestamp setts = do
 runAllTargets :: RunContext -> NwayConfig -> Maybe (TChan BenchmarkEvent) -> IO [NwayResult]
 runAllTargets ctx cfg eventChan = do
   let setts = nwaySettings cfg
-  results <- forM (zip [1 ..] (nwayTargets cfg)) $ \(idx, t) -> do
-    let n = length (nwayTargets cfg)
-        targetEps = buildEndpoints (targetUrl t) (nwayPayloads cfg)
+  forM (zip [1 ..] (nwayTargets cfg)) $ \(idx, t) -> do
+    let targetEps = buildEndpoints (targetUrl t) (nwayPayloads cfg)
+        totalReqs = iterations setts * length targetEps
 
-    emitEvent eventChan (TargetStarted (targetName t) idx n)
+    emitEvent eventChan (TargetStarted (targetName t) idx totalReqs)
 
     case targetBranch t of
       Just branch | not (T.null branch) -> do
         emitEvent eventChan (StatusMessage $ "Setting up " <> branch <> "...")
-        setupOrFail (rcManager ctx) setts branch (targetUrl t) Nothing
+        setupOrFail (rcManager ctx) setts branch (targetUrl t) (Just ["--profile", "testing", "up", "-d", "--build"])
       _ -> return ()
 
     emitEvent eventChan (StatusMessage $ "Benchmarking " <> targetName t)
@@ -163,9 +172,6 @@ runAllTargets ctx cfg eventChan = do
         , nrEndNs = endNs
         }
 
-  emitEvent eventChan BenchmarkFinished
-  return results
-
 -- | Post-benchmark analysis: reporting, tracing, baselines.
 postAnalysis ::
   Logger ->
@@ -182,8 +188,6 @@ postAnalysis logger mgr baselineMode outFmt setts timestamp results = do
       pairs = allPairComparisons pairInput
       validAll = concatMap nrValidations results
 
-  printNwayReport namedStats pairs
-  printValidationSummary validAll
   writeMarkdownReport outFmt $
     markdownNwayReport namedStats pairs
       <> markdownValidationReport validAll

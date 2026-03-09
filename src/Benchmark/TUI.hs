@@ -107,6 +107,7 @@ handleEvent (AppEvent (BenchEvent event)) = do
   modify (updateState now event)
   case event of
     BenchmarkFinished -> halt
+    BenchmarkFailed _ -> halt
     _ -> return ()
 handleEvent _ = return ()
 
@@ -247,7 +248,7 @@ histogramSection state =
     durations = toList (tsRecentDurations state)
     lo = minimum durations
     hi = maximum durations
-    nBuckets = 8 :: Int
+    nBuckets = 5 :: Int
     bucketWidth = if hi > lo then (hi - lo) / fromIntegral nBuckets else 1
     bucketIndex v = min (nBuckets - 1) (floor ((v - lo) / bucketWidth))
     counts = [length (filter (\v -> bucketIndex v == i) durations) | i <- [0 .. nBuckets - 1]]

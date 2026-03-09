@@ -17,6 +17,7 @@ import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types (Settings (..), exitWithError)
 import Benchmark.Types qualified as PT
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
+import Control.Exception (throwIO)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -61,7 +62,7 @@ initContext setts csvFile timestamp eventChan = do
 -- | Set up the git environment or exit with an error.
 setupOrFail :: Manager -> Settings -> Text -> Text -> Maybe [String] -> IO ()
 setupOrFail mgr setts branch target composeArgs =
-  setupEnvironment mgr setts branch target composeArgs >>= either exitWithError return
+  setupEnvironment mgr setts branch target composeArgs >>= either throwIO return
 
 -- | Current time as nanoseconds (wall clock).
 getNowNs :: IO TT.Nanoseconds

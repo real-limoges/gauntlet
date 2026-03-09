@@ -12,10 +12,9 @@ import Benchmark.Baseline (handleBaseline)
 import Benchmark.CLI (BaselineMode)
 import Benchmark.Config (buildEndpoints)
 import Benchmark.Output (initOutputFiles, writeMarkdownReport)
-import Benchmark.Report (printSingleBenchmarkReport, printValidationSummary)
 import Benchmark.Report.Markdown (markdownSingleReport, markdownValidationReport)
 import Benchmark.TUI (runTUI)
-import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsFinished)
+import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
 import Benchmark.Types
   ( OutputFormat (..)
   , PerfTestError (..)
@@ -27,7 +26,8 @@ import Benchmark.Types
   )
 import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (newTChanIO)
-import Control.Exception (onException)
+import Control.Exception (SomeAsyncException, SomeException, catch, fromException, throwIO, try)
+import Control.Monad (void)
 import Data.Text qualified as T
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
@@ -51,36 +51,44 @@ runSingle baselineMode outFmt cfg = do
 
   ctx <- initContext setts csvFile timestamp (Just eventChan)
 
-  benchmarkWork <- async $
-    (`onException` emitEvent (Just eventChan) BenchmarkFinished) $ do
-      startNs <- getNowNs
-      emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
-      setupOrFail
-        (rcManager ctx)
-        setts
-        (candidate $ git cfg)
-        (candidate $ targets cfg)
-        (Just ["--profile", "testing", "up", "-d", "--build"])
-      emitEvent (Just eventChan) (StatusMessage $ "Running " <> targetUrl <> " (" <> candidate (git cfg) <> ")")
-      (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
-      endNs <- getNowNs
-
-      emitEvent (Just eventChan) BenchmarkFinished
-      return (results, validSummaries, startNs, endNs)
+  benchmarkWork <- async $ do
+    let work = do
+          startNs <- getNowNs
+          emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
+          setupOrFail
+            (rcManager ctx)
+            setts
+            (candidate $ git cfg)
+            (candidate $ targets cfg)
+            (Just ["--profile", "testing", "up", "-d", "--build"])
+          emitEvent (Just eventChan) (StatusMessage $ "Running " <> targetUrl <> " (" <> candidate (git cfg) <> ")")
+          (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
+          endNs <- getNowNs
+          return (results, validSummaries, startNs, endNs)
+    result <- try work
+    case result of
+      Right val -> do
+        emitEvent (Just eventChan) BenchmarkFinished
+        return val
+      Left ex
+        | Just (_ :: SomeAsyncException) <- fromException ex -> throwIO ex
+        | otherwise -> do
+            emitEvent (Just eventChan) (BenchmarkFailed (T.pack (show ex)))
+            throwIO ex
 
   finalState <- runTUI eventChan tuiState
 
-  if not (tsFinished finalState)
-    then do
+  case (tsFinished finalState, tsError finalState) of
+    (False, _) -> do
       cancel benchmarkWork
-      exitWithError $ EnvironmentSetupError "Benchmark cancelled by user"
-    else do
+      exitWithError BenchmarkCancelled
+    (True, Just errMsg) -> do
+      void (wait benchmarkWork) `catch` \(_ :: SomeException) -> return ()
+      exitWithError (BenchmarkError (T.unpack errMsg))
+    (True, Nothing) -> do
       (results, validSummaries, startNs, endNs) <- wait benchmarkWork
 
       let stats = calculateStats results
-
-      printSingleBenchmarkReport targetUrl stats
-      printValidationSummary validSummaries
 
       writeMarkdownReport outFmt $
         markdownSingleReport targetUrl stats

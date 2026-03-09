@@ -20,7 +20,7 @@ import Benchmark.Types
   )
 import Benchmark.Types qualified as Types
 import Control.Concurrent (threadDelay)
-import Control.Exception (SomeException, evaluate, try)
+import Control.Exception (SomeAsyncException, SomeException, evaluate, fromException, throwIO, try)
 import Data.Aeson (encode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.CaseInsensitive (mk)
@@ -29,7 +29,8 @@ import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
 import Log (Logger, logWarning, makeLogger)
 import Network.HTTP.Client
-  ( Manager
+  ( HttpException (..)
+  , Manager
   , ManagerSettings (..)
   , Request
   , RequestBody (RequestBodyLBS)
@@ -96,15 +97,16 @@ timedRequestPrepared settings mgr req = do
       result <- try (httpLbs req mgr) :: IO (Either SomeException (Response LBS.ByteString))
       case result of
         Right resp -> processResponse resp startTime
+        Left err | Just (_ :: SomeAsyncException) <- fromException err -> throwIO err
         Left err | attempts > 0 -> do
           logWarning logger $
             T.pack $
-              "Connection Failed: " ++ show err ++ " - Retrying (" ++ show attempts ++ " left)..."
+              "Connection failed: " ++ showHttpErr err ++ " - Retrying (" ++ show attempts ++ " left)..."
           threadDelay delay
           go logger (attempts - 1) (round (fromIntegral delay * backoff)) backoff
         Left err -> do
           endTime <- getTime Monotonic
-          logWarning logger $ T.pack $ "FINAL FAILURE: " ++ show err
+          logWarning logger $ T.pack $ "Connection failed (no retries left): " ++ showHttpErr err
           return $
             TestingResponse
               { durationNs = Nanoseconds $ fromIntegral (max 0 (toNanoSecs endTime - toNanoSecs startTime))
@@ -112,6 +114,10 @@ timedRequestPrepared settings mgr req = do
               , respBody = Nothing
               , errorMessage = Just (show err)
               }
+
+    showHttpErr e = case fromException e of
+      Just (HttpExceptionRequest _ content) -> show content
+      _ -> show e
 
     processResponse resp startTime = do
       let body = Client.responseBody resp

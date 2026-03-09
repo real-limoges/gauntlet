@@ -56,10 +56,9 @@ writeLatenciesWithTarget csvFile mTarget results = do
   let builder = foldMap (formatResultWithTarget mTarget) results
   TLIO.appendFile csvFile (toLazyText builder)
 
--- | Write a markdown report to disk when 'OutputMarkdown' is requested.
+-- | Write a markdown report to 'endpoint_analysis.md'.
 writeMarkdownReport :: OutputFormat -> Text -> IO ()
-writeMarkdownReport OutputTerminal _ = return ()
-writeMarkdownReport (OutputMarkdown path) content = TIO.writeFile path content
+writeMarkdownReport _ = TIO.writeFile "endpoint_analysis.md"
 
 formatResultBuilder :: (Int, Endpoint, [TestingResponse]) -> Builder
 formatResultBuilder = formatResultWithTarget Nothing

@@ -11,7 +11,6 @@ import System.IO.Temp (withSystemTempDirectory, withSystemTempFile)
 import TastyCompat (shouldBe, shouldContain, shouldReturn, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
-import TestHelpers (captureStdout)
 
 nwayIntegrationSpec :: TestTree
 nwayIntegrationSpec =
@@ -35,36 +34,33 @@ nwayIntegrationSpec =
                     let cfg = makeTestNwayConfig tokenPath [port1, port2, port3]
                     result <- runNway NoBaseline OutputTerminal cfg
                     result `shouldBe` RunSuccess
-        , testCase "stdout contains target names" $
+        , testCase "report contains target names" $
             withNwayEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  output <- captureStdout $ do
-                    _ <- runNway NoBaseline OutputTerminal cfg
-                    pure ()
-                  output `shouldContain` "target-1"
-                  output `shouldContain` "target-2"
-        , testCase "stdout contains ranking table" $
+                  _ <- runNway NoBaseline OutputTerminal cfg
+                  content <- readFile "endpoint_analysis.md"
+                  content `shouldContain` "target-1"
+                  content `shouldContain` "target-2"
+        , testCase "report contains ranking table" $
             withNwayEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  output <- captureStdout $ do
-                    _ <- runNway NoBaseline OutputTerminal cfg
-                    pure ()
-                  T.pack output `shouldSatisfy` T.isInfixOf "Ranking"
-        , testCase "with OutputMarkdown writes a file" $
+                  _ <- runNway NoBaseline OutputTerminal cfg
+                  content <- readFile "endpoint_analysis.md"
+                  content `shouldContain` "Ranking"
+        , testCase "writes endpoint_analysis.md" $
             withNwayEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
-                  let mdPath = "nway-report.md"
-                      cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  result <- runNway NoBaseline (OutputMarkdown mdPath) cfg
+                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
+                  result <- runNway NoBaseline OutputTerminal cfg
                   result `shouldBe` RunSuccess
-                  exists <- doesFileExist mdPath
+                  exists <- doesFileExist "endpoint_analysis.md"
                   exists `shouldBe` True
-                  content <- readFile mdPath
+                  content <- readFile "endpoint_analysis.md"
                   content `shouldContain` "target-1"
                   content `shouldContain` "target-2"
         , testCase "creates results directory with correct CSV output" $

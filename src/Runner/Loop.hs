@@ -21,7 +21,6 @@ import Benchmark.Types
   , Settings (..)
   , TestingResponse
   , ValidationSummary
-  , exitWithError
   , isDurationBased
   , loadModeDurationSecs
   , totalRequestsForMode
@@ -29,6 +28,7 @@ import Benchmark.Types
 import Benchmark.Validation (validateResponses)
 import Control.Concurrent (newQSem)
 import Control.Concurrent.Async (mapConcurrently)
+import Control.Exception (throwIO)
 import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
 import Log (logInfo)
@@ -38,7 +38,7 @@ import Runner.Warmup (runWarmup)
 -- | Warm up then run the benchmark loop for a labelled set of endpoints.
 benchmarkEndpoints :: RunContext -> String -> [Endpoint] -> IO ([TestingResponse], [ValidationSummary])
 benchmarkEndpoints ctx label eps = case eps of
-  [] -> exitWithError $ NoEndpointsError label
+  [] -> throwIO $ NoEndpointsError label
   (firstEp : _) -> do
     runWarmup ctx firstEp
     runEndpointLoop ctx eps
