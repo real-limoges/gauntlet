@@ -34,6 +34,7 @@ data BenchmarkEvent
   | CurrentRpsUpdated Double
   | LoadStepChanged Int Double
   | BenchmarkFinished
+  | BenchmarkFailed Text
   deriving (Show, Eq)
 
 data RollingStats = RollingStats
@@ -61,6 +62,7 @@ data TUIState = TUIState
   , tsRecentRequests :: Seq Bool
   , tsRollingStats :: Maybe RollingStats
   , tsFinished :: Bool
+  , tsError :: Maybe Text
   , tsStatus :: Text
   , tsElapsedSecs :: Double
   , tsCurrentRps :: Maybe Double
@@ -86,6 +88,7 @@ initialState target total endpoints =
     , tsRecentRequests = Seq.empty
     , tsRollingStats = Nothing
     , tsFinished = False
+    , tsError = Nothing
     , tsStatus = ""
     , tsElapsedSecs = 0
     , tsCurrentRps = Nothing
@@ -159,6 +162,8 @@ updateState now event state = case event of
     state {tsCurrentStep = Just step, tsTargetRps = Just rps}
   BenchmarkFinished ->
     state {tsFinished = True}
+  BenchmarkFailed msg ->
+    state {tsFinished = True, tsError = Just msg}
   where
     unMilliseconds (Milliseconds ms) = ms
 
@@ -184,7 +189,7 @@ computeRollingStats durations
           avg = sum sorted / fromIntegral n
           (mn, mx) = case sorted of
             [] -> (0, 0)
-            (lo_ : rest) -> (lo_, last rest)
+            (lo_ : _) -> (lo_, last sorted)
        in RollingStats
             { rsMeanMs = avg
             , rsP50Ms = percentileList 0.50 sorted

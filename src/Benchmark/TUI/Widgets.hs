@@ -45,7 +45,7 @@ histogram buckets =
       barWidth = 30 :: Int
       renderBucket (label, count) =
         let pct = if total > 0 then fromIntegral count / fromIntegral total else 0 :: Float
-            filled = round (pct * fromIntegral barWidth)
+            filled = round (pct * fromIntegral barWidth * 0.5)
             bar = T.replicate filled "█" <> T.replicate (barWidth - filled) "░"
             pctText = T.pack $ show (round (pct * 100) :: Int) <> "%"
          in hBox
