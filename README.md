@@ -97,7 +97,7 @@ sudo pacman -S ghc cabal-install
 ### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/gauntlet.git
+git clone https://github.com/real-limoges/gauntlet.git
 cd gauntlet
 
 # Build with optimizations
@@ -401,8 +401,8 @@ Two distinct probability metrics are reported:
 
 1. **Conjugate Normal Model** - Assumes response times follow a normal distribution
 2. **Posterior Distribution** - Computes exact posterior using conjugate priors
-3. **Sampling** - Generates 100,000 samples from posterior distributions
-4. **Comparison** - Directly compares samples to compute probabilities
+3. **Analytical Computation** - Closed-form probability via the normal CDF (no MCMC sampling)
+4. **Comparison** - Computes P(B faster than A) directly from posterior parameters
 
 #### Interpretation Guide
 
@@ -496,7 +496,7 @@ See [`examples/README.md`](examples/README.md) for more examples.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/gauntlet.git
+git clone https://github.com/real-limoges/gauntlet.git
 cd gauntlet
 
 # Install dependencies
@@ -730,7 +730,7 @@ jobs:
       - name: Setup Haskell
         uses: haskell/actions/setup@v2
         with:
-          ghc-version: '9.10'
+          ghc-version: '9.12'
           cabal-version: '3.12'
 
       - name: Run benchmark
@@ -817,7 +817,7 @@ Statistical methodology inspired by Bayesian Data Analysis (Gelman et al.) and p
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/gauntlet/issues)
+- **Issues**: [GitHub Issues](https://github.com/real-limoges/gauntlet/issues)
 - **Examples**: See [`examples/`](examples/) directory
 
 For questions or feature requests, please open an issue.
