@@ -3,6 +3,10 @@
     "primary": "http://primary-service.internal:8080",
     "candidate": "http://candidate-service.internal:8080"
   },
+  "git": {
+    "primary": "main",
+    "candidate": "feat/candidate"
+  },
   "settings": {
     "iterations": 10000,
     "concurrency": 100,

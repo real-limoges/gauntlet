@@ -3,6 +3,10 @@
     "primary": "http://api.example.com",
     "candidate": "http://api.example.com"
   },
+  "git": {
+    "primary": "main",
+    "candidate": "main"
+  },
   "settings": {
     "iterations": 500,
     "concurrency": 10,

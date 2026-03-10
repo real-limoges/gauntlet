@@ -1,0 +1,28 @@
+{
+  "targets": [
+    { "name": "primary", "url": "http://api.example.com" },
+    { "name": "candidate", "url": "http://api-new.example.com" }
+  ],
+  "settings": {
+    "iterations": 1000,
+    "concurrency": 20,
+    "secrets": ".secrets/token.txt",
+    "logLevel": "info",
+    "loadMode": {
+      "mode": "stepLoad",
+      "steps": [
+        { "rps": 10,  "durationSecs": 30 },
+        { "rps": 50,  "durationSecs": 60 },
+        { "rps": 100, "durationSecs": 60 },
+        { "rps": 50,  "durationSecs": 30 }
+      ]
+    }
+  },
+  "payloads": [
+    {
+      "name": "get-users",
+      "method": "GET",
+      "path": "/api/v1/users"
+    }
+  ]
+}
