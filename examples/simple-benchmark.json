@@ -3,6 +3,10 @@
     "primary": "http://localhost:8080",
     "candidate": "http://localhost:8080"
   },
+  "git": {
+    "primary": "main",
+    "candidate": "main"
+  },
   "settings": {
     "iterations": 1000,
     "concurrency": 20,

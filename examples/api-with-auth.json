@@ -3,6 +3,10 @@
     "primary": "https://api.production.com",
     "candidate": "https://api.staging.com"
   },
+  "git": {
+    "primary": "main",
+    "candidate": "main"
+  },
   "settings": {
     "iterations": 2000,
     "concurrency": 25,

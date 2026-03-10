@@ -10,7 +10,7 @@ mkdir -p .secrets
 echo "your-bearer-token-here" > .secrets/token.txt
 
 # Run a simple benchmark
-cabal run gauntlet-exe -- benchmark-nway --config examples/simple-benchmark.json
+cabal run gauntlet-exe -- benchmark-single --config examples/simple-benchmark.json
 ```
 
 ## Example Files
@@ -75,6 +75,14 @@ Change `logLevel` to control output verbosity:
 - Targets specified as an array of `{name, url}` objects
 
 **Use case:** Comparing performance across multiple environments or API versions.
+
+### `load-modes.json`
+**Step load profile** - Ramp requests up and back down in discrete steps.
+- 4 steps: 10 → 50 → 100 → 50 RPS
+- Duration-based (`iterations` ignored; total requests derived from schedule)
+- Uses `benchmark-nway` with two named targets
+
+**Use case:** Stress testing, finding saturation points, validating autoscaling.
 
 ## Configuration Reference
 
@@ -180,18 +188,20 @@ Integrates with Grafana Tempo for distributed trace analysis.
 
 ## Running Examples
 
-### Single Benchmark
-Test one endpoint at a time:
+### Single or A/B Benchmark
+Configs with `targets: {primary, candidate}` use `benchmark-single`:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-nway --config examples/minimal.json
+cabal run gauntlet-exe -- benchmark-single --config examples/minimal.json
+cabal run gauntlet-exe -- benchmark-single --config examples/ab-comparison.json
 ```
 
-### A/B Comparison
-Compare primary vs. candidate:
+### N-way Comparison
+Configs with `targets: [...]` use `benchmark-nway`:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-nway --config examples/ab-comparison.json
+cabal run gauntlet-exe -- benchmark-nway --config examples/nway-comparison.json
+cabal run gauntlet-exe -- benchmark-nway --config examples/load-modes.json
 ```
 
 ### With Baseline Comparison
@@ -199,21 +209,21 @@ Save a baseline for regression detection:
 
 ```bash
 # Save baseline
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark-single \
   --config examples/simple-benchmark.json \
   --save-baseline my-baseline
 
 # Compare against baseline
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark-single \
   --config examples/simple-benchmark.json \
   --compare-baseline my-baseline
 ```
 
 ### Markdown Report
-Write a full markdown report (stats, Bayesian analysis, validation) in addition to terminal output:
+Write a full markdown report in addition to terminal output:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark-single \
   --config examples/simple-benchmark.json \
   --output markdown \
   --report-path results/report.md
