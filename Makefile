@@ -8,6 +8,3 @@ benchmark-nway: build
 
 benchmark-single: build
 	$(EXE) benchmark-single --config config.json
-
-verify: build
-	$(EXE) verify --config config.json
