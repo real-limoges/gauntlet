@@ -125,6 +125,7 @@ theAttrMap =
     , (attrName "err", fg V.red)
     , (attrName "dim", fg V.brightBlack)
     , (attrName "progress", fg V.blue)
+    , (attrName "warn", fg V.brightYellow)
     ]
 
 -- ── Drawing ──────────────────────────────────────────────────────────────────
@@ -181,6 +182,9 @@ progressSection state =
           , if elapsed > 0
               then withAttr (attrName "dim") $ txt $ "   " <> formatElapsed elapsed
               else emptyWidget
+          , case eta of
+              Just e -> withAttr (attrName "dim") $ txt $ "  ETA " <> formatElapsed e
+              Nothing -> emptyWidget
           , rpsWidget state
           ]
       ]
@@ -189,6 +193,10 @@ progressSection state =
     total = tsIsTotal state
     pct = if total > 0 then fromIntegral completed / fromIntegral total else 0 :: Float
     elapsed = tsElapsedSecs state
+    eta =
+      if completed > 0 && total > completed
+        then Just $ elapsed * fromIntegral (total - completed) / fromIntegral completed
+        else Nothing
 
 rpsWidget :: TUIState -> Widget Name
 rpsWidget state = case (tsCurrentRps state, tsTargetRps state, tsCurrentStep state) of
@@ -222,21 +230,29 @@ statsSection state =
         [ withAttr (attrName "dim") $ txt $ "Latency  (rolling last " <> T.pack (show rollingWindow) <> ")"
         , txt " "
         , hBox
-            [ statBox "Mean" (formatDuration $ rsMeanMs stats)
-            , statBox "P50 " (formatDuration $ rsP50Ms stats)
-            , statBox "P95 " (formatDuration $ rsP95Ms stats)
-            , statBox "P99 " (formatDuration $ rsP99Ms stats)
-            , statBox "Min " (formatDuration $ rsMinMs stats)
-            , statBox "Max " (formatDuration $ rsMaxMs stats)
+            [ statBox "stat" "Mean" (formatDuration $ rsMeanMs stats)
+            , statBox "stat" "P50 " (formatDuration $ rsP50Ms stats)
+            , statBox (p95Attr stats) "P95 " (formatDuration $ rsP95Ms stats)
+            , statBox (p99Attr stats) "P99 " (formatDuration $ rsP99Ms stats)
+            , statBox "stat" "Min " (formatDuration $ rsMinMs stats)
+            , statBox "stat" "Max " (formatDuration $ rsMaxMs stats)
             ]
         ]
   where
-    statBox label value =
+    statBox valueAttr label value =
       padRight (Pad 4) $
         vBox
           [ withAttr (attrName "label") $ txt label
-          , withAttr (attrName "stat") $ txt value
+          , withAttr (attrName valueAttr) $ txt value
           ]
+    p99Attr stats
+      | rsMeanMs stats > 0 && rsP99Ms stats > 2 * rsMeanMs stats = "err"
+      | rsMeanMs stats > 0 && rsP99Ms stats > 1.5 * rsMeanMs stats = "warn"
+      | otherwise = "stat"
+    p95Attr stats
+      | rsMeanMs stats > 0 && rsP95Ms stats > 2 * rsMeanMs stats = "err"
+      | rsMeanMs stats > 0 && rsP95Ms stats > 1.5 * rsMeanMs stats = "warn"
+      | otherwise = "stat"
 
 histogramSection :: TUIState -> Widget Name
 histogramSection state =
@@ -285,7 +301,7 @@ errorsSection state =
           , txt "   "
           , withAttr (attrName "err") $ txt $ "✗ " <> T.pack (show (tsErrorCount state)) <> " errors"
           , if errorCount > 0 && total > 0
-              then withAttr (attrName "dim") $ txt $ "  (" <> T.pack (show pct) <> "%)"
+              then withAttr (attrName errPctAttr) $ txt $ "  (" <> T.pack (show pct) <> "%)"
               else emptyWidget
           ]
       , if Seq.null (tsRecentErrors state)
@@ -296,6 +312,10 @@ errorsSection state =
     errorCount = tsErrorCount state
     total = errorCount + tsSuccessCount state
     pct = if total > 0 then (errorCount * 100) `div` total else 0 :: Int
+    errPctAttr
+      | total > 0 && errorCount * 100 > total = "err"
+      | total > 0 && errorCount * 1000 > total = "warn"
+      | otherwise = "dim"
     renderErr (_, msg) = withAttr (attrName "err") $ txt $ "  " <> msg
 
 footerSection :: Widget Name
