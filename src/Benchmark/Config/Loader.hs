@@ -4,7 +4,6 @@ module Benchmark.Config.Loader
   , buildEndpoints
   , validateConfig
   , validateNwayConfig
-  , toEndpoint
   )
 where
 

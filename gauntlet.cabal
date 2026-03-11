@@ -47,6 +47,10 @@ library
                           Benchmark.Report.Formatting
                           Benchmark.Report.Markdown
                           Benchmark.Report.Output
+                          Benchmark.Reporter
+                          Benchmark.Reporter.CI
+                          Benchmark.Reporter.Markdown
+                          Benchmark.Reporter.Terminal
                           Benchmark.Types
                           Benchmark.Types.Baseline
                           Benchmark.Types.Config

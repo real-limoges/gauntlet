@@ -2,6 +2,7 @@ module BaselineSpec (baselineSpec) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Report.Baseline
+import Benchmark.Reporter (noOpReporter)
 import Benchmark.Types
 import Data.IORef
 import Data.List (find)
@@ -130,7 +131,7 @@ handleBaselineSpec =
         [ cleanTest "returns RunSuccess with no log output" $
             inTempDir $ do
               (logger, logRef) <- makeTestLogger
-              result <- handleBaseline logger NoBaseline hbTimestamp hbStats
+              result <- handleBaseline noOpReporter logger NoBaseline hbTimestamp hbStats
               result `shouldBe` RunSuccess
               msgs <- readIORef logRef
               msgs `shouldBe` []
@@ -140,7 +141,7 @@ handleBaselineSpec =
         [ cleanTest "returns RunSuccess and logs 'Baseline saved'" $
             inTempDir $ do
               (logger, logRef) <- makeTestLogger
-              result <- handleBaseline logger (SaveBaseline "test") hbTimestamp hbStats
+              result <- handleBaseline noOpReporter logger (SaveBaseline "test") hbTimestamp hbStats
               result `shouldBe` RunSuccess
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]
@@ -148,7 +149,7 @@ handleBaselineSpec =
         , cleanTest "logs 'Error:' when save path is invalid" $
             inTempDir $ do
               (logger, logRef) <- makeTestLogger
-              result <- handleBaseline logger (SaveBaseline "foo\0bar") hbTimestamp hbStats
+              result <- handleBaseline noOpReporter logger (SaveBaseline "foo\0bar") hbTimestamp hbStats
               result `shouldBe` RunSuccess
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]
@@ -159,7 +160,7 @@ handleBaselineSpec =
         [ cleanTest "returns RunSuccess with error log when baseline missing" $
             inTempDir $ do
               (logger, logRef) <- makeTestLogger
-              result <- handleBaseline logger (CompareBaseline "missing") hbTimestamp hbStats
+              result <- handleBaseline noOpReporter logger (CompareBaseline "missing") hbTimestamp hbStats
               result `shouldBe` RunSuccess
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]
@@ -167,18 +168,18 @@ handleBaselineSpec =
         , cleanTest "returns RunSuccess when baseline matches (no regression)" $
             inTempDir $ do
               (logger, _) <- makeTestLogger
-              _ <- handleBaseline logger (SaveBaseline "test") hbTimestamp hbStats
+              _ <- handleBaseline noOpReporter logger (SaveBaseline "test") hbTimestamp hbStats
               (logger2, _) <- makeTestLogger
-              result <- handleBaseline logger2 (CompareBaseline "test") hbTimestamp hbStats
+              result <- handleBaseline noOpReporter logger2 (CompareBaseline "test") hbTimestamp hbStats
               result `shouldBe` RunSuccess
         , cleanTest "returns RunRegression when stats regressed" $
             inTempDir $ do
               (logger, _) <- makeTestLogger
               let goodStats = mockStats 10.0 1.0
-              _ <- handleBaseline logger (SaveBaseline "perf") hbTimestamp goodStats
+              _ <- handleBaseline noOpReporter logger (SaveBaseline "perf") hbTimestamp goodStats
               let badStats = mockStats 50.0 5.0
               (logger2, _) <- makeTestLogger
-              result <- handleBaseline logger2 (CompareBaseline "perf") hbTimestamp badStats
+              result <- handleBaseline noOpReporter logger2 (CompareBaseline "perf") hbTimestamp badStats
               case result of
                 RunRegression _ -> pure ()
                 other -> assertFailure $ "Expected RunRegression, got: " ++ show other
@@ -188,9 +189,9 @@ handleBaselineSpec =
         [ cleanTest "saves and compares" $
             inTempDir $ do
               (logger, _) <- makeTestLogger
-              _ <- handleBaseline logger (SaveBaseline "compare") hbTimestamp hbStats
+              _ <- handleBaseline noOpReporter logger (SaveBaseline "compare") hbTimestamp hbStats
               (logger2, logRef) <- makeTestLogger
-              result <- handleBaseline logger2 (SaveAndCompare "save" "compare") hbTimestamp hbStats
+              result <- handleBaseline noOpReporter logger2 (SaveAndCompare "save" "compare") hbTimestamp hbStats
               result `shouldBe` RunSuccess
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]

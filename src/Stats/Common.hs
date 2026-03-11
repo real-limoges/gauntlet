@@ -5,7 +5,6 @@ module Stats.Common
   , percentileList
   , stdDev
   , stdDevList
-  , variance
   , varianceList
   ) where
 

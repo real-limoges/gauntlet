@@ -1,5 +1,6 @@
 module ValidationSpec (validationSpec) where
 
+import Benchmark.Execution.Validation (validateResponse, validateResponses)
 import Benchmark.Types
   ( FieldAssertion (..)
   , TestingResponse (..)
@@ -7,7 +8,6 @@ import Benchmark.Types
   , ValidationSpec (..)
   , ValidationSummary (..)
   )
-import Benchmark.Execution.Validation (validateResponse, validateResponses)
 import Data.Aeson (Value (..), encode, object, (.=))
 import Data.Map.Strict qualified as Map
 import Data.Scientific (Scientific)

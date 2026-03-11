@@ -6,8 +6,8 @@ module Benchmark.Network.Exec
   )
 where
 
-import Benchmark.Network.Request (prepareRequest, timedRequestPrepared)
 import Benchmark.Execution.RateLimiter (RateLimiter, waitForSlot)
+import Benchmark.Network.Request (prepareRequest, timedRequestPrepared)
 import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types
   ( Endpoint (..)

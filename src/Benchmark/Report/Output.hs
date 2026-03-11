@@ -3,15 +3,13 @@ module Benchmark.Report.Output
   , initNwayOutputFiles
   , writeLatencies
   , writeLatenciesWithTarget
-  , writeMarkdownReport
   , resultsDir
   , formatRow
   , formatResultBuilder
   ) where
 
-import Benchmark.Types (Endpoint (..), Nanoseconds (..), OutputFormat (..), TestingResponse (..))
+import Benchmark.Types (Endpoint (..), Nanoseconds (..), TestingResponse (..))
 import Data.Text (Text)
-import Data.Text.IO qualified as TIO
 import Data.Text.Lazy.Builder (Builder, toLazyText)
 import Data.Text.Lazy.Builder qualified as B
 import Data.Text.Lazy.IO qualified as TLIO
@@ -48,10 +46,6 @@ writeLatenciesWithTarget :: FilePath -> Maybe Text -> [(Int, Endpoint, [TestingR
 writeLatenciesWithTarget csvFile mTarget results = do
   let builder = foldMap (formatResultWithTarget mTarget) results
   TLIO.appendFile csvFile (toLazyText builder)
-
--- | Write a markdown report to 'endpoint_analysis.md'.
-writeMarkdownReport :: OutputFormat -> Text -> IO ()
-writeMarkdownReport _ = TIO.writeFile "endpoint_analysis.md"
 
 formatResultBuilder :: (Int, Endpoint, [TestingResponse]) -> Builder
 formatResultBuilder = formatResultWithTarget Nothing

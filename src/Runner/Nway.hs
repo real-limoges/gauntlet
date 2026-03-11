@@ -3,8 +3,8 @@ module Runner.Nway (runNway, allPairComparisons) where
 import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Config.Loader (buildEndpoints)
 import Benchmark.Report.Baseline (handleBaseline)
-import Benchmark.Report.Output (initNwayOutputFiles, writeMarkdownReport)
-import Benchmark.Report.Markdown (markdownNwayReport, markdownValidationReport)
+import Benchmark.Report.Output (initNwayOutputFiles)
+import Benchmark.Reporter (Reporter (..))
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
 import Benchmark.Types
@@ -12,7 +12,6 @@ import Benchmark.Types
   , BenchmarkStats
   , NamedTarget (..)
   , NwayConfig (..)
-  , OutputFormat (..)
   , PerfTestError (..)
   , RegressionResult (..)
   , RunResult (..)
@@ -48,8 +47,8 @@ data NwayResult = NwayResult
   }
 
 -- | Run benchmarks against N named targets and compare all pairs.
-runNway :: BaselineMode -> OutputFormat -> NwayConfig -> IO RunResult
-runNway baselineMode outFmt cfg = do
+runNway :: Reporter -> BaselineMode -> NwayConfig -> IO RunResult
+runNway reporter baselineMode cfg = do
   (csvFile, timestamp) <- initNwayOutputFiles
 
   let setts = nwaySettings cfg
@@ -59,8 +58,8 @@ runNway baselineMode outFmt cfg = do
 
   isTerm <- hIsTerminalDevice stdin
   if isTerm
-    then runNwayWithTUI baselineMode outFmt cfg csvFile timestamp setts perTargetRequests numEndpoints
-    else runNwayNoTUI baselineMode outFmt cfg csvFile timestamp setts
+    then runNwayWithTUI reporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints
+    else runNwayNoTUI reporter baselineMode cfg csvFile timestamp setts
 
 -- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
 allPairComparisons :: [(Text, BenchmarkStats, [TestingResponse])] -> [(Text, Text, BayesianComparison)]
@@ -78,8 +77,8 @@ allPairComparisons ((nameA, statsA, timingsA) : rest) =
 
 -- | Run N-way benchmarks with TUI display.
 runNwayWithTUI ::
+  Reporter ->
   BaselineMode ->
-  OutputFormat ->
   NwayConfig ->
   FilePath ->
   String ->
@@ -87,7 +86,7 @@ runNwayWithTUI ::
   Int ->
   Int ->
   IO RunResult
-runNwayWithTUI baselineMode outFmt cfg csvFile timestamp setts perTargetRequests numEndpoints = do
+runNwayWithTUI reporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints = do
   eventChan <- newTChanIO
   let tuiState = initialState "Starting..." perTargetRequests numEndpoints
   ctx <- initContext setts csvFile timestamp (Just eventChan)
@@ -115,21 +114,21 @@ runNwayWithTUI baselineMode outFmt cfg csvFile timestamp setts perTargetRequests
       exitWithError (BenchmarkError (T.unpack errMsg))
     (True, Nothing) -> do
       results <- wait benchmarkWork
-      postAnalysis (rcLogger ctx) (rcManager ctx) baselineMode outFmt setts timestamp results
+      postAnalysis reporter (rcLogger ctx) (rcManager ctx) baselineMode setts timestamp results
 
 -- | Run N-way benchmarks without TUI (headless/CI mode).
 runNwayNoTUI ::
+  Reporter ->
   BaselineMode ->
-  OutputFormat ->
   NwayConfig ->
   FilePath ->
   String ->
   Settings ->
   IO RunResult
-runNwayNoTUI baselineMode outFmt cfg csvFile timestamp setts = do
+runNwayNoTUI reporter baselineMode cfg csvFile timestamp setts = do
   ctx <- initContext setts csvFile timestamp Nothing
   results <- runAllTargets ctx cfg Nothing
-  postAnalysis (rcLogger ctx) (rcManager ctx) baselineMode outFmt setts timestamp results
+  postAnalysis reporter (rcLogger ctx) (rcManager ctx) baselineMode setts timestamp results
 
 -- | Execute benchmarks for all targets.
 runAllTargets :: RunContext -> NwayConfig -> Maybe (TChan BenchmarkEvent) -> IO [NwayResult]
@@ -166,37 +165,35 @@ runAllTargets ctx cfg eventChan = do
 
 -- | Post-benchmark analysis: reporting, tracing, baselines.
 postAnalysis ::
+  Reporter ->
   Logger ->
   Manager ->
   BaselineMode ->
-  OutputFormat ->
   Settings ->
   String ->
   [NwayResult] ->
   IO RunResult
-postAnalysis logger mgr baselineMode outFmt setts timestamp results = do
+postAnalysis reporter logger mgr baselineMode setts timestamp results = do
   let namedStats = Map.fromList [(nrName r, nrStats r) | r <- results]
       pairInput = [(nrName r, nrStats r, nrResponses r) | r <- results]
       pairs = allPairComparisons pairInput
       validAll = concatMap nrValidations results
 
-  writeMarkdownReport outFmt $
-    markdownNwayReport namedStats pairs
-      <> markdownValidationReport validAll
+  reportNWay reporter namedStats pairs validAll
 
   forM_ results $ \r -> do
     logInfo logger $ "\n#----- Traces: " <> nrName r <> " -----#"
     runTraceAnalysis logger mgr setts timestamp (nrStartNs r) (nrEndNs r)
 
-  handleNwayBaseline logger baselineMode (T.pack timestamp) namedStats
+  handleNwayBaseline reporter logger baselineMode (T.pack timestamp) namedStats
 
 -- | Run baseline operations for each N-way target, aggregate results.
-handleNwayBaseline :: Logger -> BaselineMode -> Text -> Map Text BenchmarkStats -> IO RunResult
-handleNwayBaseline _logger NoBaseline _timestamp _namedStats = return RunSuccess
-handleNwayBaseline logger mode timestamp namedStats = do
+handleNwayBaseline :: Reporter -> Logger -> BaselineMode -> Text -> Map Text BenchmarkStats -> IO RunResult
+handleNwayBaseline _reporter _logger NoBaseline _timestamp _namedStats = return RunSuccess
+handleNwayBaseline reporter logger mode timestamp namedStats = do
   results <- forM (Map.toList namedStats) $ \(name, stats) -> do
     let qualifiedMode = qualifyBaselineMode name mode
-    handleBaseline logger qualifiedMode timestamp stats
+    handleBaseline reporter logger qualifiedMode timestamp stats
   if any isRegression results
     then return $ RunRegression $ aggregateRegressions [r | RunRegression r <- results]
     else return RunSuccess

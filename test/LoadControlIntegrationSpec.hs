@@ -1,7 +1,7 @@
 module LoadControlIntegrationSpec (loadControlIntegrationSpec) where
 
-import Benchmark.Network (runBenchmark, runBenchmarkDuration)
 import Benchmark.Execution.RateLimiter (makeLimiter)
+import Benchmark.Network (runBenchmark, runBenchmarkDuration)
 import Benchmark.Types
   ( Endpoint (..)
   , LoadMode (..)

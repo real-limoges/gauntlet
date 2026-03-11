@@ -1,7 +1,7 @@
 module Integration (integrationSpec) where
 
-import Benchmark.Report.Baseline
 import Benchmark.Network
+import Benchmark.Report.Baseline
 import Benchmark.Types
 import Control.Concurrent.QSem (newQSem)
 import Data.Aeson (object, (.=))

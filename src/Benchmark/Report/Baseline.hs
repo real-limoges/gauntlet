@@ -5,6 +5,7 @@ module Benchmark.Report.Baseline
   , baselineDir
   , listBaselines
   , handleBaseline
+  , printRegressionResult
   ) where
 
 import Control.Exception (SomeException, try)
@@ -16,8 +17,7 @@ import System.FilePath (takeBaseName, (</>))
 import Text.Printf (printf)
 
 import Benchmark.Config.CLI (BaselineMode (..))
-import Benchmark.Report.CI (CIMode (..), detectCIMode, formatForCI, writeArtifactReport, writeGitHubStepSummary)
-import Benchmark.Report.Output (resultsDir)
+import Benchmark.Reporter (Reporter (..))
 import Benchmark.Types
   ( Baseline (..)
   , BenchmarkStats (..)
@@ -108,8 +108,8 @@ checkMetric name threshold baselineVal currentVal =
 -- ---------------------------------------------------------------------------
 
 -- | Handle baseline save/compare operations per 'BaselineMode'.
-handleBaseline :: Logger -> BaselineMode -> Text -> BenchmarkStats -> IO RunResult
-handleBaseline logger mode timestamp stats = case mode of
+handleBaseline :: Reporter -> Logger -> BaselineMode -> Text -> BenchmarkStats -> IO RunResult
+handleBaseline reporter logger mode timestamp stats = case mode of
   NoBaseline -> return RunSuccess
   SaveBaseline name -> do
     result <- saveBaseline name timestamp stats
@@ -126,7 +126,7 @@ handleBaseline logger mode timestamp stats = case mode of
       Left err -> do
         logInfo logger $ "Error: " <> T.pack err
         return RunSuccess
-      Right baseline -> doBaselineComparison timestamp stats baseline
+      Right baseline -> doBaselineComparison reporter stats baseline
   SaveAndCompare saveName compareName -> do
     saveResult <- saveBaseline saveName timestamp stats
     case saveResult of
@@ -137,31 +137,15 @@ handleBaseline logger mode timestamp stats = case mode of
       Left err -> do
         logInfo logger $ "Error: " <> T.pack err
         return RunSuccess
-      Right baseline -> doBaselineComparison timestamp stats baseline
+      Right baseline -> doBaselineComparison reporter stats baseline
 
-doBaselineComparison :: Text -> BenchmarkStats -> Baseline -> IO RunResult
-doBaselineComparison timestamp stats baseline = do
+doBaselineComparison :: Reporter -> BenchmarkStats -> Baseline -> IO RunResult
+doBaselineComparison reporter stats baseline = do
   let regression = compareToBaseline defaultThresholds baseline stats
-  printRegressionResult regression
-  emitCIOutput regression (T.unpack timestamp)
+  reportRegression reporter regression
   if regressionPassed regression
     then return RunSuccess
     else return $ RunRegression regression
-
-emitCIOutput :: RegressionResult -> String -> IO ()
-emitCIOutput regression timestamp = do
-  ciMode <- detectCIMode
-  case ciMode of
-    None -> return ()
-    GitLab -> do
-      formatForCI GitLab regression
-      let reportFile = resultsDir ++ "/benchmark-report-" ++ timestamp ++ ".md"
-      writeArtifactReport reportFile regression
-    GitHub -> do
-      formatForCI GitHub regression
-      writeGitHubStepSummary regression
-      let reportFile = resultsDir ++ "/benchmark-report-" ++ timestamp ++ ".md"
-      writeArtifactReport reportFile regression
 
 printRegressionResult :: RegressionResult -> IO ()
 printRegressionResult regression = do

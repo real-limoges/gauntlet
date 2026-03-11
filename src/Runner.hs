@@ -3,13 +3,12 @@ module Runner (runSingle) where
 import Benchmark.Config.CLI (BaselineMode)
 import Benchmark.Config.Loader (buildEndpoints)
 import Benchmark.Report.Baseline (handleBaseline)
-import Benchmark.Report.Output (initOutputFiles, writeMarkdownReport)
-import Benchmark.Report.Markdown (markdownSingleReport, markdownValidationReport)
+import Benchmark.Report.Output (initOutputFiles)
+import Benchmark.Reporter (Reporter (..))
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
 import Benchmark.Types
-  ( OutputFormat (..)
-  , PerfTestError (..)
+  ( PerfTestError (..)
   , RunResult (..)
   , Settings (..)
   , Targets (..)
@@ -27,8 +26,8 @@ import Runner.Tracing (runTraceAnalysis)
 import Stats.Benchmark (calculateStats)
 
 -- | Run single-target benchmark without comparison.
-runSingle :: BaselineMode -> OutputFormat -> TestConfig -> IO RunResult
-runSingle baselineMode outFmt cfg = do
+runSingle :: Reporter -> BaselineMode -> TestConfig -> IO RunResult
+runSingle reporter baselineMode cfg = do
   (csvFile, timestamp) <- initOutputFiles
 
   let eps = buildEndpoints (candidate (targets cfg)) (payloads cfg)
@@ -82,10 +81,8 @@ runSingle baselineMode outFmt cfg = do
 
       let stats = calculateStats results
 
-      writeMarkdownReport outFmt $
-        markdownSingleReport targetUrl stats
-          <> markdownValidationReport validSummaries
+      reportSingle reporter targetUrl stats validSummaries
 
       runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
 
-      handleBaseline (rcLogger ctx) baselineMode (T.pack timestamp) stats
+      handleBaseline reporter (rcLogger ctx) baselineMode (T.pack timestamp) stats
