@@ -40,6 +40,11 @@ rateLimiterSpec =
             case ml of
               Just _ -> pure ()
               Nothing -> error "Expected Just"
+        , testCase "returns Just for LoadPoissonRps" $ do
+            ml <- makeLimiter (LoadPoissonRps 100)
+            case ml of
+              Just _ -> pure ()
+              Nothing -> error "Expected Just"
         ]
     , testGroup
         "waitForSlot"
@@ -64,6 +69,16 @@ rateLimiterSpec =
             -- 3 intervals at 50ms = 150ms minimum
             elapsed `shouldSatisfy` (>= 0.12)
             elapsed `shouldSatisfy` (< 0.5)
+        , testCase "poisson RPS dispatches 5 requests in roughly expected time" $ do
+            -- 50 RPS Poisson: mean inter-arrival = 20ms; 5 requests ~ 4 * 20ms = 80ms
+            Just limiter <- makeLimiter (LoadPoissonRps 50)
+            start <- getCurrentTime
+            replicateConcurrently_ 5 (waitForSlot limiter)
+            end <- getCurrentTime
+            let elapsed = realToFrac (diffUTCTime end start) :: Double
+            -- Wide bounds due to randomness: at least 1 interval, less than 10x mean
+            elapsed `shouldSatisfy` (>= 0.01)
+            elapsed `shouldSatisfy` (< 0.8)
         ]
     , testGroup
         "currentTargetRps"
@@ -76,6 +91,10 @@ rateLimiterSpec =
             Just limiter <- makeLimiter (LoadRampUp 10 100 60)
             rps <- currentTargetRps limiter
             rps `shouldSatisfy` (> 0)
+        , testCase "reports exact configured RPS for poisson mode" $ do
+            Just limiter <- makeLimiter (LoadPoissonRps 75.0)
+            rps <- currentTargetRps limiter
+            rps `shouldBe` 75.0
         ]
     , testGroup
         "LoadMode helpers"
@@ -93,6 +112,10 @@ rateLimiterSpec =
             isDurationBased (LoadStepLoad [LoadStep 50 30]) `shouldBe` True
         , testCase "isDurationBased is False for constant" $
             isDurationBased (LoadConstantRps 50) `shouldBe` False
+        , testCase "isDurationBased is False for poisson" $
+            isDurationBased (LoadPoissonRps 50) `shouldBe` False
+        , testCase "totalRequestsForMode poisson uses fallback" $
+            totalRequestsForMode (LoadPoissonRps 50) 1000 `shouldBe` 1000
         , testCase "loadModeDurationSecs for rampUp" $
             loadModeDurationSecs (LoadRampUp 10 100 60) `shouldSatisfy` (\d -> abs (d - 60) < 0.001)
         , testCase "loadModeDurationSecs for stepLoad" $
