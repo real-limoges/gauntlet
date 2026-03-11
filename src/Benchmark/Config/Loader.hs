@@ -114,6 +114,9 @@ validateSettings setts = do
 -- | Validate load mode settings when present.
 validateLoadMode :: Maybe LoadMode -> Either PerfTestError ()
 validateLoadMode Nothing = Right ()
+validateLoadMode (Just (LoadPoissonRps rps))
+  | rps <= 0 = Left $ ConfigValidationError "loadMode poisson: target mean must be greater than 0"
+  | otherwise = Right ()
 validateLoadMode (Just LoadUnthrottled) = Right ()
 validateLoadMode (Just (LoadConstantRps rps))
   | rps <= 0 = Left $ ConfigValidationError "loadMode constantRps: targetRps must be greater than 0"

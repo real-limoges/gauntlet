@@ -187,6 +187,8 @@ data LoadMode
     LoadRampUp Double Double Double
   | -- | Step load — sequential steps, each with its own RPS and duration
     LoadStepLoad [LoadStep]
+  | -- | Poissonly Distributed Load
+    LoadPoissonRps Double
   deriving stock (Show, Eq)
 
 instance FromJSON LoadMode where
@@ -203,6 +205,7 @@ instance FromJSON LoadMode where
 totalRequestsForMode :: LoadMode -> Int -> Int
 totalRequestsForMode LoadUnthrottled fallback = fallback
 totalRequestsForMode (LoadConstantRps _) fallback = fallback
+totalRequestsForMode (LoadPoissonRps _) fallback = fallback
 totalRequestsForMode (LoadRampUp startRps endRps dur) _ =
   round ((startRps + endRps) / 2 * dur)
 totalRequestsForMode (LoadStepLoad steps) _ =

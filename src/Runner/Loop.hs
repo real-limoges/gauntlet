@@ -101,6 +101,7 @@ runEndpointLoop RunContext {..} endpoints = do
 -- | Human-readable label for log message.
 loadModeLabel :: LoadMode -> String
 loadModeLabel LoadUnthrottled = ""
+loadModeLabel (LoadPoissonRps rps) = " at " ++ show (round rps :: Int) ++ " RPS on average"
 loadModeLabel (LoadConstantRps rps) = " at " ++ show (round rps :: Int) ++ " RPS"
 loadModeLabel (LoadRampUp s e d) =
   " ramping "
