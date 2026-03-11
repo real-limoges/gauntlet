@@ -46,23 +46,26 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 
 **Key Components:**
 - `Types.hs` - Core data types: `Endpoint`, `BenchmarkStats`, `BayesianComparison`, `TestConfig`, `PerfTestError`
-- `Config.hs` - Loads YAML/JSON config, builds endpoint definitions from payloads; also exports `loadNwayConfig`, `validateNwayConfig`, `toEndpoint`
-- `Environment.hs` - Git branch switching, docker-compose orchestration, health-check polling
-- `Network.hs` - HTTP client facade; implementation split into sub-modules:
-  - `Network/Auth.hs` - Token reading and auth header injection
-  - `Network/Exec.hs` - Request execution with retry logic
-  - `Network/Request.hs` - Nanosecond-precision timed request wrapper
-- `CLI.hs` - Command-line argument parsing
-- `Baseline.hs` - Saves/loads baselines, regression detection with configurable thresholds
-- `Validation.hs` - Per-response JSON field validation (status code + field assertions)
+- `Config/Loader.hs` - Loads YAML/JSON config, builds endpoint definitions from payloads; exports `loadNwayConfig`, `validateNwayConfig`
+- `Config/CLI.hs` - Command-line argument parsing
+- `Config/Env.hs` - `.env` / `.env.local` loading and `${VAR}` interpolation in config JSON before decode
+- `Execution/Environment.hs` - Git branch switching, docker-compose orchestration, health-check polling
+- `Execution/RateLimiter.hs` - Rate limiting: unthrottled, constant RPS, ramp-up, and step-load modes
+- `Execution/Validation.hs` - Per-response JSON field validation (status code + field assertions)
+- `Network/Auth.hs` - Token reading and auth header injection
+- `Network/Exec.hs` - Request execution with retry logic
+- `Network/Request.hs` - Nanosecond-precision timed request wrapper
 - `TUI.hs` + `TUI/State.hs` + `TUI/Widgets.hs` - Real-time Brick-based terminal UI
 - `Report.hs` - Terminal output formatting; also exports `printNwayReport`
 - `Report/Formatting.hs` - Statistical test formatting (formatMWU, formatKS, formatAD)
 - `Report/Markdown.hs` - Markdown report generation for CI artifacts; also exports `markdownNwayReport`
-- `Output.hs` - CSV/JSON serialization; also exports `initNwayOutputFiles`, `writeLatenciesWithTarget`
-- `CI.hs` - GitLab CI and GitHub Actions integration
-- `Env.hs` - `.env` / `.env.local` loading and `${VAR}` interpolation in config JSON before decode
-- `RateLimiter.hs` - Rate limiting: unthrottled, constant RPS, ramp-up, and step-load modes
+- `Report/Baseline.hs` - Saves/loads baselines, regression detection with configurable thresholds
+- `Report/CI.hs` - GitLab CI and GitHub Actions integration
+- `Report/Output.hs` - CSV/JSON serialization; exports `initNwayOutputFiles`, `writeLatenciesWithTarget`
+- `Reporter.hs` - `Reporter` record, `combineReporters`, `noOpReporter`
+- `Reporter/Terminal.hs` - Wraps `Report.hs` functions into reporter interface
+- `Reporter/Markdown.hs` - Writes markdown report to a file path; replaces old `writeMarkdownReport`
+- `Reporter/CI.hs` - CI integration behind reporter interface; wraps `Report/CI.hs`
 - `Types/` - Type sub-modules: `Baseline.hs`, `Config.hs`, `Error.hs`, `Internal.hs`, `Response.hs`, `Stats.hs`, `Units.hs`
 
 ### 2. Stats/ Module (Statistical Analysis)
