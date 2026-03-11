@@ -1,4 +1,8 @@
 module Benchmark.Reporter
+  ( Reporter (..)
+  , noOpReporter
+  , combineReporters
+  )
 where
 
 import Benchmark.Types

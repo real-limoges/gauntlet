@@ -23,11 +23,12 @@ import OutputSpec (outputSpec)
 import PropertySpec (propertySpec)
 import RateLimiterSpec (rateLimiterSpec)
 import ReportSpec (reportSpec)
+import ReporterSpec (reporterSpec)
+import RequestSpec (requestSpec)
 import StatsCommonSpec (statsCommonSpec)
 import StatsSpec (statsSpec)
 import TUISpec (tuiStateSpec, tuiWidgetsSpec)
 import TracingClientSpec (tracingClientSpec)
-import TracingQuerySpec (tracingQuerySpec)
 import TracingReportSpec (tracingReportSpec)
 import TracingSpec (tracingSpec)
 import TypesJsonSpec (typesJsonSpec)
@@ -54,7 +55,6 @@ main =
         , tuiWidgetsSpec
         , propertySpec
         , markdownSpec
-        , tracingQuerySpec
         , tracingReportSpec
         , authSpec
         , ciSpec
@@ -68,6 +68,8 @@ main =
         , nwayIntegrationSpec
         , typesSpec
         , reportSpec
+        , reporterSpec
+        , requestSpec
         , typesJsonSpec
         , environmentSpec
         , warmupSpec

@@ -6,7 +6,6 @@ module Log
   , logInfo
   , logWarning
   , logError
-  , withTimestamp
   , formatMessage
   )
 where
