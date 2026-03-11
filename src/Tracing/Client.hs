@@ -1,7 +1,5 @@
 module Tracing.Client
-  ( searchTraces
-  , fetchTrace
-  , fetchTracesForTimeRange
+  ( fetchTracesForTimeRange
   , parseSearchResponse
   , parseTraceResponse
   , buildTraceQL

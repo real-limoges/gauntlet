@@ -142,7 +142,6 @@ test-suite            gauntlet-test
                     , StatsSpec
                     , TestHelpers
                     , TracingClientSpec
-                    , TracingQuerySpec
                     , TracingReportSpec
                     , TracingSpec
                     , TUISpec
