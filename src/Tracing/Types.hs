@@ -1,5 +1,3 @@
-{-# LANGUAGE StrictData #-}
-
 module Tracing.Types
   ( -- * Configuration
     TempoConfig (..)

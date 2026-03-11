@@ -23,11 +23,8 @@ library
   hs-source-dirs:         src
   exposed-modules:        Lib
                           Log
-                          Runner
                           Runner.Context
-                          Runner.Loop
                           Runner.Nway
-                          Runner.Tracing
                           Runner.Warmup
                           Stats.Common
                           Stats.Benchmark
@@ -39,19 +36,29 @@ library
                           Benchmark.Execution.Validation
                           Benchmark.Network
                           Benchmark.Network.Auth
-                          Benchmark.Network.Exec
-                          Benchmark.Network.Request
                           Benchmark.Report
                           Benchmark.Report.Baseline
                           Benchmark.Report.CI
-                          Benchmark.Report.Formatting
                           Benchmark.Report.Markdown
                           Benchmark.Report.Output
                           Benchmark.Reporter
-                          Benchmark.Reporter.CI
                           Benchmark.Reporter.Markdown
-                          Benchmark.Reporter.Terminal
                           Benchmark.Types
+                          Benchmark.TUI.State
+                          Benchmark.TUI.Widgets
+                          Tracing.Client
+                          Tracing.Report
+                          Tracing.Types
+
+  other-modules:          Runner
+                          Runner.Loop
+                          Runner.Tracing
+                          Benchmark.Network.Exec
+                          Benchmark.Network.Request
+                          Benchmark.Report.Formatting
+                          Benchmark.Reporter.CI
+                          Benchmark.Reporter.Terminal
+                          Benchmark.TUI
                           Benchmark.Types.Baseline
                           Benchmark.Types.Config
                           Benchmark.Types.Error
@@ -59,12 +66,6 @@ library
                           Benchmark.Types.Response
                           Benchmark.Types.Stats
                           Benchmark.Types.Units
-                          Benchmark.TUI
-                          Benchmark.TUI.State
-                          Benchmark.TUI.Widgets
-                          Tracing.Client
-                          Tracing.Report
-                          Tracing.Types
 
   default-extensions:     OverloadedStrings
                         , NumericUnderscores
@@ -138,6 +139,8 @@ test-suite            gauntlet-test
                     , OutputSpec
                     , PropertySpec
                     , ReportSpec
+                    , ReporterSpec
+                    , RequestSpec
                     , StatsCommonSpec
                     , StatsSpec
                     , TestHelpers
