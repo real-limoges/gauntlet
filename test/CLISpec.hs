@@ -1,6 +1,6 @@
 module CLISpec (cliSpec) where
 
-import Benchmark.CLI
+import Benchmark.Config.CLI
 import Benchmark.Types (OutputFormat (..))
 import Options.Applicative
 import TastyCompat (shouldBe)

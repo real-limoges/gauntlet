@@ -1,10 +1,3 @@
-{-|
-Module      : Tracing.Report
-Description : Terminal output for trace analysis
-Stability   : experimental
-
-Formats and prints span duration statistics from trace analysis.
--}
 module Tracing.Report
   ( printTraceAnalysis
   , printSpanTable

@@ -1,12 +1,4 @@
-{-|
-Module      : Benchmark.Env
-Description : .env file parsing and config interpolation
-Stability   : experimental
-
-Loads environment variables from process env, .env, and .env.local files,
-then interpolates \${VAR} patterns in config text before JSON decoding.
--}
-module Benchmark.Env
+module Benchmark.Config.Env
   ( parseEnvFile
   , loadEnvVars
   , interpolateEnv

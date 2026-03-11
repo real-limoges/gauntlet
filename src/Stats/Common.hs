@@ -1,10 +1,3 @@
-{-|
-Module      : Stats.Common
-Description : Shared statistical utilities
-Stability   : experimental
-
-Common statistical functions used by both benchmark analysis and trace analysis.
--}
 module Stats.Common
   ( -- * Descriptive Statistics
     percentile
@@ -12,7 +5,6 @@ module Stats.Common
   , percentileList
   , stdDev
   , stdDevList
-  , variance
   , varianceList
   ) where
 

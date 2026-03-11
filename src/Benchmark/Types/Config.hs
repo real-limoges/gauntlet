@@ -39,7 +39,6 @@ import Data.Aeson
   , withObject
   , (.:)
   )
-import Data.Aeson qualified
 import Data.Aeson.Types (Parser)
 import Data.Map.Strict (Map)
 import Data.Text (Text)

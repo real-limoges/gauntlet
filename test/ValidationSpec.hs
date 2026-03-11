@@ -1,5 +1,6 @@
 module ValidationSpec (validationSpec) where
 
+import Benchmark.Execution.Validation (validateResponse, validateResponses)
 import Benchmark.Types
   ( FieldAssertion (..)
   , TestingResponse (..)
@@ -7,12 +8,11 @@ import Benchmark.Types
   , ValidationSpec (..)
   , ValidationSummary (..)
   )
-import Benchmark.Validation (validateResponse, validateResponses)
 import Data.Aeson (Value (..), encode, object, (.=))
 import Data.Map.Strict qualified as Map
 import Data.Scientific (Scientific)
 import Data.Text (Text)
-import TastyCompat (shouldBe, shouldSatisfy)
+import TastyCompat (shouldBe)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
 import TestHelpers (makeResponseWithBody)

@@ -1,10 +1,6 @@
-{-|
-Module      : Runner.Tracing
-Description : Optional Grafana Tempo trace fetching and reporting
--}
 module Runner.Tracing (runTraceAnalysis) where
 
-import Benchmark.Output (resultsDir)
+import Benchmark.Report.Output (resultsDir)
 import Benchmark.Types (Settings (..), TempoSettings)
 import Benchmark.Types qualified as PT
 import Control.Exception (SomeException, try)

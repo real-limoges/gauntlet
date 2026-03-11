@@ -1,6 +1,6 @@
 module NwaySpec (nwaySpec) where
 
-import Benchmark.Config (validateNwayConfig)
+import Benchmark.Config.Loader (validateNwayConfig)
 import Benchmark.Types
 import Data.Text (Text)
 import Data.Text qualified as T

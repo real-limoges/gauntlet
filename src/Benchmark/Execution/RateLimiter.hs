@@ -1,14 +1,4 @@
-{-|
-Module      : Benchmark.RateLimiter
-Description : MVar-based rate limiter for load control modes
-
-Provides an 'MVar'-based slot scheduler that paces request dispatch.
-Each call to 'waitForSlot' atomically claims the next time slot and
-sleeps until that slot arrives. This composes cleanly with the existing
-'QSem' concurrency gate — call 'waitForSlot' /before/ 'waitQSem' so
-threads wait at the rate gate without holding a semaphore slot.
--}
-module Benchmark.RateLimiter
+module Benchmark.Execution.RateLimiter
   ( RateLimiter
   , waitForSlot
   , makeLimiter
@@ -65,8 +55,6 @@ makeLimiter mode = do
             let elapsed = realToFrac (diffUTCTime t now) :: Double
                 rps = findStepRps steps elapsed
             pure (realToFrac (1.0 / rps) :: NominalDiffTime)
-        LoadUnthrottled ->
-          \_ -> pure 0
   pure $
     Just
       RateLimiter

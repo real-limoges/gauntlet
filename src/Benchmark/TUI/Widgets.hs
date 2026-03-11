@@ -1,10 +1,3 @@
-{-|
-Module      : Benchmark.TUI.Widgets
-Description : Custom Brick widgets for TUI
-Stability   : experimental
-
-Custom widgets for the benchmark TUI: progress bar, histogram, and formatters.
--}
 module Benchmark.TUI.Widgets
   ( progressBar
   , histogram

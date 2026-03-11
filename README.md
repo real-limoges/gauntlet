@@ -534,29 +534,27 @@ gauntlet/
 ├── src/
 │   ├── Benchmark/          # HTTP benchmarking engine
 │   │   ├── Types.hs        # Core data types (re-exports Types/ sub-modules)
-│   │   ├── Types/          # Type sub-modules
-│   │   │   ├── Baseline.hs # Baseline data types
-│   │   │   ├── Config.hs   # Configuration types
-│   │   │   ├── Error.hs    # Error types
-│   │   │   ├── Internal.hs # Internal types
-│   │   │   ├── Response.hs # Response types
-│   │   │   ├── Stats.hs    # Statistics types
-│   │   │   └── Units.hs    # Nanoseconds/Milliseconds newtypes
-│   │   ├── Config.hs       # Configuration parsing
-│   │   ├── Env.hs          # .env/.env.local loading, ${VAR} interpolation
-│   │   ├── Environment.hs  # Git switch + docker-compose + health check
-│   │   ├── Network.hs      # HTTP client facade + connection pool init
-│   │   ├── Network/        # Network sub-modules (Auth, Exec, Request)
-│   │   ├── CLI.hs          # Command-line interface
-│   │   ├── Baseline.hs     # Baseline save/load
-│   │   ├── RateLimiter.hs  # Rate limiting (unthrottled, constant RPS, ramp-up, step-load)
-│   │   ├── Validation.hs   # Per-response JSON field validation
+│   │   ├── Types/          # Type sub-modules (Baseline, Config, Error, Internal, Response, Stats, Units)
+│   │   ├── Config/         # Configuration
+│   │   │   ├── Loader.hs   # JSON/YAML config parsing
+│   │   │   ├── CLI.hs      # Command-line argument parsing
+│   │   │   └── Env.hs      # .env/.env.local loading, ${VAR} interpolation
+│   │   ├── Execution/      # Runtime execution
+│   │   │   ├── Environment.hs  # Git switch + docker-compose + health check
+│   │   │   ├── RateLimiter.hs  # unthrottled, constantRps, rampUp, stepLoad
+│   │   │   └── Validation.hs   # Per-response JSON field validation
+│   │   ├── Network/        # HTTP client (Auth, Exec, Request)
 │   │   ├── TUI.hs          # Real-time terminal UI
 │   │   ├── TUI/            # TUI sub-modules (State, Widgets)
-│   │   ├── Report.hs       # Terminal output
-│   │   ├── Report/         # Report sub-modules (Formatting, Markdown)
-│   │   ├── Output.hs       # JSON/CSV serialization
-│   │   └── CI.hs           # GitLab CI / GitHub Actions integration
+│   │   ├── Report.hs       # Terminal output formatting
+│   │   ├── Report/         # Report sub-modules
+│   │   │   ├── Baseline.hs # Baseline save/load/regression detection
+│   │   │   ├── CI.hs       # GitLab CI / GitHub Actions integration
+│   │   │   ├── Formatting.hs  # Statistical test formatting (MWU, KS, AD)
+│   │   │   ├── Markdown.hs    # Markdown report generation
+│   │   │   └── Output.hs   # JSON/CSV serialization
+│   │   ├── Reporter.hs     # Reporter record, combineReporters, noOpReporter
+│   │   └── Reporter/       # Built-in reporters (Terminal, Markdown, CI)
 │   ├── Runner/             # Benchmark orchestration
 │   │   ├── Context.hs      # RunContext, initContext, setupOrFail
 │   │   ├── Loop.hs         # Concurrent benchmark loops
@@ -681,11 +679,12 @@ Terminal Output + Optional Markdown Report + Exit Code
 
 ### Key Modules
 
-- **Benchmark.Network** - HTTP client with connection pooling and retries
+- **Benchmark.Network.{Auth,Exec,Request}** - HTTP client with connection pooling and retries
 - **Stats.Benchmark** - Bayesian comparison and percentile calculations
 - **Benchmark.TUI** - Real-time Brick-based terminal UI
 - **Tracing.Client** - Grafana Tempo integration
-- **Benchmark.Baseline** - Regression detection
+- **Benchmark.Report.Baseline** - Regression detection
+- **Benchmark.Reporter** - Output abstraction; combines terminal, markdown, and CI reporters
 
 See [`CLAUDE.md`](CLAUDE.md) for detailed architecture documentation.
 

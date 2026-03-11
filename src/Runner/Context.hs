@@ -1,7 +1,3 @@
-{-|
-Module      : Runner.Context
-Description : Per-run context record, initialisation, and shared utilities
--}
 module Runner.Context
   ( RunContext (..)
   , initContext
@@ -11,7 +7,7 @@ module Runner.Context
   )
 where
 
-import Benchmark.Environment (setupEnvironment)
+import Benchmark.Execution.Environment (setupEnvironment)
 import Benchmark.Network (initNetwork, readToken)
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types (Settings (..), exitWithError)

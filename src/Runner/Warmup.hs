@@ -1,7 +1,3 @@
-{-|
-Module      : Runner.Warmup
-Description : Warmup execution before the main benchmark
--}
 module Runner.Warmup (runWarmup) where
 
 import Benchmark.Network (addAuth, runBenchmark)

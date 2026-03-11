@@ -1,21 +1,13 @@
-{-|
-Module      : Benchmark.Config
-Description : Configuration loading and validation
-Stability   : experimental
-
-Loads JSON configuration and builds endpoint definitions for benchmarking.
--}
-module Benchmark.Config
+module Benchmark.Config.Loader
   ( loadConfig
   , loadNwayConfig
   , buildEndpoints
   , validateConfig
   , validateNwayConfig
-  , toEndpoint
   )
 where
 
-import Benchmark.Env (interpolateEnv, loadEnvVars)
+import Benchmark.Config.Env (interpolateEnv, loadEnvVars)
 import Benchmark.Types
 import Control.Exception (IOException, try)
 import Control.Monad (when)

@@ -1,6 +1,6 @@
 module OutputSpec (outputSpec) where
 
-import Benchmark.Output
+import Benchmark.Report.Output
 import Benchmark.Types (Endpoint (..), Nanoseconds (..), TestingResponse (..))
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO

@@ -1,12 +1,4 @@
-{-|
-Module      : Benchmark.Validation
-Description : Per-response assertion checking
-Stability   : experimental
-
-Validates HTTP responses against a 'ValidationSpec': checks status codes
-and navigates dot-path field assertions into JSON response bodies.
--}
-module Benchmark.Validation
+module Benchmark.Execution.Validation
   ( validateResponse
   , validateResponses
   )

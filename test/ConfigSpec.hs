@@ -1,6 +1,6 @@
 module ConfigSpec (configSpec) where
 
-import Benchmark.Config
+import Benchmark.Config.Loader
 import Benchmark.Types
 import Data.Aeson (eitherDecode)
 import Data.Map.Strict qualified as Map

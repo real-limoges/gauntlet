@@ -1,13 +1,5 @@
 {-# LANGUAGE StrictData #-}
 
-{-|
-Module      : Tracing.Types
-Description : Data types for distributed tracing
-Stability   : experimental
-
-Core types for Tempo configuration, trace queries, and span data.
-All timing values are in nanoseconds unless noted otherwise.
--}
 module Tracing.Types
   ( -- * Configuration
     TempoConfig (..)

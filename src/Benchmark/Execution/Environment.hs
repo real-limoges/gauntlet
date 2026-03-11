@@ -1,11 +1,4 @@
-{-|
-Module      : Benchmark.Environment
-Description : Git and Docker environment setup
-Stability   : experimental
-
-Switches git branches and starts Docker containers for benchmark targets.
--}
-module Benchmark.Environment
+module Benchmark.Execution.Environment
   ( setupEnvironment
   , waitForHealth
   ) where

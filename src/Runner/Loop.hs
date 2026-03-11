@@ -1,9 +1,7 @@
-{-|
-Module      : Runner.Loop
-Description : Endpoint benchmark loop with concurrency and validation
--}
-module Runner.Loop (benchmarkEndpoints, runEndpointLoop) where
+module Runner.Loop (benchmarkEndpoints) where
 
+import Benchmark.Execution.RateLimiter (makeLimiter)
+import Benchmark.Execution.Validation (validateResponses)
 import Benchmark.Network
   ( addAuth
   , runBenchmark
@@ -11,8 +9,7 @@ import Benchmark.Network
   , runBenchmarkDurationWithEvents
   , runBenchmarkWithEvents
   )
-import Benchmark.Output (writeLatenciesWithTarget)
-import Benchmark.RateLimiter (makeLimiter)
+import Benchmark.Report.Output (writeLatenciesWithTarget)
 import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types
   ( Endpoint (..)
@@ -25,7 +22,6 @@ import Benchmark.Types
   , loadModeDurationSecs
   , totalRequestsForMode
   )
-import Benchmark.Validation (validateResponses)
 import Control.Concurrent (newQSem)
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Exception (throwIO)

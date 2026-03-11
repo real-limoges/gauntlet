@@ -31,21 +31,26 @@ library
                           Runner.Warmup
                           Stats.Common
                           Stats.Benchmark
-                          Benchmark.Baseline
-                          Benchmark.CI
-                          Benchmark.CLI
-                          Benchmark.Config
-                          Benchmark.Env
-                          Benchmark.Environment
+                          Benchmark.Config.CLI
+                          Benchmark.Config.Env
+                          Benchmark.Config.Loader
+                          Benchmark.Execution.Environment
+                          Benchmark.Execution.RateLimiter
+                          Benchmark.Execution.Validation
                           Benchmark.Network
                           Benchmark.Network.Auth
                           Benchmark.Network.Exec
                           Benchmark.Network.Request
-                          Benchmark.Output
-                          Benchmark.RateLimiter
                           Benchmark.Report
+                          Benchmark.Report.Baseline
+                          Benchmark.Report.CI
                           Benchmark.Report.Formatting
                           Benchmark.Report.Markdown
+                          Benchmark.Report.Output
+                          Benchmark.Reporter
+                          Benchmark.Reporter.CI
+                          Benchmark.Reporter.Markdown
+                          Benchmark.Reporter.Terminal
                           Benchmark.Types
                           Benchmark.Types.Baseline
                           Benchmark.Types.Config
@@ -54,7 +59,6 @@ library
                           Benchmark.Types.Response
                           Benchmark.Types.Stats
                           Benchmark.Types.Units
-                          Benchmark.Validation
                           Benchmark.TUI
                           Benchmark.TUI.State
                           Benchmark.TUI.Widgets

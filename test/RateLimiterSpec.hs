@@ -1,6 +1,6 @@
 module RateLimiterSpec (rateLimiterSpec) where
 
-import Benchmark.RateLimiter (currentTargetRps, makeLimiter, waitForSlot)
+import Benchmark.Execution.RateLimiter (currentTargetRps, makeLimiter, waitForSlot)
 import Benchmark.Types
   ( LoadMode (..)
   , LoadStep (..)

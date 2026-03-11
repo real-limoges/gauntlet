@@ -1,6 +1,6 @@
 module CISpec (ciSpec) where
 
-import Benchmark.CI
+import Benchmark.Report.CI
 import Benchmark.Types (MetricRegression (..), RegressionResult (..))
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO

@@ -1,6 +1,6 @@
 module EnvironmentSpec (environmentSpec) where
 
-import Benchmark.Environment (waitForHealth)
+import Benchmark.Execution.Environment (waitForHealth)
 import Benchmark.Types (PerfTestError (..))
 import Data.Text qualified as T
 import MockServer (mockFailThenSucceed, mockStatus)
