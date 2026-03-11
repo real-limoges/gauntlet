@@ -174,4 +174,6 @@ printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
 INVARIANT: callers guarantee the key exists (constructed from the same target list).
 -}
 lookupStats :: Text -> Map Text BenchmarkStats -> BenchmarkStats
-lookupStats name m = m Map.! name
+lookupStats name m = case Map.lookup name m of
+  Just v  -> v
+  Nothing -> error $ "lookupStats: missing key " <> show name

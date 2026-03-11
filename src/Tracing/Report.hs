@@ -69,6 +69,18 @@ groupByName :: [Span] -> Map.Map Text [Span]
 groupByName = foldr (\s -> Map.insertWith (++) (spanName s) [s]) Map.empty
 
 computeAggregation :: (Text, [Span]) -> SpanAggregation
+computeAggregation (name, []) =
+  SpanAggregation
+    { aggSpanName = name
+    , aggCount = 0
+    , aggMeanMs = Milliseconds 0
+    , aggStdDevMs = Milliseconds 0
+    , aggP50Ms = Milliseconds 0
+    , aggP95Ms = Milliseconds 0
+    , aggP99Ms = Milliseconds 0
+    , aggMinMs = Milliseconds 0
+    , aggMaxMs = Milliseconds 0
+    }
 computeAggregation (name, spanList) =
   let durations = map (unMs . nsToMs . spanDurationNs) spanList
       sorted = sort durations

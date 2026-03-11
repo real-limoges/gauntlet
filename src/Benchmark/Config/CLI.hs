@@ -31,6 +31,14 @@ data Command
       , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
       }
+  | Compare
+      { compareFileA :: FilePath
+      , compareFileB :: FilePath
+      }
+  | Validate
+      { validateConfigPath :: FilePath
+      , checkEndpoints :: Bool
+      }
   deriving (Show, Eq)
 
 parseArgs :: IO Command
@@ -49,6 +57,8 @@ commandParser =
   subparser
     ( command "benchmark-nway" (info benchmarkNwayOptions (progDesc "Run N-way benchmark comparison"))
         <> command "benchmark-single" (info benchmarkSingleOptions (progDesc "Run single-target benchmark"))
+        <> command "compare" (info compareOptions (progDesc "Compare two saved benchmark results"))
+        <> command "validate" (info validateOptions (progDesc "Validate config without running benchmarks"))
     )
 
 configOption :: Parser FilePath
@@ -118,3 +128,15 @@ benchmarkNwayOptions =
 benchmarkSingleOptions :: Parser Command
 benchmarkSingleOptions =
   BenchmarkSingle <$> configOption <*> baselineModeParser <*> outputFormatParser
+
+compareOptions :: Parser Command
+compareOptions =
+  Compare
+    <$> strArgument (metavar "FILE_A" <> help "First benchmark result JSON file")
+    <*> strArgument (metavar "FILE_B" <> help "Second benchmark result JSON file")
+
+validateOptions :: Parser Command
+validateOptions =
+  Validate
+    <$> configOption
+    <*> switch (long "check-endpoints" <> help "Perform HTTP GET to each target's health check path")

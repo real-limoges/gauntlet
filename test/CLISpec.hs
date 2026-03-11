@@ -53,4 +53,21 @@ cliSpec =
         , testCase "fails on unknown subcommand" $ do
             parse ["unknown-cmd", "--config", "foo.json"] `shouldBe` Nothing
         ]
+    , testGroup
+        "compare"
+        [ testCase "parses compare a.json b.json" $ do
+            parse ["compare", "a.json", "b.json"]
+              `shouldBe` Just (Compare "a.json" "b.json")
+        , testCase "fails on missing arguments" $ do
+            parse ["compare"] `shouldBe` Nothing
+        ]
+    , testGroup
+        "validate"
+        [ testCase "parses validate --config c.json" $ do
+            parse ["validate", "--config", "c.json"]
+              `shouldBe` Just (Validate "c.json" False)
+        , testCase "parses validate --config c.json --check-endpoints" $ do
+            parse ["validate", "--config", "c.json", "--check-endpoints"]
+              `shouldBe` Just (Validate "c.json" True)
+        ]
     ]
