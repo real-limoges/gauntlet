@@ -1,7 +1,7 @@
 module BaselineSpec (baselineSpec) where
 
-import Benchmark.Baseline
-import Benchmark.CLI (BaselineMode (..))
+import Benchmark.Config.CLI (BaselineMode (..))
+import Benchmark.Report.Baseline
 import Benchmark.Types
 import Data.IORef
 import Data.List (find)

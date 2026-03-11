@@ -1,7 +1,3 @@
-{-|
-Module      : Benchmark.Report.Formatting
-Description : Shared formatters for terminal and markdown reports
--}
 module Benchmark.Report.Formatting
   ( formatMWU
   , formatKS

@@ -1,10 +1,3 @@
-{-|
-Module      : Log
-Description : Structured logging with timestamps and log levels
-Stability   : experimental
-
-Provides structured logging with timestamps, log levels, and configurable verbosity.
--}
 module Log
   ( Logger (..)
   , makeLogger

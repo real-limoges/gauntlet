@@ -1,6 +1,6 @@
 module Integration (integrationSpec) where
 
-import Benchmark.Baseline
+import Benchmark.Report.Baseline
 import Benchmark.Network
 import Benchmark.Types
 import Control.Concurrent.QSem (newQSem)

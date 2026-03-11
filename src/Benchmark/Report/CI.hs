@@ -1,12 +1,4 @@
-{-|
-Module      : Benchmark.CI
-Description : CI environment integration for benchmark results
-Stability   : experimental
-
-Detects CI environment and formats regression output for GitLab and GitHub Actions pipelines.
-Writes markdown reports for merge request artifacts and job summaries.
--}
-module Benchmark.CI
+module Benchmark.Report.CI
   ( CIMode (..)
   , detectCIMode
   , formatForCI

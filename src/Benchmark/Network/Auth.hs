@@ -1,7 +1,3 @@
-{-|
-Module      : Benchmark.Network.Auth
-Description : Token loading and Bearer auth header injection
--}
 module Benchmark.Network.Auth (readToken, addAuth) where
 
 import Benchmark.Types (Endpoint (..), PerfTestError (..))

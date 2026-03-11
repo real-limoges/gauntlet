@@ -1,6 +1,6 @@
 module PropertySpec (propertySpec) where
 
-import Benchmark.Baseline (compareToBaseline)
+import Benchmark.Report.Baseline (compareToBaseline)
 import Benchmark.Types
 import Stats.Benchmark (calculateStats)
 import Test.QuickCheck

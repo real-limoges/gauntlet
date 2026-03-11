@@ -1,17 +1,9 @@
-{-|
-Module      : Runner.Nway
-Description : N-way benchmark orchestration
-Stability   : experimental
-
-Runs benchmarks against N>=2 named targets and produces all-pairs
-Bayesian comparisons. Integrates TUI, tracing, baseline, and CSV output.
--}
 module Runner.Nway (runNway, allPairComparisons) where
 
-import Benchmark.Baseline (handleBaseline)
-import Benchmark.CLI (BaselineMode (..))
-import Benchmark.Config (buildEndpoints)
-import Benchmark.Output (initNwayOutputFiles, writeMarkdownReport)
+import Benchmark.Config.CLI (BaselineMode (..))
+import Benchmark.Config.Loader (buildEndpoints)
+import Benchmark.Report.Baseline (handleBaseline)
+import Benchmark.Report.Output (initNwayOutputFiles, writeMarkdownReport)
 import Benchmark.Report.Markdown (markdownNwayReport, markdownValidationReport)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)

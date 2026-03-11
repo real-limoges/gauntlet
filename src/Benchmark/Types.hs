@@ -1,11 +1,3 @@
-{-|
-Module      : Benchmark.Types
-Description : Core data types for benchmarking (re-export facade)
-Stability   : experimental
-
-Re-exports all types from submodules. Downstream code can continue to
-import 'Benchmark.Types' without changes.
--}
 module Benchmark.Types
   ( -- * Request/Response Types
     Endpoint (..)

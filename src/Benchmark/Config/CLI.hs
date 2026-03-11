@@ -1,11 +1,4 @@
-{-|
-Module      : Benchmark.CLI
-Description : Command-line argument parsing
-Stability   : experimental
-
-Parses CLI arguments for benchmark-multiple and benchmark-single commands.
--}
-module Benchmark.CLI
+module Benchmark.Config.CLI
   ( parseArgs
   , Command (..)
   , BaselineMode (..)

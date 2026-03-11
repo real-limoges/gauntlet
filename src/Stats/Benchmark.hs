@@ -1,12 +1,3 @@
-{-|
-Module      : Stats.Benchmark
-Description : Statistical analysis for benchmark results
-Stability   : experimental
-
-Computes descriptive statistics and Bayesian A/B comparison between
-benchmark runs. Uses conjugate normal model for mean comparison with
-95% credible intervals.
--}
 module Stats.Benchmark
   ( -- * Descriptive Statistics
     calculateStats

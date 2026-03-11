@@ -1,11 +1,3 @@
-{-|
-Module      : Tracing.Client
-Description : Grafana Tempo HTTP client
-Stability   : experimental
-
-Queries Grafana Tempo for distributed traces using TraceQL. Parses OTLP JSON
-format responses to extract spans with timing and attribute data.
--}
 module Tracing.Client
   ( searchTraces
   , fetchTrace

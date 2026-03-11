@@ -1,11 +1,3 @@
-{-|
-Module      : Benchmark.Report.Markdown
-Description : Pure markdown report generators for benchmark results
-Stability   : experimental
-
-Produces self-contained markdown sections for stats, Bayesian analysis,
-regression comparisons, and validation summaries.
--}
 module Benchmark.Report.Markdown
   ( markdownSingleReport
   , markdownMultipleReport

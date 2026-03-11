@@ -1,6 +1,6 @@
 module NwayIntegrationSpec (nwayIntegrationSpec) where
 
-import Benchmark.CLI (BaselineMode (..))
+import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Types
 import Data.Text qualified as T
 import MockServer (mockJson)

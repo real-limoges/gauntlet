@@ -1,10 +1,3 @@
-{-|
-Module      : Benchmark.Report
-Description : Terminal output formatting for benchmark results
-Stability   : experimental
-
-Formats and prints benchmark statistics and Bayesian comparisons to the terminal.
--}
 module Benchmark.Report
   ( printMultipleBenchmarkReport
   , printSingleBenchmarkReport
@@ -16,8 +9,11 @@ where
 
 import Benchmark.Report.Formatting (formatAD, formatKS, formatMWU, formatValidationError)
 import Benchmark.Types
-  ( BayesianComparison (..)
+  ( ADResult
+  , BayesianComparison (..)
   , BenchmarkStats (..)
+  , KSResult
+  , MWUResult
   , PercentileComparison (..)
   , ValidationSummary (..)
   )
@@ -183,8 +179,13 @@ printStats stats = do
 printHeader :: String -> IO ()
 printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
 
+printMWU :: Maybe MWUResult -> IO ()
 printMWU mwu = printf "Mann-Whitney U:      %s\n" (formatMWU mwu)
+
+printKS :: Maybe KSResult -> IO ()
 printKS ks = printf "Kolmogorov-Smirnov:  %s\n" (formatKS ks)
+
+printAD :: Maybe ADResult -> IO ()
 printAD ad = printf "Anderson-Darling:    %s\n" (formatAD ad)
 
 {-| Look up stats for a target by name.

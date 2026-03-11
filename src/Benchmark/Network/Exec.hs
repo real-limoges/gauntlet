@@ -1,7 +1,3 @@
-{-|
-Module      : Benchmark.Network.Exec
-Description : Concurrent benchmark execution loops and A/B comparison
--}
 module Benchmark.Network.Exec
   ( runBenchmark
   , runBenchmarkWithEvents
@@ -11,7 +7,7 @@ module Benchmark.Network.Exec
 where
 
 import Benchmark.Network.Request (prepareRequest, timedRequestPrepared)
-import Benchmark.RateLimiter (RateLimiter, waitForSlot)
+import Benchmark.Execution.RateLimiter (RateLimiter, waitForSlot)
 import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types
   ( Endpoint (..)
@@ -117,7 +113,7 @@ runBenchmarkDurationWithEvents ::
   RateLimiter ->
   TChan BenchmarkEvent ->
   IO [TestingResponse]
-runBenchmarkDurationWithEvents settings sem mgr duration pIdx endpoint limiter eventChan = do
+runBenchmarkDurationWithEvents settings sem mgr duration _pIdx endpoint limiter eventChan = do
   now <- getCurrentTime
   let deadline = addUTCTime duration now
       conc = concurrency settings

@@ -1,18 +1,11 @@
 {- HLINT ignore "Use exitSuccess" -}
 
-{-|
-Module      : Lib
-Description : Main entry point
-Stability   : experimental
-
-CLI dispatch for benchmark commands.
--}
 module Lib (run) where
 
 import System.Exit (ExitCode (..), exitWith)
 
-import Benchmark.CLI (Command (..), parseArgs)
-import Benchmark.Config (loadConfig, loadNwayConfig, validateConfig, validateNwayConfig)
+import Benchmark.Config.CLI (Command (..), parseArgs)
+import Benchmark.Config.Loader (loadConfig, loadNwayConfig, validateConfig, validateNwayConfig)
 import Benchmark.Types
   ( NwayConfig
   , PerfTestError (..)

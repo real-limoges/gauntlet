@@ -1,7 +1,3 @@
-{-|
-Module      : Benchmark.Network.Request
-Description : Request preparation and timed execution with retry logic
--}
 module Benchmark.Network.Request
   ( initNetwork
   , prepareRequest

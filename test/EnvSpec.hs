@@ -1,7 +1,7 @@
 module EnvSpec (envSpec) where
 
-import Benchmark.Config (loadConfig)
-import Benchmark.Env (interpolateEnv, loadEnvVars, parseEnvFile)
+import Benchmark.Config.Env (interpolateEnv, loadEnvVars, parseEnvFile)
+import Benchmark.Config.Loader (loadConfig)
 import Benchmark.Types
 import Data.Map.Strict qualified as Map
 import System.Directory (withCurrentDirectory)

@@ -1,12 +1,4 @@
-{-|
-Module      : Benchmark.Baseline
-Description : Baseline storage and regression detection
-Stability   : experimental
-
-Save benchmark results as baselines and compare future runs against them
-for CI/CD regression detection.
--}
-module Benchmark.Baseline
+module Benchmark.Report.Baseline
   ( saveBaseline
   , loadBaseline
   , compareToBaseline
@@ -23,9 +15,9 @@ import System.Directory (createDirectoryIfMissing, doesFileExist, listDirectory)
 import System.FilePath (takeBaseName, (</>))
 import Text.Printf (printf)
 
-import Benchmark.CI (CIMode (..), detectCIMode, formatForCI, writeArtifactReport, writeGitHubStepSummary)
-import Benchmark.CLI (BaselineMode (..))
-import Benchmark.Output (resultsDir)
+import Benchmark.Config.CLI (BaselineMode (..))
+import Benchmark.Report.CI (CIMode (..), detectCIMode, formatForCI, writeArtifactReport, writeGitHubStepSummary)
+import Benchmark.Report.Output (resultsDir)
 import Benchmark.Types
   ( Baseline (..)
   , BenchmarkStats (..)

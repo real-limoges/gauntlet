@@ -1,11 +1,4 @@
-{-|
-Module      : Benchmark.Output
-Description : CSV output for benchmark results
-Stability   : experimental
-
-Writes latency measurements to timestamped CSV files in the results directory.
--}
-module Benchmark.Output
+module Benchmark.Report.Output
   ( initOutputFiles
   , initNwayOutputFiles
   , writeLatencies

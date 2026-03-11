@@ -1,17 +1,9 @@
-{-|
-Module      : Runner
-Description : Benchmark orchestration
-Stability   : experimental
-
-Orchestrates single-target benchmark runs ('runSingle').
-Delegates to sub-modules for context setup, warmup, looping, tracing, and baseline handling.
--}
 module Runner (runSingle) where
 
-import Benchmark.Baseline (handleBaseline)
-import Benchmark.CLI (BaselineMode)
-import Benchmark.Config (buildEndpoints)
-import Benchmark.Output (initOutputFiles, writeMarkdownReport)
+import Benchmark.Config.CLI (BaselineMode)
+import Benchmark.Config.Loader (buildEndpoints)
+import Benchmark.Report.Baseline (handleBaseline)
+import Benchmark.Report.Output (initOutputFiles, writeMarkdownReport)
 import Benchmark.Report.Markdown (markdownSingleReport, markdownValidationReport)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
