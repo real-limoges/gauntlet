@@ -259,19 +259,20 @@ histogramSection state =
   borderWithLabel (withAttr (attrName "label") $ txt " Distribution ") $
     if null durations
       then withAttr (attrName "dim") $ txt "Waiting for data..."
-      else histogram (zip labels counts)
+      else
+        let lo = minimum durations
+            hi = maximum durations
+            nBuckets = 5 :: Int
+            bucketWidth = if hi > lo then (hi - lo) / fromIntegral nBuckets else 1
+            bucketIndex v = min (nBuckets - 1) (floor ((v - lo) / bucketWidth))
+            counts = [length (filter (\v -> bucketIndex v == i) durations) | i <- [0 .. nBuckets - 1]]
+            labels =
+              [ formatDuration (lo + fromIntegral i * bucketWidth)
+              | i <- [0 .. nBuckets - 1]
+              ]
+         in histogram (zip labels counts)
   where
     durations = toList (tsRecentDurations state)
-    lo = minimum durations
-    hi = maximum durations
-    nBuckets = 5 :: Int
-    bucketWidth = if hi > lo then (hi - lo) / fromIntegral nBuckets else 1
-    bucketIndex v = min (nBuckets - 1) (floor ((v - lo) / bucketWidth))
-    counts = [length (filter (\v -> bucketIndex v == i) durations) | i <- [0 .. nBuckets - 1]]
-    labels =
-      [ formatDuration (lo + fromIntegral i * bucketWidth)
-      | i <- [0 .. nBuckets - 1]
-      ]
 
 requestTimelineSection :: TUIState -> Widget Name
 requestTimelineSection state =

@@ -41,6 +41,7 @@ library
                           Benchmark.Report.CI
                           Benchmark.Report.Markdown
                           Benchmark.Report.Output
+                          Benchmark.Compare
                           Benchmark.Reporter
                           Benchmark.Reporter.Markdown
                           Benchmark.Types
