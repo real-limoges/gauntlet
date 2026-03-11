@@ -46,20 +46,6 @@ reportSpec =
             , testCase "contains Tail Analysis header" $ do
                 output <- captureStdout $ printMultipleBenchmarkReport "a" "b" statsA statsB bayes
                 output `shouldSatisfy` ("Tail Analysis" `isInfixOf`)
-            , testCase "contains Distribution Tests header" $ do
-                output <- captureStdout $ printMultipleBenchmarkReport "a" "b" statsA statsB bayes
-                output `shouldSatisfy` ("Distribution Tests" `isInfixOf`)
-            , testCase "shows 'sample too small' when MWU/KS/AD are Nothing" $ do
-                output <- captureStdout $ printMultipleBenchmarkReport "a" "b" statsA statsB bayes
-                output `shouldSatisfy` ("sample too small" `isInfixOf`)
-            , testCase "shows 'Significant' when MWU significant" $ do
-                let bayesMWU = bayes {mannWhitneyU = Just (MWUResult True)}
-                output <- captureStdout $ printMultipleBenchmarkReport "a" "b" statsA statsB bayesMWU
-                output `shouldSatisfy` ("Significant" `isInfixOf`)
-            , testCase "shows 'Not significant' when MWU not significant" $ do
-                let bayesMWU = bayes {mannWhitneyU = Just (MWUResult False)}
-                output <- captureStdout $ printMultipleBenchmarkReport "a" "b" statsA statsB bayesMWU
-                output `shouldSatisfy` ("Not significant" `isInfixOf`)
             ]
     , testGroup
         "printValidationSummary"

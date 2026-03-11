@@ -16,7 +16,6 @@ import Benchmark.Types
   , RegressionResult (..)
   , RunResult (..)
   , Settings (..)
-  , TestingResponse
   , ValidationSummary
   , exitWithError
   )
@@ -33,14 +32,13 @@ import Network.HTTP.Client (Manager)
 import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
-import Stats.Benchmark (addFrequentistTests, calculateStats, compareBayesian)
+import Stats.Benchmark (calculateStats, compareBayesian)
 import System.IO (hIsTerminalDevice, stdin)
 import Tracing.Types qualified as TT
 
 data NwayResult = NwayResult
   { nrName :: Text
   , nrStats :: BenchmarkStats
-  , nrResponses :: [TestingResponse]
   , nrValidations :: [ValidationSummary]
   , nrStartNs :: TT.Nanoseconds
   , nrEndNs :: TT.Nanoseconds
@@ -62,16 +60,11 @@ runNway reporter baselineMode cfg = do
     else runNwayNoTUI reporter baselineMode cfg csvFile timestamp setts
 
 -- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
-allPairComparisons :: [(Text, BenchmarkStats, [TestingResponse])] -> [(Text, Text, BayesianComparison)]
+allPairComparisons :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)]
 allPairComparisons [] = []
-allPairComparisons ((nameA, statsA, timingsA) : rest) =
-  [ (nameA, nameB, comparison)
-  | (nameB, statsB, timingsB) <- rest
-  , let comparison =
-          addFrequentistTests
-            timingsA
-            timingsB
-            (compareBayesian statsA statsB)
+allPairComparisons ((nameA, statsA) : rest) =
+  [ (nameA, nameB, compareBayesian statsA statsB)
+  | (nameB, statsB) <- rest
   ]
     ++ allPairComparisons rest
 
@@ -157,7 +150,6 @@ runAllTargets ctx cfg eventChan = do
       NwayResult
         { nrName = targetName t
         , nrStats = calculateStats timings
-        , nrResponses = timings
         , nrValidations = validSummaries
         , nrStartNs = startNs
         , nrEndNs = endNs
@@ -175,8 +167,7 @@ postAnalysis ::
   IO RunResult
 postAnalysis reporter logger mgr baselineMode setts timestamp results = do
   let namedStats = Map.fromList [(nrName r, nrStats r) | r <- results]
-      pairInput = [(nrName r, nrStats r, nrResponses r) | r <- results]
-      pairs = allPairComparisons pairInput
+      pairs = allPairComparisons [(nrName r, nrStats r) | r <- results]
       validAll = concatMap nrValidations results
 
   reportNWay reporter namedStats pairs validAll

@@ -7,13 +7,10 @@ module Benchmark.Report
   )
 where
 
-import Benchmark.Report.Formatting (formatAD, formatKS, formatMWU, formatValidationError)
+import Benchmark.Report.Formatting (formatValidationError)
 import Benchmark.Types
-  ( ADResult
-  , BayesianComparison (..)
+  ( BayesianComparison (..)
   , BenchmarkStats (..)
-  , KSResult
-  , MWUResult
   , PercentileComparison (..)
   , ValidationSummary (..)
   )
@@ -72,12 +69,6 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
     (pctCredibleLower p99)
     (pctCredibleUpper p99)
   printf "P99 Regression Probability: %.2f%%\n" (probPctRegression p99 * 100.0)
-
-  putStrLn ""
-  printHeader "Distribution Tests"
-  printMWU (mannWhitneyU bayes)
-  printKS (kolmogorovSmirnov bayes)
-  printAD (andersonDarling bayes)
 
 printSingleBenchmarkReport :: Text -> BenchmarkStats -> IO ()
 printSingleBenchmarkReport name stats = do
@@ -178,15 +169,6 @@ printStats stats = do
 
 printHeader :: String -> IO ()
 printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
-
-printMWU :: Maybe MWUResult -> IO ()
-printMWU mwu = printf "Mann-Whitney U:      %s\n" (formatMWU mwu)
-
-printKS :: Maybe KSResult -> IO ()
-printKS ks = printf "Kolmogorov-Smirnov:  %s\n" (formatKS ks)
-
-printAD :: Maybe ADResult -> IO ()
-printAD ad = printf "Anderson-Darling:    %s\n" (formatAD ad)
 
 {-| Look up stats for a target by name.
 INVARIANT: callers guarantee the key exists (constructed from the same target list).

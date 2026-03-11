@@ -12,9 +12,6 @@ module Benchmark.Types
   , BenchmarkStats (..)
   , BayesianComparison (..)
   , PercentileComparison (..)
-  , MWUResult (..)
-  , KSResult (..)
-  , ADResult (..)
 
     -- * Validation
   , FieldAssertion (..)
