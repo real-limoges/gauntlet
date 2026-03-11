@@ -1,10 +1,13 @@
 module StatsSpec (statsSpec) where
 
 import Benchmark.Types (BenchmarkStats (..))
-import Stats.Benchmark (calculateStats)
+import Data.Vector.Unboxed qualified as V
+import Stats.Benchmark (calculateStats, earthMoversDistance)
 import TastyCompat (shouldBe, shouldSatisfy)
+import Test.QuickCheck (NonEmptyList (NonEmpty), Positive (getPositive), ioProperty)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)
+import Test.Tasty.QuickCheck (testProperty)
 import TestHelpers
 
 statsSpec :: TestTree
@@ -40,5 +43,31 @@ statsSpec =
             let stats = calculateStats responses
             p50Ms stats `shouldSatisfy` (\x -> x > 5.0 && x < 6.0)
             p99Ms stats `shouldSatisfy` (> 9.0)
+        ]
+    , testGroup
+        "earthMoversDistance"
+        [ testCase "returns 0 for identical vectors" $ do
+            let v = V.fromList [1.0, 2.0, 3.0]
+            earthMoversDistance v v `shouldBe` 0
+        , testCase "returns 1.0 for [0,0,0] vs [1,1,1]" $ do
+            let a = V.fromList [0, 0, 0]
+                b = V.fromList [1, 1, 1]
+            earthMoversDistance a b `shouldBe` 1.0
+        , testCase "returns positive result for unequal-size samples" $ do
+            let a = V.fromList [1.0, 2.0, 3.0]
+                b = V.fromList [4.0, 5.0]
+            earthMoversDistance a b `shouldSatisfy` (> 0)
+        , testCase "returns 0 for empty vs non-empty vectors" $ do
+            earthMoversDistance V.empty (V.fromList [1]) `shouldBe` 0
+            earthMoversDistance (V.fromList [1]) V.empty `shouldBe` 0
+        , testProperty "earthMoversDistance a b >= 0 for non-empty vectors (QuickCheck)" $
+            \(NonEmpty xs) (NonEmpty ys) -> ioProperty $ do
+              let a = V.fromList (map getPositive xs :: [Double])
+                  b = V.fromList (map getPositive ys :: [Double])
+              earthMoversDistance a b `shouldSatisfy` (>= 0)
+        , testProperty "earthMoversDistance a a == 0 for non-empty vectors (QuickCheck)" $
+            \(NonEmpty xs) -> ioProperty $ do
+              let a = V.fromList (map getPositive xs :: [Double])
+              earthMoversDistance a a `shouldSatisfy` (<= 1e-10)
         ]
     ]

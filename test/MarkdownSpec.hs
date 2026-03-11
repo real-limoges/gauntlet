@@ -9,7 +9,7 @@ import Runner.Nway (allPairComparisons)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)
-import TestHelpers (makeResult, mockBayesianComparison, mockStats)
+import TestHelpers (mockBayesianComparison, mockStats)
 
 markdownSpec :: TestTree
 markdownSpec =
@@ -59,9 +59,8 @@ markdownSpec =
     , testGroup
         "markdownNwayReport"
         [ testCase "renders 2-target report with ranking and pair" $ do
-            let triples = [("alpha", mockStats 10 1, makeTimings 10), ("beta", mockStats 20 2, makeTimings 20)]
-                namedStats = Map.fromList [(n, s) | (n, s, _) <- triples]
-                pairs = allPairComparisons triples
+            let namedStats = Map.fromList [("alpha", mockStats 10 1), ("beta", mockStats 20 2)]
+                pairs = allPairComparisons (Map.toList namedStats)
                 md = markdownNwayReport namedStats pairs
             md `shouldSatisfy` T.isInfixOf "Ranking"
             md `shouldSatisfy` T.isInfixOf "| # | Target |"
@@ -69,13 +68,13 @@ markdownSpec =
             md `shouldSatisfy` T.isInfixOf "beta"
             md `shouldSatisfy` T.isInfixOf "Bayesian Analysis"
         , testCase "renders 3-target report with all 3 pairs" $ do
-            let triples =
-                  [ ("fast", mockStats 10 1, makeTimings 10)
-                  , ("medium", mockStats 50 5, makeTimings 50)
-                  , ("slow", mockStats 100 10, makeTimings 100)
-                  ]
-                namedStats = Map.fromList [(n, s) | (n, s, _) <- triples]
-                pairs = allPairComparisons triples
+            let namedStats =
+                  Map.fromList
+                    [ ("fast", mockStats 10 1)
+                    , ("medium", mockStats 50 5)
+                    , ("slow", mockStats 100 10)
+                    ]
+                pairs = allPairComparisons (Map.toList namedStats)
                 md = markdownNwayReport namedStats pairs
             -- All 3 target names present
             md `shouldSatisfy` T.isInfixOf "fast"
@@ -170,35 +169,6 @@ markdownSpec =
             report `shouldSatisfy` T.isInfixOf "Field not found"
         ]
     , testGroup
-        "markdownMultipleReport with frequentist results"
-        [ let primary = mockStats 100.0 10.0
-              candidate = mockStats 80.0 8.0
-           in testGroup
-                "frequentist"
-                [ testCase "renders MWU significant result" $ do
-                    let bayes = mockBayesianComparison {mannWhitneyU = Just (MWUResult True)}
-                    let report = markdownMultipleReport "p" "c" primary candidate bayes
-                    report `shouldSatisfy` T.isInfixOf "Significant (p < 0.05)"
-                , testCase "renders MWU not significant result" $ do
-                    let bayes = mockBayesianComparison {mannWhitneyU = Just (MWUResult False)}
-                    let report = markdownMultipleReport "p" "c" primary candidate bayes
-                    report `shouldSatisfy` T.isInfixOf "Not significant (p >= 0.05)"
-                , testCase "renders KS test with D statistic" $ do
-                    let bayes = mockBayesianComparison {kolmogorovSmirnov = Just (KSResult 0.42 0.03 True)}
-                    let report = markdownMultipleReport "p" "c" primary candidate bayes
-                    report `shouldSatisfy` T.isInfixOf "D = 0.420"
-                    report `shouldSatisfy` T.isInfixOf "significant"
-                , testCase "renders AD test with A-squared statistic" $ do
-                    let bayes = mockBayesianComparison {andersonDarling = Just (ADResult 2.5 0.01 True)}
-                    let report = markdownMultipleReport "p" "c" primary candidate bayes
-                    report `shouldSatisfy` T.isInfixOf "2.500"
-                    report `shouldSatisfy` T.isInfixOf "significant"
-                , testCase "renders 'sample too small' when frequentist tests are Nothing" $ do
-                    let report = markdownMultipleReport "p" "c" primary candidate mockBayesianComparison
-                    report `shouldSatisfy` T.isInfixOf "sample too small"
-                ]
-        ]
-    , testGroup
         "markdownRegressionReport with regressed metrics"
         [ testCase "lists regressed metric names in summary" $ do
             let m = MetricRegression "p99" 100.0 130.0 0.3 0.15 True
@@ -220,6 +190,3 @@ mockRegressionResult name passed metrics =
     , regressionPassed = passed
     , regressionMetrics = metrics
     }
-
-makeTimings :: Integer -> [TestingResponse]
-makeTimings baseNs = [makeResult (baseNs * 1_000_000 + offset) | offset <- [0, 100_000 .. 900_000]]

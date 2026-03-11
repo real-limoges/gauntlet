@@ -8,7 +8,7 @@ import Runner.Nway (allPairComparisons)
 import TastyCompat (shouldBe, shouldContain)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
-import TestHelpers (makeResult, mockStats)
+import TestHelpers (mockStats)
 
 nwaySpec :: TestTree
 nwaySpec =
@@ -65,12 +65,12 @@ nwaySpec =
         , testCase "produces 0 pairs for empty list" $ do
             allPairComparisons [] `shouldBe` []
         , testCase "produces 0 pairs for single target" $ do
-            allPairComparisons [("only", mockStats 10 1, makeTimings 10)] `shouldBe` []
+            allPairComparisons [("only", mockStats 10 1)] `shouldBe` []
         , testCase "includes correct target names in pairs" $ do
             let stats =
-                  [ ("alpha", mockStats 10 1, makeTimings 10)
-                  , ("beta", mockStats 20 2, makeTimings 20)
-                  , ("gamma", mockStats 30 3, makeTimings 30)
+                  [ ("alpha", mockStats 10 1)
+                  , ("beta", mockStats 20 2)
+                  , ("gamma", mockStats 30 3)
                   ]
             let pairs = allPairComparisons stats
             let pairNames = [(a, b) | (a, b, _) <- pairs]
@@ -105,14 +105,8 @@ makeNwayConfig ts =
     , nwayPayloads = [PayloadSpec "test" "GET" "/api/test" Nothing Nothing Nothing]
     }
 
-makePairStats :: Int -> [(Text, BenchmarkStats, [TestingResponse])]
+makePairStats :: Int -> [(Text, BenchmarkStats)]
 makePairStats n =
-  [ ( T.pack ("target-" ++ show i)
-    , mockStats (fromIntegral i * 10) (fromIntegral i)
-    , makeTimings (fromIntegral i * 10)
-    )
+  [ (T.pack ("target-" ++ show i), mockStats (fromIntegral i * 10) (fromIntegral i))
   | i <- [1 .. n]
   ]
-
-makeTimings :: Integer -> [TestingResponse]
-makeTimings baseNs = [makeResult (baseNs * 1_000_000 + offset) | offset <- [0, 100_000 .. 900_000]]

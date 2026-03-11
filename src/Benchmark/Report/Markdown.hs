@@ -7,7 +7,7 @@ module Benchmark.Report.Markdown
   ) where
 
 import Benchmark.Report (lookupStats)
-import Benchmark.Report.Formatting (formatAD, formatKS, formatMWU, formatValidationError)
+import Benchmark.Report.Formatting (formatValidationError)
 import Benchmark.Types
   ( BayesianComparison (..)
   , BenchmarkStats (..)
@@ -201,9 +201,6 @@ bayesTable b =
   , row "Relative effect" (printf "%+.1f%%" (relativeEffect b * 100))
   , row "p95 difference" (pctRow $ p95Comparison b)
   , row "p99 difference" (pctRow $ p99Comparison b)
-  , row "Mann-Whitney U" (formatMWU $ mannWhitneyU b)
-  , row "Kolmogorov-Smirnov" (formatKS $ kolmogorovSmirnov b)
-  , row "Anderson-Darling" (formatAD $ andersonDarling b)
   ]
   where
     row label val = T.pack $ printf "| %s | %s |" (label :: String) (val :: String)

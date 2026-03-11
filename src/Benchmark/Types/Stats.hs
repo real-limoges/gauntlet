@@ -2,9 +2,6 @@ module Benchmark.Types.Stats
   ( BenchmarkStats (..)
   , BayesianComparison (..)
   , PercentileComparison (..)
-  , MWUResult (..)
-  , KSResult (..)
-  , ADResult (..)
   )
 where
 
@@ -40,40 +37,6 @@ data PercentileComparison = PercentileComparison
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)
 
--- | Result of a Mann-Whitney U test between two samples.
-newtype MWUResult = MWUResult
-  { mwuSignificant :: Bool
-  -- ^ True if distributions differ significantly at p < 0.05
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (ToJSON)
-
--- | Result of a two-sample Kolmogorov-Smirnov test.
-data KSResult = KSResult
-  { ksStatistic :: Double
-  -- ^ KS D statistic (0 = identical CDFs, 1 = no overlap)
-  , ksPValue :: Double
-  -- ^ Approximate p-value
-  , ksSignificant :: Bool
-  -- ^ True if distributions differ significantly at p < 0.05
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (ToJSON)
-
-{-| Result of a two-sample Anderson-Darling test (Scholz & Stephens 1987).
-More sensitive to tail differences than the KS test.
--}
-data ADResult = ADResult
-  { adStatistic :: Double
-  -- ^ Raw A² statistic (unnormalized)
-  , adPValue :: Double
-  -- ^ Approximate p-value interpolated from Scholz-Stephens Table 2 quantiles
-  , adSignificant :: Bool
-  -- ^ True if distributions differ significantly at p < 0.05
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (ToJSON)
-
 -- | Bayesian A/B comparison results.
 data BayesianComparison = BayesianComparison
   { probBFasterThanA :: Double
@@ -90,12 +53,6 @@ data BayesianComparison = BayesianComparison
   -- ^ Percentage improvement (positive = candidate faster)
   , p95Comparison :: PercentileComparison
   , p99Comparison :: PercentileComparison
-  , mannWhitneyU :: Maybe MWUResult
-  -- ^ Mann-Whitney U test (Nothing if sample too small)
-  , kolmogorovSmirnov :: Maybe KSResult
-  -- ^ Two-sample KS test (Nothing if sample too small)
-  , andersonDarling :: Maybe ADResult
-  -- ^ Two-sample Anderson-Darling test; more tail-sensitive than KS (Nothing if sample too small)
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)

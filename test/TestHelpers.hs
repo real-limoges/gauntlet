@@ -145,9 +145,6 @@ mockBayesianComparison =
     , relativeEffect = 10.0
     , p95Comparison = mockPercentileComparison
     , p99Comparison = mockPercentileComparison
-    , mannWhitneyU = Nothing
-    , kolmogorovSmirnov = Nothing
-    , andersonDarling = Nothing
     }
 
 -- | Fixture PercentileComparison.

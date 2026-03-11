@@ -131,7 +131,6 @@ test-suite            gauntlet-test
                     , BayesianSpec
                     , CISpec
                     , ConfigSpec
-                    , FrequentistSpec
                     , Integration
                     , LogSpec
                     , MarkdownSpec

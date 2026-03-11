@@ -5,36 +5,24 @@ module Stats.Benchmark
     -- * Bayesian Comparison
   , compareBayesian
 
-    -- * Frequentist Tests
-  , addFrequentistTests
-
     -- * Distribution Comparison
   , earthMoversDistance
   )
 where
 
 import Benchmark.Types
-  ( ADResult (..)
-  , BayesianComparison (..)
+  ( BayesianComparison (..)
   , BenchmarkStats (..)
-  , KSResult (..)
-  , MWUResult (..)
   , Milliseconds (..)
   , PercentileComparison (..)
   , TestingResponse (..)
   , nsToMs
   )
-import Data.List (sortBy)
 import Data.Maybe qualified as M
-import Data.Ord (comparing)
 import Data.Vector.Algorithms.Intro qualified as VA
 import Data.Vector.Unboxed qualified as V
 import Numeric.SpecFunctions (erfc)
 import Statistics.Sample (mean, stdDev)
-import Statistics.Test.KolmogorovSmirnov (kolmogorovSmirnovTest2)
-import Statistics.Test.MannWhitneyU (mannWhitneyUtest)
-import Statistics.Test.Types (PositionTest (..), Test (..), TestResult (..))
-import Statistics.Types (mkPValue, pValue)
 import Stats.Common (percentileSorted)
 
 {-| Compute descriptive statistics from benchmark responses.
@@ -148,9 +136,6 @@ compareBayesian statsA statsB =
         , relativeEffect = relEffect
         , p95Comparison = p95Comp
         , p99Comparison = p99Comp
-        , mannWhitneyU = Nothing
-        , kolmogorovSmirnov = Nothing
-        , andersonDarling = Nothing
         }
 
 -- | Compare percentiles between primary and candidate with Maritz-Jarrett SE.
@@ -195,105 +180,6 @@ inverseNormalCDF p
 -- | Standard normal cumulative distribution function.
 standardNormalCDF :: Double -> Double
 standardNormalCDF x = 0.5 * erfc (-(x / sqrt 2))
-
-{-| Enrich a 'BayesianComparison' with Mann-Whitney U and KS test results.
-Call this after 'compareBayesian' when the raw responses are available.
-Both tests require at least 2 successful responses per sample.
--}
-addFrequentistTests :: [TestingResponse] -> [TestingResponse] -> BayesianComparison -> BayesianComparison
-addFrequentistTests responsesA responsesB bayes =
-  let durA = V.fromList $ M.mapMaybe getDuration responsesA
-      durB = V.fromList $ M.mapMaybe getDuration responsesB
-   in bayes
-        { mannWhitneyU = runMWU durA durB
-        , kolmogorovSmirnov = runKS durA durB
-        , andersonDarling = runAD durA durB
-        }
-
--- | Run Mann-Whitney U test. Returns Nothing if either sample has fewer than 2 observations.
-runMWU :: V.Vector Double -> V.Vector Double -> Maybe MWUResult
-runMWU a b
-  | V.length a < 2 || V.length b < 2 = Nothing
-  | otherwise =
-      let result = mannWhitneyUtest SamplesDiffer (mkPValue 0.05) a b
-       in Just $ MWUResult {mwuSignificant = result == Just Significant}
-
--- | Run two-sample KS test. Returns Nothing if either sample has fewer than 2 observations.
-runKS :: V.Vector Double -> V.Vector Double -> Maybe KSResult
-runKS a b
-  | V.length a < 2 || V.length b < 2 = Nothing
-  | otherwise = case kolmogorovSmirnovTest2 a b of
-      Nothing -> Nothing
-      Just t ->
-        let p = pValue (testSignificance t)
-         in Just
-              KSResult
-                { ksStatistic = testStatistics t
-                , ksPValue = p
-                , ksSignificant = p < 0.05
-                }
-
-{-| Run two-sample Anderson-Darling test (Scholz & Stephens 1987).
-More sensitive to tail differences than KS. Returns Nothing if either sample < 5.
--}
-runAD :: V.Vector Double -> V.Vector Double -> Maybe ADResult
-runAD va vb
-  | V.length va < 5 || V.length vb < 5 = Nothing
-  | otherwise =
-      let a = V.toList va
-          b = V.toList vb
-          bigN = V.length va + V.length vb
-          stat = computeADStatistic a b
-          -- Scholz-Stephens k=2 variance approximation: σ² ≈ (4·H_{N-1} - 6) / 45
-          gN = harmonicNumber (bigN - 1)
-          sigma = sqrt ((4 * gN - 6) / 45)
-          tStat = if sigma > 0 then (stat - 1) / sigma else 0
-          pVal = adPValueFromT tStat
-       in Just
-            ADResult
-              { adStatistic = stat
-              , adPValue = pVal
-              , adSignificant = pVal < 0.05
-              }
-
-{-| Two-sample Anderson-Darling A² statistic (Scholz & Stephens 1987).
-A² = (N / (m·n)) · Σ_{i=1}^{N-1} (N·F_i - m·i)² / (i·(N-i))
-where F_i is the count of sample-a values at combined rank i.
--}
-computeADStatistic :: [Double] -> [Double] -> Double
-computeADStatistic a b = (bigN / (m * n)) * total
-  where
-    m = fromIntegral (length a) :: Double
-    n = fromIntegral (length b) :: Double
-    bigN = m + n
-    tagged = map (,True) a ++ map (,False) b
-    combined = sortBy (comparing fst) tagged
-    (_, _, total) = foldl step (0.0, 1.0, 0.0) combined
-    step (fi, l, acc) (_, isA) =
-      let fi' = if isA then fi + 1.0 else fi
-          term =
-            if l < bigN
-              then (bigN * fi' - m * l) ^ (2 :: Int) / (l * (bigN - l))
-              else 0.0
-       in (fi', l + 1.0, acc + term)
-
--- | H_{n} = Σ_{i=1}^{n} 1/i (harmonic number).
-harmonicNumber :: Int -> Double
-harmonicNumber n = sum [1 / fromIntegral i | i <- [1 .. n]]
-
-{-| Approximate p-value for the standardized AD statistic T,
-interpolated from Scholz-Stephens (1987) Table 2 asymptotic quantiles.
--}
-adPValueFromT :: Double -> Double
-adPValueFromT t
-  | t < 1.248 = 0.25
-  | t < 1.610 = lerp 0.25 0.10 1.248 1.610 t
-  | t < 1.859 = lerp 0.10 0.05 1.610 1.859 t
-  | t < 2.094 = lerp 0.05 0.025 1.859 2.094 t
-  | t < 2.408 = lerp 0.025 0.01 2.094 2.408 t
-  | otherwise = 0.01
-  where
-    lerp p1 p2 t1 t2 x = p1 + (x - t1) / (t2 - t1) * (p2 - p1)
 
 {-| Earth Mover's Distance (1-Wasserstein distance).
 

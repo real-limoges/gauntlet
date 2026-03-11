@@ -12,7 +12,6 @@ import ConfigSpec (configSpec)
 import ContextSpec (contextSpec)
 import EnvSpec (envSpec)
 import EnvironmentSpec (environmentSpec)
-import FrequentistSpec (frequentistSpec)
 import Integration (integrationSpec)
 import LoadControlIntegrationSpec (loadControlIntegrationSpec)
 import LogSpec (logSpec)
@@ -45,7 +44,6 @@ main =
         [ statsSpec
         , statsCommonSpec
         , bayesianSpec
-        , frequentistSpec
         , validationSpec
         , configSpec
         , envSpec
