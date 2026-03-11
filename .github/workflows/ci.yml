@@ -15,12 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Show cabal paths
+        run: cabal path
+
       - name: Cache cabal store
         uses: actions/cache@v4
         with:
           path: |
-            /root/.cabal/store
-            /root/.cabal/packages
+            ~/.local/state/cabal
+            ~/.cabal/packages
           key: ${{ runner.os }}-ghc-9.12.2-store-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'cabal.project') }}
           restore-keys: |
             ${{ runner.os }}-ghc-9.12.2-store-
