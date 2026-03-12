@@ -14,10 +14,10 @@ runCompare reporter fileA fileB = do
   resB <- eitherDecodeFileStrict @BenchmarkStats fileB
   case (resA, resB) of
     (Left err, _) -> do
-      let msg = "failed to decode " <> fileA <> ": " <> err
+      let msg = T.pack $ "failed to decode " <> fileA <> ": " <> err
       pure (RunError (ConfigParseError msg))
     (_, Left err) -> do
-      let msg = "failed to decode " <> fileB <> ": " <> err
+      let msg = T.pack $ "failed to decode " <> fileB <> ": " <> err
       pure (RunError (ConfigParseError msg))
     (Right statsA, Right statsB) -> do
       let nameA = T.pack fileA

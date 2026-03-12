@@ -8,16 +8,17 @@ where
 import Control.Exception (Exception)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
 import System.Exit (exitFailure)
-import System.IO (hPutStrLn, stderr)
+import System.IO (stderr)
 
 data PerfTestError
-  = ConfigParseError String
-  | ConfigValidationError String
-  | TokenReadError FilePath String
+  = ConfigParseError Text
+  | ConfigValidationError Text
+  | TokenReadError Text Text
   | HealthCheckTimeout Text Int
-  | NoEndpointsError String
-  | EnvironmentSetupError String
+  | NoEndpointsError Text
+  | EnvironmentSetupError Text
   | BenchmarkCancelled
   | -- | Request timed out; contains endpoint URL
     NetworkTimeout Text
@@ -33,19 +34,20 @@ data PerfTestError
 
 instance Exception PerfTestError
 
-formatError :: PerfTestError -> String
-formatError (ConfigParseError msg) = "Failed to parse config: " ++ msg
-formatError (ConfigValidationError msg) = "Invalid config: " ++ msg
-formatError (TokenReadError path msg) = "Failed to read token from " ++ path ++ ": " ++ msg
-formatError (HealthCheckTimeout url retries) = "Service at " ++ T.unpack url ++ " failed to start after " ++ show retries ++ " retries"
-formatError (NoEndpointsError which) = "No " ++ which ++ " endpoints defined"
-formatError (EnvironmentSetupError msg) = "Environment setup failed: " ++ msg
+formatError :: PerfTestError -> Text
+formatError (ConfigParseError msg) = "Config parse error: " <> msg
+formatError (ConfigValidationError msg) = "Config validation error: " <> msg
+formatError (TokenReadError path msg) = "Token read error (" <> path <> "): " <> msg
+formatError (HealthCheckTimeout url retries) =
+  "Health check timeout: " <> url <> " failed after " <> T.pack (show retries) <> " retries"
+formatError (NoEndpointsError which) = "No " <> which <> " endpoints defined"
+formatError (EnvironmentSetupError msg) = "Environment setup error: " <> msg
 formatError BenchmarkCancelled = "Benchmark cancelled by user"
-formatError (NetworkTimeout url) = "Request to " ++ T.unpack url ++ " timed out"
-formatError (ConnectionRefused url) = "Connection refused: " ++ T.unpack url
-formatError (TlsError url reason) = "TLS error connecting to " ++ T.unpack url ++ ": " ++ T.unpack reason
-formatError (HttpError url code) = "HTTP " ++ show code ++ " from " ++ T.unpack url
-formatError (UnknownNetworkError msg) = "Network error: " ++ T.unpack msg
+formatError (NetworkTimeout url) = "Network timeout: " <> url
+formatError (ConnectionRefused url) = "Connection refused: " <> url
+formatError (TlsError url reason) = "TLS error (" <> url <> "): " <> reason
+formatError (HttpError url code) = "HTTP " <> T.pack (show code) <> " from " <> url
+formatError (UnknownNetworkError msg) = "Network error: " <> msg
 
 exitWithError :: PerfTestError -> IO a
-exitWithError err = hPutStrLn stderr ("Error: " ++ formatError err) >> exitFailure
+exitWithError err = TIO.hPutStrLn stderr ("Error: " <> formatError err) >> exitFailure

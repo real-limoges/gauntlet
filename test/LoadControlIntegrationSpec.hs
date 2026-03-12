@@ -32,7 +32,7 @@ loadControlIntegrationSpec =
           Just limiter <- makeLimiter (LoadConstantRps 20)
           sem <- newQSem 4
           start <- getCurrentTime
-          results <- runBenchmark testSettings sem mgr 10 1 (endpoint port) (Just limiter)
+          results <- runBenchmark testSettings sem mgr 10 1 (endpoint port) Nothing (Just limiter)
           end <- getCurrentTime
           let elapsed = realToFrac (diffUTCTime end start) :: Double
           length results `shouldBe` 10
@@ -47,7 +47,7 @@ loadControlIntegrationSpec =
           Just limiter <- makeLimiter (LoadConstantRps 10)
           sem <- newQSem 4
           start <- getCurrentTime
-          results <- runBenchmarkDuration durationSettings sem mgr 1.0 1 (endpoint port) limiter
+          results <- runBenchmarkDuration durationSettings sem mgr 1.0 1 (endpoint port) limiter Nothing
           end <- getCurrentTime
           let elapsed = realToFrac (diffUTCTime end start) :: Double
           -- Should get some requests (at least 4, at most ~20)
@@ -60,7 +60,7 @@ loadControlIntegrationSpec =
         mgr <- newManager tlsManagerSettings
         mockJson "{}" $ \port -> do
           sem <- newQSem 4
-          results <- runBenchmark testSettings sem mgr 5 1 (endpoint port) Nothing
+          results <- runBenchmark testSettings sem mgr 5 1 (endpoint port) Nothing Nothing
           length results `shouldBe` 5
           all ((== 200) . statusCode) results `shouldBe` True
     ]

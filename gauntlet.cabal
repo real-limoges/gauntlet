@@ -1,7 +1,8 @@
 cabal-version: 3.12
 name:               gauntlet
 version:            0.1.0.0
-license:            NONE
+license:            MIT
+license-file:       LICENSE
 author:             Real Limoges
 maintainer:         b.real.limoges@gmail.com
 build-type:         Simple

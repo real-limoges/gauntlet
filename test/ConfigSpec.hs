@@ -4,7 +4,7 @@ import Benchmark.Config.Loader
 import Benchmark.Types
 import Data.Aeson (eitherDecode)
 import Data.Map.Strict qualified as Map
-import TastyCompat (shouldBe, shouldContain, shouldNotContain)
+import TastyCompat (shouldBe, shouldContain, shouldNotContain, textShouldContain)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
 import TestHelpers
@@ -41,7 +41,7 @@ configSpec =
             let cfg = makeValidConfig {payloads = [badPayload]}
             case validateConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldContain` "Invalid HTTP method"
+                msg `textShouldContain` "Invalid HTTP method"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts all valid HTTP methods" $ do
             let methods = ["GET", "POST", "PUT", "DELETE", "PATCH"]
@@ -52,13 +52,13 @@ configSpec =
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {requestTimeout = Just (-1)}}
             case validateConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldContain` "requestTimeout"
+                msg `textShouldContain` "requestTimeout"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects zero requestTimeout" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {requestTimeout = Just 0}}
             case validateConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldContain` "requestTimeout"
+                msg `textShouldContain` "requestTimeout"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts positive requestTimeout" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {requestTimeout = Just 30}}
@@ -67,28 +67,28 @@ configSpec =
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {healthCheckTimeout = Just 0}}
             case validateConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldContain` "healthCheckTimeout"
+                msg `textShouldContain` "healthCheckTimeout"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects retryBackoffMultiplier < 1.0" $ do
             let r = RetrySettings 3 1000 0.5
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {retry = Just r}}
             case validateConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldContain` "retryBackoffMultiplier"
+                msg `textShouldContain` "retryBackoffMultiplier"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects negative retryMaxAttempts" $ do
             let r = RetrySettings (-1) 1000 2.0
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {retry = Just r}}
             case validateConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldContain` "retryMaxAttempts"
+                msg `textShouldContain` "retryMaxAttempts"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects zero retryInitialDelayMs" $ do
             let r = RetrySettings 3 0 2.0
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {retry = Just r}}
             case validateConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldContain` "retryInitialDelayMs"
+                msg `textShouldContain` "retryInitialDelayMs"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts valid retry settings" $ do
             let r = RetrySettings 3 1000 2.0
@@ -199,32 +199,32 @@ configSpec =
         , testCase "rejects constantRps with rps=0" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadConstantRps 0)}}
             case validateConfig cfg of
-              Left (ConfigValidationError msg) -> msg `shouldContain` "targetRps"
+              Left (ConfigValidationError msg) -> msg `textShouldContain` "targetRps"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects rampUp with startRps=0" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp 0 100 60)}}
             case validateConfig cfg of
-              Left (ConfigValidationError msg) -> msg `shouldContain` "startRps"
+              Left (ConfigValidationError msg) -> msg `textShouldContain` "startRps"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects rampUp with negative durationSecs" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp 10 100 (-1))}}
             case validateConfig cfg of
-              Left (ConfigValidationError msg) -> msg `shouldContain` "durationSecs"
+              Left (ConfigValidationError msg) -> msg `textShouldContain` "durationSecs"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects stepLoad with empty steps" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadStepLoad [])}}
             case validateConfig cfg of
-              Left (ConfigValidationError msg) -> msg `shouldContain` "steps must not be empty"
+              Left (ConfigValidationError msg) -> msg `textShouldContain` "steps must not be empty"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects stepLoad with zero rps" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 0 30])}}
             case validateConfig cfg of
-              Left (ConfigValidationError msg) -> msg `shouldContain` "step rps"
+              Left (ConfigValidationError msg) -> msg `textShouldContain` "step rps"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects stepLoad with zero durationSecs" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 50 0])}}
             case validateConfig cfg of
-              Left (ConfigValidationError msg) -> msg `shouldContain` "step durationSecs"
+              Left (ConfigValidationError msg) -> msg `textShouldContain` "step durationSecs"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts valid rampUp" $ do
             let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp 10 100 60)}}

@@ -3,7 +3,6 @@ module ExecSpec (execSpec) where
 import Benchmark.Network
   ( initNetwork
   , runBenchmark
-  , runBenchmarkWithEvents
   )
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types
@@ -21,13 +20,13 @@ execSpec :: TestTree
 execSpec =
   testGroup
     "Benchmark.Network.Exec"
-    [ testCase "runBenchmarkWithEvents emits one event per iteration" $ do
+    [ testCase "runBenchmark with events emits one event per iteration" $ do
         chan <- newTChanIO
         mockJson "{}" $ \port -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 1
           results <-
-            runBenchmarkWithEvents testSettings sem mgr 5 1 (testEndpoint port) (chan :: TChan BenchmarkEvent) Nothing
+            runBenchmark testSettings sem mgr 5 1 (testEndpoint port) (Just (chan :: TChan BenchmarkEvent)) Nothing
           length results `shouldBe` 5
           events <- replicateM 5 (atomically (readTChan chan))
           length events `shouldBe` 5
@@ -35,14 +34,14 @@ execSpec =
         mockStatus status500 $ \port -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 1
-          results <- runBenchmark testSettings sem mgr 5 1 (testEndpoint port) Nothing
+          results <- runBenchmark testSettings sem mgr 5 1 (testEndpoint port) Nothing Nothing
           length results `shouldBe` 5
           all (\r -> statusCode r == 500) results `shouldBe` True
     , testCase "concurrency: all 10 requests complete" $
         mockCountedRequests status200 "{}" $ \port readCount -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 4
-          results <- runBenchmark testSettings sem mgr 10 1 (testEndpoint port) Nothing
+          results <- runBenchmark testSettings sem mgr 10 1 (testEndpoint port) Nothing Nothing
           length results `shouldBe` 10
           count <- readCount
           count `shouldBe` 10

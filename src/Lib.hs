@@ -78,7 +78,7 @@ loadAndValidate :: (FilePath -> IO (Either String a)) -> (a -> Either PerfTestEr
 loadAndValidate load validate path = do
   res <- load path
   case res of
-    Left err -> exitWithError $ ConfigParseError err
+    Left err -> exitWithError $ ConfigParseError (T.pack err)
     Right cfg -> either exitWithError return (validate cfg)
 
 -- | Validate a config file without running any benchmarks.
@@ -88,7 +88,7 @@ runValidate cfgPath doCheck = do
   case res of
     Left err -> do
       hPutStrLn stderr $ "Config error: " <> err
-      pure (RunError (ConfigParseError err))
+      pure (RunError (ConfigParseError (T.pack err)))
     Right cfg -> case validateNwayConfig cfg of
       Left err -> do
         hPutStrLn stderr $ "Validation error: " <> show err

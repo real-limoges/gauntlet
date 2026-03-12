@@ -12,7 +12,7 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 
 ## Features
 
-### 🎯 Core Capabilities
+### Core Capabilities
 - **A/B Comparison Testing** - Compare two API versions with statistical rigor
 - **N-Way Comparison Testing** - Compare multiple API targets simultaneously
 - **Bayesian Statistical Analysis** - Get probability distributions, not just p-values
@@ -20,7 +20,7 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 - **Concurrent Execution** - Configurable concurrency with STM-based coordination
 - **Connection Pooling** - Efficient HTTP connection reuse
 
-### 📊 Statistical Analysis
+### Statistical Analysis
 - **Bayesian Comparison** - Three probability metrics: P(candidate faster, means), P(single request faster), P(candidate less jittery)
 - **Effect Size Calculation** - Cohen's d for practical significance
 - **Percentile Analysis** - P50, P95, P99 with Maritz-Jarrett standard errors
@@ -28,13 +28,13 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 - **Credible Intervals** - 95% Bayesian credible intervals for mean differences
 - **Expected Shortfall** - Mean latency of the worst 1% of requests (E[X | X > p99])
 
-### 🔍 Observability
+### Observability
 - **Real-time TUI** - Live progress tracking with Brick-based terminal UI
 - **Grafana Tempo Integration** - Distributed trace collection and analysis
 - **Structured Logging** - Configurable log levels (debug, info, warning, error)
 - **Multiple Output Formats** - Terminal, JSON, CSV, Markdown
 
-### 🚀 Production Ready
+### Production Ready
 - **Regression Detection** - Compare against saved baselines with configurable thresholds
 - **CI/CD Integration** - Native GitLab CI and GitHub Actions support with automatic step summaries
 - **Markdown Reports** - Full stats, Bayesian analysis, and validation results in a single `.md` file
@@ -548,7 +548,7 @@ gauntlet/
 │   │   ├── Report/         # Report sub-modules
 │   │   │   ├── Baseline.hs # Baseline save/load/regression detection
 │   │   │   ├── CI.hs       # GitLab CI / GitHub Actions integration
-│   │   │   ├── Formatting.hs  # Statistical test formatting (MWU, KS, AD)
+│   │   │   ├── Formatting.hs  # Validation error formatting
 │   │   │   ├── Markdown.hs    # Markdown report generation
 │   │   │   └── Output.hs   # JSON/CSV serialization
 │   │   ├── Reporter.hs     # Reporter record, combineReporters, noOpReporter
@@ -794,7 +794,7 @@ cabal build -O2
 This project is proprietary software. All rights reserved.
 
 **Author**: Real Limoges
-**Maintainer**: real.limoges@truefootage.tech
+**Maintainer**: b.real.limoges@gmail.com
 
 ---
 

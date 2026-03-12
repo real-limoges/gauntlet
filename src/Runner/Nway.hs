@@ -143,7 +143,7 @@ runAllTargets ctx cfg eventChan = do
 
     startNs <- getNowNs
     let ctxWithTarget = ctx {rcTargetName = targetName t}
-    (timings, validSummaries) <- benchmarkEndpoints ctxWithTarget (T.unpack (targetName t)) targetEps
+    (timings, validSummaries) <- benchmarkEndpoints ctxWithTarget (targetName t) targetEps
     endNs <- getNowNs
 
     pure

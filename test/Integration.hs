@@ -43,7 +43,7 @@ integrationSpec = withResource setupManager (\_ -> pure ()) $ \getMgr ->
             mgr <- getMgr
             mockJson "{}" $ \port -> do
               sem <- newQSem 4
-              results <- runBenchmark testSettings sem mgr 5 1 (endpoint port) Nothing
+              results <- runBenchmark testSettings sem mgr 5 1 (endpoint port) Nothing Nothing
               length results `shouldBe` 5
               all ((== 200) . statusCode) results `shouldBe` True
         ]

@@ -5,7 +5,7 @@ import Benchmark.Types
 import Data.Text (Text)
 import Data.Text qualified as T
 import Runner.Nway (allPairComparisons)
-import TastyCompat (shouldBe, shouldContain)
+import TastyCompat (shouldBe, textShouldContain)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
 import TestHelpers (mockStats)
@@ -48,7 +48,7 @@ nwaySpec =
                     }
             case validateNwayConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldContain` "Invalid HTTP method"
+                msg `textShouldContain` "Invalid HTTP method"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts valid 2-target config" $ do
             let cfg = makeNwayConfig [NamedTarget "a" "http://a" Nothing, NamedTarget "b" "http://b" Nothing]

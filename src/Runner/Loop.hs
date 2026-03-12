@@ -6,8 +6,6 @@ import Benchmark.Network
   ( addAuth
   , runBenchmark
   , runBenchmarkDuration
-  , runBenchmarkDurationWithEvents
-  , runBenchmarkWithEvents
   )
 import Benchmark.Report.Output (writeLatenciesWithTarget)
 import Benchmark.TUI.State (BenchmarkEvent (..))
@@ -26,13 +24,14 @@ import Control.Concurrent (newQSem)
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Exception (throwIO)
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 import Data.Text qualified as T
 import Log (logInfo)
 import Runner.Context (RunContext (..), emitEvent)
 import Runner.Warmup (runWarmup)
 
 -- | Warm up then run the benchmark loop for a labelled set of endpoints.
-benchmarkEndpoints :: RunContext -> String -> [Endpoint] -> IO ([TestingResponse], [ValidationSummary])
+benchmarkEndpoints :: RunContext -> Text -> [Endpoint] -> IO ([TestingResponse], [ValidationSummary])
 benchmarkEndpoints ctx label eps = case eps of
   [] -> throwIO $ NoEndpointsError label
   (firstEp : _) -> do
@@ -71,15 +70,9 @@ runEndpointLoop RunContext {..} endpoints = do
               then case mLimiter of
                 Just limiter ->
                   let dur = realToFrac (loadModeDurationSecs mode)
-                   in case rcEventChan of
-                        Just chan -> runBenchmarkDurationWithEvents rcSettings sem rcManager dur idx authorizedEp limiter chan
-                        Nothing -> runBenchmarkDuration rcSettings sem rcManager dur idx authorizedEp limiter
-                Nothing -> case rcEventChan of
-                  Just chan -> runBenchmarkWithEvents rcSettings sem rcManager iters idx authorizedEp chan Nothing
-                  Nothing -> runBenchmark rcSettings sem rcManager iters idx authorizedEp Nothing
-              else case rcEventChan of
-                Just chan -> runBenchmarkWithEvents rcSettings sem rcManager iters idx authorizedEp chan mLimiter
-                Nothing -> runBenchmark rcSettings sem rcManager iters idx authorizedEp mLimiter
+                   in runBenchmarkDuration rcSettings sem rcManager dur idx authorizedEp limiter rcEventChan
+                Nothing -> runBenchmark rcSettings sem rcManager iters idx authorizedEp rcEventChan Nothing
+              else runBenchmark rcSettings sem rcManager iters idx authorizedEp rcEventChan mLimiter
           return (idx, ep, responses)
       )
       indexedEndpoints
@@ -106,7 +99,7 @@ loadModeLabel (LoadConstantRps rps) = " at " ++ show (round rps :: Int) ++ " RPS
 loadModeLabel (LoadRampUp s e d) =
   " ramping "
     ++ show (round s :: Int)
-    ++ "→"
+    ++ "\8594"
     ++ show (round e :: Int)
     ++ " RPS over "
     ++ show (round d :: Int)

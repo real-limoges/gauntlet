@@ -10,7 +10,7 @@ where
 import Benchmark.Config.Env (interpolateEnv, loadEnvVars)
 import Benchmark.Types
 import Control.Exception (IOException, try)
-import Control.Monad (when)
+import Control.Monad (unless, when)
 import Data.Aeson (FromJSON, eitherDecode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
@@ -56,32 +56,37 @@ toEndpoint baseUrl spec =
         }
 
 validateConfig :: TestConfig -> Either PerfTestError TestConfig
-validateConfig cfg
-  | null (payloads cfg) =
-      Left $ ConfigValidationError "No payloads defined in config"
-  | iterations (settings cfg) <= 0 =
-      Left $ ConfigValidationError "iterations must be greater than 0"
-  | concurrency (settings cfg) <= 0 =
-      Left $ ConfigValidationError "concurrency must be greater than 0"
-  | not (all isValidMethod (payloads cfg)) =
-      Left $ ConfigValidationError "Invalid HTTP method in payloads (must be GET, POST, PUT, DELETE, or PATCH)"
-  | Left err <- validateSettings (settings cfg) =
-      Left err
-  | otherwise = Right cfg
+validateConfig cfg = do
+  when (null (payloads cfg)) $
+    Left $
+      ConfigValidationError "No payloads defined in config"
+  when (iterations (settings cfg) <= 0) $
+    Left $
+      ConfigValidationError "iterations must be greater than 0"
+  validateCommon (payloads cfg) (settings cfg)
+  Right cfg
 
 validateNwayConfig :: NwayConfig -> Either PerfTestError NwayConfig
-validateNwayConfig cfg
-  | null (nwayPayloads cfg) =
-      Left $ ConfigValidationError "No payloads defined in config"
-  | concurrency (nwaySettings cfg) <= 0 =
-      Left $ ConfigValidationError "concurrency must be greater than 0"
-  | not (all isValidMethod (nwayPayloads cfg)) =
-      Left $ ConfigValidationError "Invalid HTTP method in payloads (must be GET, POST, PUT, DELETE, or PATCH)"
-  | length (nwayTargets cfg) < 2 =
-      Left $ ConfigValidationError "Must have at least 2 targets"
-  | Left err <- validateSettings (nwaySettings cfg) =
-      Left err
-  | otherwise = Right cfg
+validateNwayConfig cfg = do
+  when (null (nwayPayloads cfg)) $
+    Left $
+      ConfigValidationError "No payloads defined in config"
+  validateCommon (nwayPayloads cfg) (nwaySettings cfg)
+  when (length (nwayTargets cfg) < 2) $
+    Left $
+      ConfigValidationError "Must have at least 2 targets"
+  Right cfg
+
+-- | Shared validation logic for both single and N-way configs.
+validateCommon :: [PayloadSpec] -> Settings -> Either PerfTestError ()
+validateCommon ps setts = do
+  when (concurrency setts <= 0) $
+    Left $
+      ConfigValidationError "concurrency must be greater than 0"
+  unless (all isValidMethod ps) $
+    Left $
+      ConfigValidationError "Invalid HTTP method in payloads (must be GET, POST, PUT, DELETE, or PATCH)"
+  validateSettings setts
 
 isValidMethod :: PayloadSpec -> Bool
 isValidMethod p = specMethod p `elem` ["GET", "POST", "PUT", "DELETE", "PATCH"]
@@ -105,7 +110,7 @@ validateSettings setts = do
           ConfigValidationError "retryBackoffMultiplier must be at least 1.0"
   validateLoadMode (loadMode setts)
   where
-    check :: Maybe Int -> (Int -> Bool) -> String -> Either PerfTestError ()
+    check :: Maybe Int -> (Int -> Bool) -> Text -> Either PerfTestError ()
     check Nothing _ _ = Right ()
     check (Just v) predicate msg
       | predicate v = Left $ ConfigValidationError msg

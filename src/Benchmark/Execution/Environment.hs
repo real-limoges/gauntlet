@@ -36,12 +36,12 @@ setupEnvironment mgr setts branch serviceName composeArgs = do
 
   case gitResult of
     Left ex ->
-      return $ Left $ EnvironmentSetupError $ "Could not run git: " ++ show ex
+      return $ Left $ EnvironmentSetupError $ "Could not run git: " <> T.pack (show ex)
     Right (ExitFailure _, _, gitStderr) ->
       return $
         Left $
           EnvironmentSetupError $
-            "git switch " ++ T.unpack branch ++ " failed: " ++ T.unpack (T.strip (T.pack gitStderr))
+            "git switch " <> branch <> " failed: " <> T.strip (T.pack gitStderr)
     Right (ExitSuccess, _, _) ->
       case composeArgs of
         Nothing -> return $ Right ()
@@ -55,12 +55,12 @@ setupEnvironment mgr setts branch serviceName composeArgs = do
               return $
                 Left $
                   EnvironmentSetupError $
-                    "Could not run docker-compose: " ++ show ex ++ "\nIs docker-compose installed and in your PATH?"
+                    "Could not run docker-compose: " <> T.pack (show ex) <> "\nIs docker-compose installed and in your PATH?"
             Right (ExitFailure _, _, dockerStderr) ->
               return $
                 Left $
                   EnvironmentSetupError $
-                    "docker-compose up failed: " ++ T.unpack (T.strip (T.pack dockerStderr))
+                    "docker-compose up failed: " <> T.strip (T.pack dockerStderr)
             Right (ExitSuccess, _, _) ->
               waitForHealth mgr (serviceName <> hcPath) hcTimeout
 

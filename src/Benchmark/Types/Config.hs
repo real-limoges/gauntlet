@@ -36,8 +36,10 @@ import Data.Aeson
   , fieldLabelModifier
   , genericParseJSON
   , genericToJSON
+  , object
   , withObject
   , (.:)
+  , (.=)
   )
 import Data.Aeson.Types (Parser)
 import Data.Map.Strict (Map)
@@ -187,7 +189,7 @@ data LoadMode
     LoadRampUp Double Double Double
   | -- | Step load — sequential steps, each with its own RPS and duration
     LoadStepLoad [LoadStep]
-  | -- | Poissonly Distributed Load
+  | -- | Poisson-distributed load
     LoadPoissonRps Double
   deriving stock (Show, Eq)
 
@@ -201,6 +203,13 @@ instance FromJSON LoadMode where
       "stepLoad" -> LoadStepLoad <$> o .: "steps"
       "poissonRps" -> LoadPoissonRps <$> o .: "targetRps"
       _ -> fail $ "Unknown load mode: " ++ show mode
+
+instance ToJSON LoadMode where
+  toJSON LoadUnthrottled = object ["mode" .= ("unthrottled" :: Text)]
+  toJSON (LoadConstantRps rps) = object ["mode" .= ("constantRps" :: Text), "targetRps" .= rps]
+  toJSON (LoadRampUp s e d) = object ["mode" .= ("rampUp" :: Text), "startRps" .= s, "endRps" .= e, "durationSecs" .= d]
+  toJSON (LoadStepLoad steps) = object ["mode" .= ("stepLoad" :: Text), "steps" .= steps]
+  toJSON (LoadPoissonRps rps) = object ["mode" .= ("poissonRps" :: Text), "targetRps" .= rps]
 
 -- | Compute total requests for a load mode given a fallback iteration count.
 totalRequestsForMode :: LoadMode -> Int -> Int

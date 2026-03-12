@@ -116,7 +116,7 @@ timedRequestPrepared settings mgr req = do
               { durationNs = Nanoseconds $ fromIntegral (max 0 (toNanoSecs endTime - toNanoSecs startTime))
               , statusCode = 0
               , respBody = Nothing
-              , errorMessage = Just (formatError categorized)
+              , errorMessage = Just (T.unpack (formatError categorized))
               , requestedAt
               }
 
