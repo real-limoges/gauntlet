@@ -126,9 +126,19 @@ compareBayesian statsA statsB =
       -- Uses individual observation variance (σ²), not standard error (σ²/n)
       sigmaPred = sqrt (varA + varB)
       probSingle = if sigmaPred > 0 then standardNormalCDF (muDiff / sigmaPred) else 0.5
+
+      -- P(sigma_B < sigma_A): log-normal approximation log(s²) ~ N(log(σ²), 2/(n-1))
+      probLessJittery =
+        if sdA <= 0 || sdB <= 0 || countA <= 1 || countB <= 1
+          then 0.5
+          else
+            let seLogVar = sqrt (2 / (countA - 1) + 2 / (countB - 1))
+                zJitter = (log varA - log varB) / seLogVar
+             in standardNormalCDF zJitter
    in BayesianComparison
         { probBFasterThanA = probBIsFaster
         , probSingleRequestFaster = probSingle
+        , probBLessJittery = probLessJittery
         , meanDifference = muDiff
         , credibleIntervalLower = ciLower
         , credibleIntervalUpper = ciUpper

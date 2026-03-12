@@ -169,7 +169,7 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 ### Statistical Foundation
 - **Bayesian over Frequentist:** Direct probability answers ("95% chance candidate is faster") vs p-values
 - **Conjugate Normal Model:** Analytical posterior computation without MCMC sampling
-- **Two probability metrics:** `probBFasterThanA` (population means, σ/√n) vs `probSingleRequestFaster` (individual requests, σ)
+- **Three probability metrics:** `probBFasterThanA` (population means, σ/√n), `probSingleRequestFaster` (individual requests, σ), `probBLessJittery` (P(sigma_B < sigma_A), log-normal approximation)
 - **Expected Shortfall:** `esMs` = E[X | X > p99], mean of worst 1% of requests
 - **Type Safety:** Newtypes (`Nanoseconds`, `Milliseconds`) prevent unit conversion bugs
 

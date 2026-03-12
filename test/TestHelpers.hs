@@ -138,6 +138,7 @@ mockBayesianComparison =
   BayesianComparison
     { probBFasterThanA = 0.85
     , probSingleRequestFaster = 0.65
+    , probBLessJittery = 0.72
     , meanDifference = 5.0
     , credibleIntervalLower = 2.0
     , credibleIntervalUpper = 8.0

@@ -43,6 +43,8 @@ data BayesianComparison = BayesianComparison
   -- ^ Probability candidate is faster than primary (mean-level, based on σ/√n)
   , probSingleRequestFaster :: Double
   -- ^ Probability a single request to B is faster than a single request to A (based on σ)
+  , probBLessJittery :: Double
+  -- ^ P(sigma_B < sigma_A) under log-normal approximation: Φ((log(s_A²) - log(s_B²)) / sqrt(2/(n_A-1) + 2/(n_B-1)))
   , meanDifference :: Double
   -- ^ Primary mean - Candidate mean (positive = candidate faster)
   , credibleIntervalLower :: Double

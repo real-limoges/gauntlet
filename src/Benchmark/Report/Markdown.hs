@@ -195,6 +195,7 @@ bayesTable b =
   , "|--------|-------|"
   , row "P(candidate faster, means)" (printf "%.1f%%" (probBFasterThanA b * 100))
   , row "P(single request faster)" (printf "%.1f%%" (probSingleRequestFaster b * 100))
+  , row "P(candidate less jittery)" (printf "%.1f%%" (probBLessJittery b * 100))
   , row "Mean difference" (printf "%+.2f ms" (meanDifference b))
   , row "95% credible interval" credInterval
   , row "Effect size (Cohen's d)" (printf "%.3f" (effectSize b))
