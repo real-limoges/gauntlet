@@ -12,7 +12,6 @@ import Control.Monad (when)
 import Data.Time (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import System.Random (randomRIO)
 
-
 data RateLimiter = RateLimiter
   { rlNextSlot :: MVar UTCTime
   -- ^ The next available dispatch time

@@ -24,6 +24,7 @@ library
   exposed-modules:        Lib
                           Log
                           Runner.Context
+                          Runner.Loop
                           Runner.Nway
                           Runner.Warmup
                           Stats.Common
@@ -42,6 +43,7 @@ library
                           Benchmark.Report.Markdown
                           Benchmark.Report.Output
                           Benchmark.Compare
+                          Benchmark.Report.Formatting
                           Benchmark.Reporter
                           Benchmark.Reporter.Markdown
                           Benchmark.Types
@@ -52,11 +54,9 @@ library
                           Tracing.Types
 
   other-modules:          Runner
-                          Runner.Loop
                           Runner.Tracing
                           Benchmark.Network.Exec
                           Benchmark.Network.Request
-                          Benchmark.Report.Formatting
                           Benchmark.Reporter.CI
                           Benchmark.Reporter.Terminal
                           Benchmark.TUI
@@ -122,6 +122,10 @@ test-suite            gauntlet-test
   hs-source-dirs:     test
   other-modules:      AuthSpec
                     , BaselineSpec
+                    , ExecSpec
+                    , FormattingSpec
+                    , LoopSpec
+                    , TypesConfigSpec
                     , CLISpec
                     , ContextSpec
                     , EnvSpec

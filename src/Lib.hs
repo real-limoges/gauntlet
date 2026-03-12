@@ -5,8 +5,8 @@ module Lib (run) where
 import Control.Monad (forM_)
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text qualified as T
-import Data.Time.Clock (getCurrentTime, diffUTCTime)
-import Network.HTTP.Client (Manager, newManager, httpNoBody, parseRequest, responseStatus)
+import Data.Time.Clock (diffUTCTime, getCurrentTime)
+import Network.HTTP.Client (Manager, httpNoBody, newManager, parseRequest, responseStatus)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types.Status (statusCode)
 import System.Exit (ExitCode (..), exitWith)
@@ -70,8 +70,8 @@ loadAndValidateNwayConfig :: FilePath -> IO NwayConfig
 loadAndValidateNwayConfig = loadAndValidate loadNwayConfig validateNwayConfig
 
 getMarkdownPath :: Command -> Maybe FilePath
-getMarkdownPath (BenchmarkNway _ _ fmt) = case fmt of { OutputMarkdown p -> Just p; _ -> Nothing }
-getMarkdownPath (BenchmarkSingle _ _ fmt) = case fmt of { OutputMarkdown p -> Just p; _ -> Nothing }
+getMarkdownPath (BenchmarkNway _ _ fmt) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
+getMarkdownPath (BenchmarkSingle _ _ fmt) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
 getMarkdownPath _ = Nothing
 
 loadAndValidate :: (FilePath -> IO (Either String a)) -> (a -> Either PerfTestError a) -> FilePath -> IO a
@@ -110,9 +110,9 @@ runValidate cfgPath doCheck = do
           then do
             mgr <- newManager tlsManagerSettings
             results <- mapM (checkEndpoint mgr hcPath) targets
-            if all id results
+            if and results
               then pure RunSuccess
-              else pure (RunError (BenchmarkError "one or more endpoints unreachable"))
+              else pure (RunError (UnknownNetworkError "one or more endpoints unreachable"))
           else pure RunSuccess
 
 checkEndpoint :: Manager -> T.Text -> NamedTarget -> IO Bool
@@ -124,5 +124,6 @@ checkEndpoint mgr hcPath target = do
   t1 <- getCurrentTime
   let ms = round (diffUTCTime t1 t0 * 1000) :: Int
       code = statusCode (responseStatus resp)
-  putStrLn $ "  " <> T.unpack (targetName target) <> " " <> url <> " => HTTP " <> show code <> " (" <> show ms <> "ms)"
+  putStrLn $
+    "  " <> T.unpack (targetName target) <> " " <> url <> " => HTTP " <> show code <> " (" <> show ms <> "ms)"
   pure (code >= 200 && code < 400)

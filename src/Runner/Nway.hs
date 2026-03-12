@@ -104,7 +104,7 @@ runNwayWithTUI reporter baselineMode cfg csvFile timestamp setts perTargetReques
       exitWithError BenchmarkCancelled
     (True, Just errMsg) -> do
       void (wait benchmarkWork) `catch` \(_ :: SomeException) -> return ()
-      exitWithError (BenchmarkError (T.unpack errMsg))
+      exitWithError (UnknownNetworkError errMsg)
     (True, Nothing) -> do
       results <- wait benchmarkWork
       postAnalysis reporter (rcLogger ctx) (rcManager ctx) baselineMode setts timestamp results

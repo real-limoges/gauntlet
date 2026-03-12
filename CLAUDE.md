@@ -45,7 +45,7 @@ The codebase is organized into three major functional areas:
 Core benchmarking engine that handles HTTP requests, concurrent execution, and analysis.
 
 **Key Components:**
-- `Types.hs` - Core data types: `Endpoint`, `BenchmarkStats`, `BayesianComparison`, `TestConfig`, `PerfTestError`
+- `Types.hs` - Core data types: `Endpoint`, `BenchmarkStats`, `BayesianComparison`, `TestConfig`, `PerfTestError` (with typed network error variants: `NetworkTimeout`, `ConnectionRefused`, `TlsError`, `HttpError`, `UnknownNetworkError`)
 - `Config/Loader.hs` - Loads YAML/JSON config, builds endpoint definitions from payloads; exports `loadNwayConfig`, `validateNwayConfig`
 - `Config/CLI.hs` - Command-line argument parsing
 - `Config/Env.hs` - `.env` / `.env.local` loading and `${VAR}` interpolation in config JSON before decode
@@ -54,10 +54,10 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 - `Execution/Validation.hs` - Per-response JSON field validation (status code + field assertions)
 - `Network/Auth.hs` - Token reading and auth header injection
 - `Network/Exec.hs` - Request execution with retry logic
-- `Network/Request.hs` - Nanosecond-precision timed request wrapper
+- `Network/Request.hs` - Nanosecond-precision timed request wrapper; `categorizeNetworkError` maps `HttpException` to typed `PerfTestError` variants
 - `TUI.hs` + `TUI/State.hs` + `TUI/Widgets.hs` - Real-time Brick-based terminal UI
 - `Report.hs` - Terminal output formatting; also exports `printNwayReport`
-- `Report/Formatting.hs` - Statistical test formatting (formatMWU, formatKS, formatAD)
+- `Report/Formatting.hs` - Validation error formatting (`formatValidationError`)
 - `Report/Markdown.hs` - Markdown report generation for CI artifacts; also exports `markdownNwayReport`
 - `Report/Baseline.hs` - Saves/loads baselines, regression detection with configurable thresholds
 - `Report/CI.hs` - GitLab CI and GitHub Actions integration
@@ -81,7 +81,6 @@ Shared statistical utilities used by both benchmark and trace analysis.
     - Mean difference with 95% credible intervals
     - Cohen's d effect size
     - Percentile comparison with Maritz-Jarrett standard error
-  - `addFrequentistTests()` - Appends MWU, KS, and Anderson-Darling tests
   - `earthMoversDistance()` - 1-Wasserstein distance for distribution comparison
 
 ### 3. Tracing/ Module (Distributed Tracing Integration)
@@ -119,7 +118,7 @@ Git Switch (primary branch) → docker-compose up → Health Check
     ↓
 Concurrent Execution → Nanosecond-timed Responses
     ↓
-Statistical Analysis → Bayesian Comparison → Frequentist Tests → Report
+Statistical Analysis → Bayesian Comparison → Report
     ↓
 Optional: Fetch Traces → Aggregate Spans → Trace Report
     ↓
@@ -133,7 +132,7 @@ Terminal/JSON/CSV/Markdown Output + Exit Code (0=success, 1=regression, 2=error)
 **Framework:** Tasty with tasty-hunit and tasty-quickcheck for property-based testing
 
 **Test Types:**
-- **Unit Tests:** StatsSpec, BayesianSpec, FrequentistSpec, ConfigSpec, BaselineSpec, TracingSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, LogSpec, MarkdownSpec, NwaySpec, OutputSpec, RateLimiterSpec, ReportSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
+- **Unit Tests:** StatsSpec, BayesianSpec, ConfigSpec, BaselineSpec, TracingSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, ExecSpec, FormattingSpec, LogSpec, LoopSpec, MarkdownSpec, NwaySpec, OutputSpec, RateLimiterSpec, ReportSpec, TypesConfigSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
 - **Integration Tests:** Integration.hs uses `MockServer.hs` to test HTTP operations end-to-end
 - **Property Tests:** PropertySpec.hs verifies statistical invariants (percentile ordering, stat bounds)
 - **UI Tests:** TUISpec.hs for Brick widget/state testing
@@ -160,7 +159,7 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 - `settings.tempo` - Optional tracing configuration (URL, service name, auth token)
 - `payloads[].headers` - Optional custom HTTP headers (Map Text Text)
 - `payloads[].validate` - Optional per-response validation (`status`, `fields` map of dot-path assertions)
-- `settings.loadMode` - Load control mode: `unthrottled` (default), `constantRps`, `rampUp`, `stepLoad`
+- `settings.loadMode` - Load control mode: `unthrottled` (default), `constantRps`, `rampUp`, `stepLoad`, `poissonRps`
 - `settings.maxConnections` - HTTP connection pool size (default: 10)
 - `settings.requestTimeout` - Per-request timeout in seconds (default: 30)
 - Environment variable expansion: `${VAR}` in any config value, resolved from `.env.local` > `.env` > process env
@@ -171,7 +170,6 @@ Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsin
 - **Bayesian over Frequentist:** Direct probability answers ("95% chance candidate is faster") vs p-values
 - **Conjugate Normal Model:** Analytical posterior computation without MCMC sampling
 - **Two probability metrics:** `probBFasterThanA` (population means, σ/√n) vs `probSingleRequestFaster` (individual requests, σ)
-- **Anderson-Darling test:** Scholz-Stephens (1987) two-sample test; more tail-sensitive than KS; complement to Mann-Whitney U
 - **Expected Shortfall:** `esMs` = E[X | X > p99], mean of worst 1% of requests
 - **Type Safety:** Newtypes (`Nanoseconds`, `Milliseconds`) prevent unit conversion bugs
 

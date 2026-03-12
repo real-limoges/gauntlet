@@ -28,6 +28,23 @@ typesSpec =
             , testCase "formats EnvironmentSetupError" $ do
                 formatError (EnvironmentSetupError "git checkout failed")
                   `shouldBe` "Environment setup failed: git checkout failed"
+            , testCase "formats BenchmarkCancelled" $ do
+                formatError BenchmarkCancelled `shouldBe` "Benchmark cancelled by user"
+            , testCase "formats NetworkTimeout" $ do
+                formatError (NetworkTimeout "http://svc:8080")
+                  `shouldBe` "Request to http://svc:8080 timed out"
+            , testCase "formats ConnectionRefused" $ do
+                formatError (ConnectionRefused "http://svc:8080")
+                  `shouldBe` "Connection refused: http://svc:8080"
+            , testCase "formats TlsError" $ do
+                formatError (TlsError "https://svc:443" "handshake failed")
+                  `shouldBe` "TLS error connecting to https://svc:443: handshake failed"
+            , testCase "formats HttpError" $ do
+                formatError (HttpError "http://svc:8080" 503)
+                  `shouldBe` "HTTP 503 from http://svc:8080"
+            , testCase "formats UnknownNetworkError" $ do
+                formatError (UnknownNetworkError "something went wrong")
+                  `shouldBe` "Network error: something went wrong"
             ]
         ]
     ]

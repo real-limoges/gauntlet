@@ -199,6 +199,7 @@ instance FromJSON LoadMode where
       "constantRps" -> LoadConstantRps <$> o .: "targetRps"
       "rampUp" -> LoadRampUp <$> o .: "startRps" <*> o .: "endRps" <*> o .: "durationSecs"
       "stepLoad" -> LoadStepLoad <$> o .: "steps"
+      "poissonRps" -> LoadPoissonRps <$> o .: "targetRps"
       _ -> fail $ "Unknown load mode: " ++ show mode
 
 -- | Compute total requests for a load mode given a fallback iteration count.

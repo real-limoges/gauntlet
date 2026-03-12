@@ -9,23 +9,27 @@ where
 import Benchmark.Types
   ( Endpoint (..)
   , Nanoseconds (..)
+  , PerfTestError (..)
   , Settings (..)
   , TestingResponse (..)
   , defaultLogLevel
   , defaultRetrySettings
   )
 import Benchmark.Types qualified as Types
+import Benchmark.Types.Error (formatError)
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeAsyncException, SomeException, evaluate, fromException, throwIO, try)
 import Data.Aeson (encode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.CaseInsensitive (mk)
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
 import Log (Logger, logWarning, makeLogger)
 import Network.HTTP.Client
   ( HttpException (..)
+  , HttpExceptionContent (..)
   , Manager
   , ManagerSettings (..)
   , Request
@@ -103,12 +107,14 @@ timedRequestPrepared settings mgr req = do
         Left err -> do
           endTime <- getTime Monotonic
           logWarning logger $ T.pack $ "Connection failed (no retries left): " ++ showHttpErr err
+          let urlText = T.pack (show (Client.getUri req))
+              categorized = categorizeNetworkError urlText err
           return $
             TestingResponse
               { durationNs = Nanoseconds $ fromIntegral (max 0 (toNanoSecs endTime - toNanoSecs startTime))
               , statusCode = 0
               , respBody = Nothing
-              , errorMessage = Just (show err)
+              , errorMessage = Just (formatError categorized)
               }
 
     showHttpErr e = case fromException e of
@@ -127,3 +133,18 @@ timedRequestPrepared settings mgr req = do
           , respBody = Just body
           , errorMessage = Nothing
           }
+
+-- | Classify a network exception into a structured 'PerfTestError'.
+categorizeNetworkError :: Text -> SomeException -> PerfTestError
+categorizeNetworkError url err = case fromException err of
+  Just (HttpExceptionRequest _ content) -> case content of
+    ResponseTimeout -> NetworkTimeout url
+    ConnectionTimeout -> NetworkTimeout url
+    ConnectionFailure _ -> ConnectionRefused url
+    TlsNotSupported -> TlsError url "TLS not supported"
+    StatusCodeException resp _ ->
+      HttpError url (Status.statusCode (Client.responseStatus resp))
+    _ -> UnknownNetworkError (T.pack (show err))
+  Just (InvalidUrlException _ reason) ->
+    UnknownNetworkError (T.pack ("Invalid URL: " ++ reason))
+  Nothing -> UnknownNetworkError (T.pack (show err))

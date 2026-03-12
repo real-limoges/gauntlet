@@ -15,10 +15,10 @@ runCompare reporter fileA fileB = do
   case (resA, resB) of
     (Left err, _) -> do
       let msg = "failed to decode " <> fileA <> ": " <> err
-      pure (RunError (BenchmarkError msg))
+      pure (RunError (ConfigParseError msg))
     (_, Left err) -> do
       let msg = "failed to decode " <> fileB <> ": " <> err
-      pure (RunError (BenchmarkError msg))
+      pure (RunError (ConfigParseError msg))
     (Right statsA, Right statsB) -> do
       let nameA = T.pack fileA
           nameB = T.pack fileB
