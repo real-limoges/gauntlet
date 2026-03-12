@@ -17,6 +17,7 @@ import Benchmark.Types
 import Control.Monad (when)
 import Data.ByteString.Lazy qualified as LBS
 import Data.IORef
+import Data.Time (UTCTime (..), fromGregorian)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Word (Word64)
@@ -26,6 +27,9 @@ import System.IO (hClose, hFlush, hSetEncoding, stdout, utf8)
 import System.IO.Temp (withSystemTempFile)
 import Tracing.Types
 
+epoch :: UTCTime
+epoch = UTCTime (fromGregorian 2000 1 1) 0
+
 makeResult :: Integer -> TestingResponse
 makeResult ns =
   TestingResponse
@@ -33,6 +37,7 @@ makeResult ns =
     , statusCode = 200
     , respBody = Nothing
     , errorMessage = Nothing
+    , requestedAt = epoch
     }
 
 makeErrorResult :: String -> TestingResponse
@@ -42,6 +47,7 @@ makeErrorResult msg =
     , statusCode = 0
     , respBody = Nothing
     , errorMessage = Just msg
+    , requestedAt = epoch
     }
 
 makeResponseWithBody :: Int -> LBS.ByteString -> TestingResponse
@@ -51,6 +57,7 @@ makeResponseWithBody status body =
     , statusCode = status
     , respBody = Just body
     , errorMessage = Nothing
+    , requestedAt = epoch
     }
 
 mockStats :: Double -> Double -> BenchmarkStats

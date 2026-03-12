@@ -12,4 +12,5 @@ gauntlet-exe
 .DS_Store
 *.log
 *.csv
+*.png
 docs/

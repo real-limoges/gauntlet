@@ -31,8 +31,7 @@ data RunContext = RunContext
   , rcTimestamp :: String
   , rcEventChan :: Maybe (TChan BenchmarkEvent)
   , rcLogger :: Logger
-  , rcTargetName :: Maybe Text
-  -- ^ Nothing for A/B runs, Just name for N-way runs
+  , rcTargetName :: Text
   }
 
 -- | Initialise a 'RunContext' from benchmark settings.
@@ -52,7 +51,7 @@ initContext setts csvFile timestamp eventChan = do
       , rcTimestamp = timestamp
       , rcEventChan = eventChan
       , rcLogger = logger
-      , rcTargetName = Nothing
+      , rcTargetName = ""
       }
 
 -- | Set up the git environment or exit with an error.

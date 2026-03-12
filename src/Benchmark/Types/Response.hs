@@ -32,6 +32,7 @@ import Data.Map.Strict (Map)
 import Data.Maybe (catMaybes)
 import Data.Scientific (Scientific)
 import Data.Text (Text)
+import Data.Time (UTCTime)
 import GHC.Generics (Generic)
 
 -- | Per-field assertion in a validation spec.
@@ -143,5 +144,6 @@ data TestingResponse = TestingResponse
   , statusCode :: Int
   , respBody :: Maybe LBS.ByteString
   , errorMessage :: Maybe String
+  , requestedAt :: UTCTime
   }
   deriving stock (Show, Eq)

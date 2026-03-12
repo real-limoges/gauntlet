@@ -81,7 +81,7 @@ nwayIntegrationSpec =
                       csvContents <- T.pack <$> readFile ("results/" ++ f)
                       -- Check header
                       case T.lines csvContents of
-                        (hdr : _) -> T.unpack hdr `shouldBe` "target_name,payload_id,url,status_code,latency_ms"
+                        (hdr : _) -> T.unpack hdr `shouldBe` "target_name,payload_id,url,method,status_code,latency_ms,timestamp_iso"
                         [] -> assertFailure "CSV file is empty"
                       -- Check target names in rows
                       T.isInfixOf "target-1" csvContents `shouldBe` True

@@ -40,7 +40,8 @@ runSingle reporter baselineMode cfg = do
       numEndpoints = length eps
       tuiState = initialState targetUrl totalRequests numEndpoints
 
-  ctx <- initContext setts csvFile timestamp (Just eventChan)
+  baseCtx <- initContext setts csvFile timestamp (Just eventChan)
+  let ctx = baseCtx {rcTargetName = targetUrl}
 
   benchmarkWork <- async $ do
     let work = do

@@ -3,7 +3,7 @@ module Runner.Nway (runNway, allPairComparisons) where
 import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Config.Loader (buildEndpoints)
 import Benchmark.Report.Baseline (handleBaseline)
-import Benchmark.Report.Output (initNwayOutputFiles)
+import Benchmark.Report.Output (initOutputFiles)
 import Benchmark.Reporter (Reporter (..))
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
@@ -47,7 +47,7 @@ data NwayResult = NwayResult
 -- | Run benchmarks against N named targets and compare all pairs.
 runNway :: Reporter -> BaselineMode -> NwayConfig -> IO RunResult
 runNway reporter baselineMode cfg = do
-  (csvFile, timestamp) <- initNwayOutputFiles
+  (csvFile, timestamp) <- initOutputFiles
 
   let setts = nwaySettings cfg
       eps = buildEndpoints "" (nwayPayloads cfg)
@@ -142,7 +142,7 @@ runAllTargets ctx cfg eventChan = do
     emitEvent eventChan (StatusMessage $ "Benchmarking " <> targetName t)
 
     startNs <- getNowNs
-    let ctxWithTarget = ctx {rcTargetName = Just (targetName t)}
+    let ctxWithTarget = ctx {rcTargetName = targetName t}
     (timings, validSummaries) <- benchmarkEndpoints ctxWithTarget (T.unpack (targetName t)) targetEps
     endNs <- getNowNs
 

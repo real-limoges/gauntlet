@@ -26,6 +26,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
+import Data.Time (getCurrentTime)
 import Log (Logger, logWarning, makeLogger)
 import Network.HTTP.Client
   ( HttpException (..)
@@ -93,10 +94,11 @@ timedRequestPrepared settings mgr req = do
   where
     go :: Logger -> Int -> Int -> Double -> IO TestingResponse
     go logger attempts delay backoff = do
+      requestedAt <- getCurrentTime
       startTime <- getTime Monotonic
       result <- try (httpLbs req mgr) :: IO (Either SomeException (Response LBS.ByteString))
       case result of
-        Right resp -> processResponse resp startTime
+        Right resp -> processResponse requestedAt resp startTime
         Left err | Just (_ :: SomeAsyncException) <- fromException err -> throwIO err
         Left err | attempts > 0 -> do
           logWarning logger $
@@ -115,13 +117,14 @@ timedRequestPrepared settings mgr req = do
               , statusCode = 0
               , respBody = Nothing
               , errorMessage = Just (formatError categorized)
+              , requestedAt
               }
 
     showHttpErr e = case fromException e of
       Just (HttpExceptionRequest _ content) -> show content
       _ -> show e
 
-    processResponse resp startTime = do
+    processResponse requestedAt resp startTime = do
       let body = Client.responseBody resp
           code = Status.statusCode (responseStatus resp)
       _ <- evaluate (LBS.length body)
@@ -132,6 +135,7 @@ timedRequestPrepared settings mgr req = do
           , statusCode = code
           , respBody = Just body
           , errorMessage = Nothing
+          , requestedAt
           }
 
 -- | Classify a network exception into a structured 'PerfTestError'.
