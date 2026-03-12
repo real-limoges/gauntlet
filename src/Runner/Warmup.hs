@@ -1,6 +1,7 @@
+-- | Warmup request execution before benchmark runs.
 module Runner.Warmup (runWarmup) where
 
-import Benchmark.Network (addAuth, runBenchmark)
+import Benchmark.Network (BenchmarkEnv (..), addAuth, runBenchmark)
 import Benchmark.Types (Endpoint, defaultWarmupSettings)
 import Benchmark.Types qualified as PT
 import Control.Concurrent (newQSem)
@@ -26,4 +27,5 @@ runWarmup RunContext {..} ep = do
         <> ")..."
     sem <- newQSem 1
     let authorizedEp = addAuth rcToken ep
-    void $ runBenchmark rcSettings sem rcManager warmupIters 1 authorizedEp Nothing Nothing
+        env = BenchmarkEnv rcSettings sem rcManager 1 Nothing
+    void $ runBenchmark env warmupIters authorizedEp Nothing

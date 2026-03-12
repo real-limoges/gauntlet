@@ -1,3 +1,4 @@
+-- | Benchmark statistical analysis: descriptive stats, Bayesian comparison, and earth mover's distance.
 module Stats.Benchmark
   ( -- * Descriptive Statistics
     calculateStats
@@ -24,6 +25,14 @@ import Data.Vector.Unboxed qualified as V
 import Numeric.SpecFunctions (erfc)
 import Statistics.Sample (mean, stdDev)
 import Stats.Common (percentileSorted)
+
+-- | Z-score for the 95% credible interval (two-tailed).
+z95 :: Double
+z95 = 1.96
+
+-- | Percentile threshold for Expected Shortfall (ES = E[X | X > p99]).
+esPercentile :: Double
+esPercentile = 0.99
 
 {-| Compute descriptive statistics from benchmark responses.
 Failed responses (with errorMessage) are excluded from latency calculations.
@@ -74,7 +83,7 @@ expectedShortfall sorted
   | V.null sorted = 0
   | otherwise =
       let n = V.length sorted
-          threshold = floor (0.99 * (fromIntegral n :: Double))
+          threshold = floor (esPercentile * (fromIntegral n :: Double))
           tailVals = V.drop threshold sorted
        in if V.null tailVals
             then V.last sorted
@@ -107,8 +116,8 @@ compareBayesian statsA statsB =
       muDiff = muA - muB
       sigmaDiff = sqrt ((varA / countA) + (varB / countB))
       probBIsFaster = if sigmaDiff > 0 then standardNormalCDF (muDiff / sigmaDiff) else 0.5
-      ciLower = muDiff - (1.96 * sigmaDiff)
-      ciUpper = muDiff + (1.96 * sigmaDiff)
+      ciLower = muDiff - (z95 * sigmaDiff)
+      ciUpper = muDiff + (z95 * sigmaDiff)
 
       pooledVar =
         if countA + countB > 2
@@ -161,8 +170,8 @@ comparePercentile p pctA pctB sdA sdB nA nB =
       probRegress = 1 - standardNormalCDF zPct
    in PercentileComparison
         { pctDifference = diff
-        , pctCredibleLower = diff - 1.96 * seDiff
-        , pctCredibleUpper = diff + 1.96 * seDiff
+        , pctCredibleLower = diff - z95 * seDiff
+        , pctCredibleUpper = diff + z95 * seDiff
         , probPctRegression = probRegress
         }
 
@@ -173,7 +182,10 @@ percentileSEMultiplier p =
       phi = exp (-(0.5 * z * z)) / sqrt (2 * pi)
    in if phi > 0 then sqrt (p * (1 - p)) / phi else 1.0
 
--- | Rational approximation of inverse normal CDF (Abramowitz and Stegun).
+{-| Rational approximation of inverse normal CDF.
+Abramowitz and Stegun, Handbook of Mathematical Functions (1964), formula 26.2.23.
+Coefficients: c0=2.515517, c1=0.802853, c2=0.010328, d1=1.432788, d2=0.189269, d3=0.001308.
+-}
 inverseNormalCDF :: Double -> Double
 inverseNormalCDF p
   | p <= 0 = -10

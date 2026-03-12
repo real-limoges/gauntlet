@@ -1,3 +1,4 @@
+-- | Tests for Stats.Common.
 module StatsCommonSpec (statsCommonSpec) where
 
 import Data.Vector.Unboxed qualified as V

@@ -1,3 +1,4 @@
+-- | Structured logging with configurable verbosity levels.
 module Log
   ( Logger (..)
   , makeLogger
@@ -35,10 +36,20 @@ makeLogger minLevel =
           TIO.hPutStrLn stderr formatted
     }
 
-logDebug, logInfo, logWarning, logError :: Logger -> Text -> IO ()
+-- | Log a message at 'Debug' level.
+logDebug :: Logger -> Text -> IO ()
 logDebug = logAt Debug
+
+-- | Log a message at 'Info' level.
+logInfo :: Logger -> Text -> IO ()
 logInfo = logAt Info
+
+-- | Log a message at 'Warning' level.
+logWarning :: Logger -> Text -> IO ()
 logWarning = logAt Warning
+
+-- | Log a message at 'Error' level.
+logError :: Logger -> Text -> IO ()
 logError = logAt Error
 
 -- | Log at a given level

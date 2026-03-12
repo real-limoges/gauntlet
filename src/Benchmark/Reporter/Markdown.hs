@@ -1,3 +1,4 @@
+-- | Reporter backend that writes markdown reports to a file.
 module Benchmark.Reporter.Markdown (markdownReporter) where
 
 import Benchmark.Report.Markdown

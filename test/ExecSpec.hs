@@ -1,7 +1,9 @@
+-- | Tests for Benchmark.Network.Exec.
 module ExecSpec (execSpec) where
 
 import Benchmark.Network
-  ( initNetwork
+  ( BenchmarkEnv (..)
+  , initNetwork
   , runBenchmark
   )
 import Benchmark.TUI.State (BenchmarkEvent)
@@ -25,8 +27,8 @@ execSpec =
         mockJson "{}" $ \port -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 1
-          results <-
-            runBenchmark testSettings sem mgr 5 1 (testEndpoint port) (Just (chan :: TChan BenchmarkEvent)) Nothing
+          let env = BenchmarkEnv testSettings sem mgr 1 (Just (chan :: TChan BenchmarkEvent))
+          results <- runBenchmark env 5 (testEndpoint port) Nothing
           length results `shouldBe` 5
           events <- replicateM 5 (atomically (readTChan chan))
           length events `shouldBe` 5
@@ -34,14 +36,16 @@ execSpec =
         mockStatus status500 $ \port -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 1
-          results <- runBenchmark testSettings sem mgr 5 1 (testEndpoint port) Nothing Nothing
+          let env = BenchmarkEnv testSettings sem mgr 1 Nothing
+          results <- runBenchmark env 5 (testEndpoint port) Nothing
           length results `shouldBe` 5
           all (\r -> statusCode r == 500) results `shouldBe` True
     , testCase "concurrency: all 10 requests complete" $
         mockCountedRequests status200 "{}" $ \port readCount -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 4
-          results <- runBenchmark testSettings sem mgr 10 1 (testEndpoint port) Nothing Nothing
+          let env = BenchmarkEnv testSettings sem mgr 1 Nothing
+          results <- runBenchmark env 10 (testEndpoint port) Nothing
           length results `shouldBe` 10
           count <- readCount
           count `shouldBe` 10

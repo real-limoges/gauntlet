@@ -1,3 +1,4 @@
+-- | Grafana Tempo HTTP client: TraceQL queries, trace fetching, and span aggregation.
 module Tracing.Client
   ( fetchTracesForTimeRange
   , parseSearchResponse
@@ -102,6 +103,7 @@ addAuthHeader cfg req = case tempoAuthToken cfg of
 urlEncode :: Text -> Text
 urlEncode = decodeUtf8 . URI.urlEncode True . encodeUtf8
 
+-- | Decode a Tempo search API JSON response into a 'TempoSearchResponse'.
 parseSearchResponse :: LBS.ByteString -> Either String TempoSearchResponse
 parseSearchResponse body = do
   val <- eitherDecode body
@@ -131,6 +133,7 @@ parseTraceMetadata = withObject "TraceMetadata" $ \o -> do
       , metaDurationMs = durationMs
       }
 
+-- | Decode a Tempo trace detail JSON response (OTLP format) into a 'Trace'.
 parseTraceResponse :: Text -> LBS.ByteString -> Either String Trace
 parseTraceResponse traceId body = do
   val <- eitherDecode body

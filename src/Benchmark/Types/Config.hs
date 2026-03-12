@@ -1,3 +1,4 @@
+-- | Configuration data types: test settings, targets, payloads, and load modes.
 module Benchmark.Types.Config
   ( -- * Configuration
     TestConfig (..)
@@ -49,6 +50,7 @@ import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
+-- | Top-level A\/B benchmark configuration (two targets, git branches, settings, payloads).
 data TestConfig = TestConfig
   { targets :: Targets
   , git :: Targets
@@ -58,6 +60,7 @@ data TestConfig = TestConfig
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
 
+-- | N-way benchmark configuration (multiple named targets).
 data NwayConfig = NwayConfig
   { nwayTargets :: [NamedTarget]
   , nwaySettings :: Settings
@@ -236,6 +239,7 @@ loadModeDurationSecs (LoadRampUp _ _ d) = d
 loadModeDurationSecs (LoadStepLoad steps) = sum (map loadStepDurationSecs steps)
 loadModeDurationSecs _ = 0
 
+-- | Runtime settings controlling iterations, concurrency, timeouts, and optional features.
 data Settings = Settings
   { iterations :: Int
   , concurrency :: Int
@@ -274,6 +278,7 @@ data TempoSettings = TempoSettings
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
 
+-- | Specification for a single HTTP payload within a benchmark.
 data PayloadSpec = PayloadSpec
   { specName :: Text
   , specMethod :: Text

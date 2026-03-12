@@ -1,3 +1,4 @@
+-- | Terminal output formatting for benchmark results and comparisons.
 module Benchmark.Report
   ( printMultipleBenchmarkReport
   , printSingleBenchmarkReport
@@ -22,6 +23,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Text.Printf (printf)
 
+-- | Print a tabulated comparison of multiple benchmark results to stdout.
 printMultipleBenchmarkReport ::
   Text -> Text -> BenchmarkStats -> BenchmarkStats -> BayesianComparison -> IO ()
 printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
@@ -71,6 +73,7 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
     (pctCredibleUpper p99)
   printf "P99 Regression Probability: %.2f%%\n" (probPctRegression p99 * 100.0)
 
+-- | Print a single target's benchmark statistics to stdout.
 printSingleBenchmarkReport :: Text -> BenchmarkStats -> IO ()
 printSingleBenchmarkReport name stats = do
   putStrLn ""

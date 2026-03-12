@@ -1,3 +1,4 @@
+-- | Reporter backend that generates latency distribution charts.
 module Benchmark.Reporter.Plot (plotReporter) where
 
 import Benchmark.Reporter (Reporter (..))

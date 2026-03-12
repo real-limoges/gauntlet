@@ -1,3 +1,4 @@
+-- | Nanosecond-precision timed HTTP requests and network error categorization.
 module Benchmark.Network.Request
   ( initNetwork
   , prepareRequest

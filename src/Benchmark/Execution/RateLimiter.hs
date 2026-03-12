@@ -1,3 +1,4 @@
+-- | Rate limiting strategies: constant RPS, ramp-up, step-load, and Poisson modes.
 module Benchmark.Execution.RateLimiter
   ( RateLimiter
   , waitForSlot
@@ -12,6 +13,7 @@ import Control.Monad (when)
 import Data.Time (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import System.Random (randomRIO)
 
+-- | Handle for controlling request rate across concurrent workers.
 data RateLimiter = RateLimiter
   { rlNextSlot :: MVar UTCTime
   -- ^ The next available dispatch time

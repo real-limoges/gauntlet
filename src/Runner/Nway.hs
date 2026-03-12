@@ -1,3 +1,4 @@
+-- | N-way benchmark comparison orchestration.
 module Runner.Nway (runNway, allPairComparisons) where
 
 import Benchmark.Config.CLI (BaselineMode (..))

@@ -1,3 +1,4 @@
+-- | Single-endpoint benchmark runner.
 module Runner (runSingle) where
 
 import Benchmark.Config.CLI (BaselineMode)

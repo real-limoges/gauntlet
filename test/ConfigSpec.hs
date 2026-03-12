@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Config.Loader.
 module ConfigSpec (configSpec) where
 
 import Benchmark.Config.Loader

@@ -1,3 +1,4 @@
+-- | Command-line argument parsing for benchmark subcommands.
 module Benchmark.Config.CLI
   ( parseArgs
   , Command (..)
@@ -20,6 +21,7 @@ data BaselineMode
     SaveAndCompare Text Text
   deriving (Show, Eq)
 
+-- | Top-level CLI command (benchmark, compare, validate, etc.).
 data Command
   = BenchmarkNway
       { configPath :: FilePath
@@ -43,6 +45,7 @@ data Command
       }
   deriving (Show, Eq)
 
+-- | Parse command-line arguments into a 'Command'.
 parseArgs :: IO Command
 parseArgs = execParser opts
   where
@@ -54,6 +57,7 @@ parseArgs = execParser opts
             <> header ""
         )
 
+-- | Optparse-applicative parser for 'Command'.
 commandParser :: Parser Command
 commandParser =
   subparser

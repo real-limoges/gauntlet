@@ -1,3 +1,4 @@
+-- | Tests for Stats.Benchmark (calculateStats).
 module StatsSpec (statsSpec) where
 
 import Benchmark.Types (BenchmarkStats (..))

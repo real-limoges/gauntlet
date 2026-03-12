@@ -1,3 +1,4 @@
+-- | TUI widget rendering: progress bars, histograms, and formatting helpers.
 module Benchmark.TUI.Widgets
   ( progressBar
   , histogram

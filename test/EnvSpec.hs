@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Config.Env.
 module EnvSpec (envSpec) where
 
 import Benchmark.Config.Env (interpolateEnv, loadEnvVars, parseEnvFile)

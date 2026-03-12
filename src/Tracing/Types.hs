@@ -1,3 +1,4 @@
+-- | Data types for Tempo configuration, traces, and span structures.
 module Tracing.Types
   ( -- * Configuration
     TempoConfig (..)
@@ -57,6 +58,7 @@ data TraceQuery = TraceQuery
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)
 
+-- | Wrapper for the JSON response from Tempo's search API.
 newtype TempoSearchResponse = TempoSearchResponse
   { foundTraces :: [TraceMetadata]
   }
@@ -98,6 +100,7 @@ data Span = Span
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
+-- | OpenTelemetry span kind classification.
 data SpanKind
   = SpanKindServer
   | SpanKindClient
@@ -108,6 +111,7 @@ data SpanKind
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
+-- | OpenTelemetry span status.
 data SpanStatus
   = StatusOk
   | StatusError

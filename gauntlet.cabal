@@ -6,6 +6,9 @@ license-file:       LICENSE
 author:             Real Limoges
 maintainer:         b.real.limoges@gmail.com
 build-type:         Simple
+synopsis:           Statistically rigorous HTTP performance benchmarking
+description:        HTTP benchmarking tool with Bayesian A/B analysis, distributed tracing, and CI/CD integration.
+category:           Testing, Benchmarking
 
 
 common warnings

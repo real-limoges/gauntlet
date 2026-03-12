@@ -1,3 +1,4 @@
+-- | Tests for Tracing.Report.
 module TracingReportSpec (tracingReportSpec) where
 
 import Benchmark.Types (Milliseconds (..))

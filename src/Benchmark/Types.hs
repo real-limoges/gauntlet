@@ -1,3 +1,4 @@
+-- | Re-exports all benchmark type definitions.
 module Benchmark.Types
   ( -- * Request/Response Types
     Endpoint (..)

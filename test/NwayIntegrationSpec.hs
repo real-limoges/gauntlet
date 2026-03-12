@@ -1,3 +1,4 @@
+-- | Integration tests for N-way comparison.
 module NwayIntegrationSpec (nwayIntegrationSpec) where
 
 import Benchmark.Config.CLI (BaselineMode (..))

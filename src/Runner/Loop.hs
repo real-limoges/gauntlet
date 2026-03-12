@@ -1,9 +1,11 @@
+-- | Concurrent benchmark execution loop with STM channels.
 module Runner.Loop (benchmarkEndpoints) where
 
 import Benchmark.Execution.RateLimiter (makeLimiter)
 import Benchmark.Execution.Validation (validateResponses)
 import Benchmark.Network
-  ( addAuth
+  ( BenchmarkEnv (..)
+  , addAuth
   , runBenchmark
   , runBenchmarkDuration
   )
@@ -65,14 +67,15 @@ runEndpointLoop RunContext {..} endpoints = do
       ( \(idx, ep) -> do
           emitEvent rcEventChan (EndpointStarted (url ep) idx numEndpoints)
           let authorizedEp = addAuth rcToken ep
+              env = BenchmarkEnv rcSettings sem rcManager idx rcEventChan
           responses <-
             if isDurationBased mode
               then case mLimiter of
                 Just limiter ->
                   let dur = realToFrac (loadModeDurationSecs mode)
-                   in runBenchmarkDuration rcSettings sem rcManager dur idx authorizedEp limiter rcEventChan
-                Nothing -> runBenchmark rcSettings sem rcManager iters idx authorizedEp rcEventChan Nothing
-              else runBenchmark rcSettings sem rcManager iters idx authorizedEp rcEventChan mLimiter
+                   in runBenchmarkDuration env dur authorizedEp limiter
+                Nothing -> runBenchmark env iters authorizedEp Nothing
+              else runBenchmark env iters authorizedEp mLimiter
           return (idx, ep, responses)
       )
       indexedEndpoints
@@ -99,10 +102,14 @@ loadModeLabel (LoadConstantRps rps) = " at " ++ show (round rps :: Int) ++ " RPS
 loadModeLabel (LoadRampUp s e d) =
   " ramping "
     ++ show (round s :: Int)
-    ++ "\8594"
+    ++ arrowRight
     ++ show (round e :: Int)
     ++ " RPS over "
     ++ show (round d :: Int)
     ++ "s"
 loadModeLabel (LoadStepLoad steps) =
   " with " ++ show (length steps) ++ " load steps"
+
+-- | Unicode right arrow (→) for display formatting.
+arrowRight :: String
+arrowRight = "\8594"

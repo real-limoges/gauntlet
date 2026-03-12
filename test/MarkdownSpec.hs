@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Report.Markdown.
 module MarkdownSpec (markdownSpec) where
 
 import Benchmark.Report.Markdown

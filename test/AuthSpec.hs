@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Network.Auth.
 module AuthSpec (authSpec) where
 
 import Benchmark.Network.Auth (addAuth, readToken)

@@ -1,3 +1,4 @@
+-- | CI integration for GitLab CI and GitHub Actions artifact reports.
 module Benchmark.Report.CI
   ( CIMode (..)
   , detectCIMode

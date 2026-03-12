@@ -1,3 +1,4 @@
+-- | HTTP mock server utilities for integration testing.
 module MockServer
   ( withMockServer
   , mockJson

@@ -1,3 +1,4 @@
+-- | Compatibility shims for Tasty assertion functions.
 module TastyCompat
   ( shouldBe
   , shouldSatisfy

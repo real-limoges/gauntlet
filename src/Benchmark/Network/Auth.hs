@@ -1,3 +1,4 @@
+-- | Bearer token reading and authentication header injection.
 module Benchmark.Network.Auth (readToken, addAuth) where
 
 import Benchmark.Types (Endpoint (..), PerfTestError (..))

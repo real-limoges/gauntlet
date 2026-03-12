@@ -1,3 +1,4 @@
+-- | Tests for Log.
 module LogSpec (logSpec) where
 
 import Benchmark.Types (LogLevel (..))

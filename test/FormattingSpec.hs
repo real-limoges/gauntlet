@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Report.Formatting.
 module FormattingSpec (formattingSpec) where
 
 import Benchmark.Report.Formatting (formatValidationError)

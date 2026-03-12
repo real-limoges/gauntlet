@@ -1,5 +1,7 @@
+-- | HTTP request execution with retry logic and connection pooling.
 module Benchmark.Network.Exec
-  ( runBenchmark
+  ( BenchmarkEnv (..)
+  , runBenchmark
   , runBenchmarkDuration
   )
 where
@@ -27,31 +29,47 @@ import Data.Time (NominalDiffTime, UTCTime, addUTCTime, getCurrentTime)
 import Log (Logger, logInfo, makeLogger)
 import Network.HTTP.Client (Manager, Request)
 
+{-| Shared context for benchmark execution, bundling the common parameters
+needed by 'runBenchmark' and 'runBenchmarkDuration'.
+-}
+data BenchmarkEnv = BenchmarkEnv
+  { beSettings :: Settings
+  -- ^ Benchmark configuration (concurrency, timeouts, retry, etc.)
+  , beSem :: QSem
+  -- ^ Semaphore controlling concurrent request limit
+  , beManager :: Manager
+  -- ^ HTTP connection manager (shared across all requests)
+  , bePayloadIndex :: Int
+  -- ^ Index of the current payload\/endpoint (for progress logging)
+  , beEventChan :: Maybe (TChan BenchmarkEvent)
+  -- ^ Optional TUI event channel for real-time feedback
+  }
+
+-- | Frequency (in completed requests) at which duration-mode workers log progress.
+logFrequency :: Int
+logFrequency = 100
+
 {-| Run concurrent benchmark iterations with rate limiting via semaphore.
 When a 'RateLimiter' is provided, each thread waits for a rate slot before
 acquiring the semaphore.  Optionally emits TUI events when a channel is provided.
 -}
 runBenchmark ::
-  Settings ->
-  QSem ->
-  Manager ->
-  Int ->
+  BenchmarkEnv ->
   Int ->
   Endpoint ->
-  Maybe (TChan BenchmarkEvent) ->
   Maybe RateLimiter ->
   IO [TestingResponse]
-runBenchmark settings sem mgr iters pIdx endpoint mEventChan mLimiter = do
-  let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
+runBenchmark BenchmarkEnv {..} iters endpoint mLimiter = do
+  let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel beSettings))
   countRef <- newIORef 0
-  preparedReq <- prepareRequest settings endpoint
+  preparedReq <- prepareRequest beSettings endpoint
   replicateConcurrently iters $ do
     mapM_ waitForSlot mLimiter
-    bracket_ (waitQSem sem) (signalQSem sem) $ do
-      res <- timedRequestPrepared settings mgr preparedReq
-      emitEvent mEventChan res
+    bracket_ (waitQSem beSem) (signalQSem beSem) $ do
+      res <- timedRequestPrepared beSettings beManager preparedReq
+      emitEvent beEventChan res
       current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
-      printProgressBar logger pIdx current iters
+      printProgressBar logger bePayloadIndex current iters
       return res
 
 {-| Run benchmark for a fixed wall-clock duration (for ramp-up and step-load modes).
@@ -59,41 +77,37 @@ Spawns @concurrency@ worker threads that loop until the deadline, each calling
 'waitForSlot' before executing a request.  Optionally emits TUI events.
 -}
 runBenchmarkDuration ::
-  Settings ->
-  QSem ->
-  Manager ->
+  BenchmarkEnv ->
   NominalDiffTime ->
-  Int ->
   Endpoint ->
   RateLimiter ->
-  Maybe (TChan BenchmarkEvent) ->
   IO [TestingResponse]
-runBenchmarkDuration settings sem mgr duration pIdx endpoint limiter mEventChan = do
-  let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel settings))
+runBenchmarkDuration BenchmarkEnv {..} duration endpoint limiter = do
+  let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel beSettings))
   now <- getCurrentTime
   let deadline = addUTCTime duration now
-      conc = concurrency settings
+      conc = concurrency beSettings
   countRef <- newIORef 0
-  preparedReq <- prepareRequest settings endpoint
+  preparedReq <- prepareRequest beSettings endpoint
   resultRefs <-
     replicateConcurrently conc $
-      workerLoop preparedReq deadline countRef logger pIdx sem mgr settings limiter mEventChan
+      workerLoop beSettings beSem beManager bePayloadIndex beEventChan preparedReq deadline countRef logger limiter
   pure (concat resultRefs)
 
 -- | Worker loop that runs requests until the deadline.
 workerLoop ::
+  Settings ->
+  QSem ->
+  Manager ->
+  Int ->
+  Maybe (TChan BenchmarkEvent) ->
   Request ->
   UTCTime ->
   IORef Int ->
   Logger ->
-  Int ->
-  QSem ->
-  Manager ->
-  Settings ->
   RateLimiter ->
-  Maybe (TChan BenchmarkEvent) ->
   IO [TestingResponse]
-workerLoop preparedReq deadline countRef logger pIdx sem mgr settings limiter mEventChan = go []
+workerLoop settings sem mgr pIdx mEventChan preparedReq deadline countRef logger limiter = go []
   where
     go acc = do
       now <- getCurrentTime
@@ -110,7 +124,7 @@ workerLoop preparedReq deadline countRef logger pIdx sem mgr settings limiter mE
                   timedRequestPrepared settings mgr preparedReq
               emitEvent mEventChan res
               current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
-              when (current `mod` 100 == 0) $
+              when (current `mod` logFrequency == 0) $
                 logInfo logger $
                   T.pack $
                     "[Ep " ++ show pIdx ++ "] Completed " ++ show current ++ " requests"

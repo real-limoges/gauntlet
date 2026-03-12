@@ -1,5 +1,7 @@
+-- | Facade re-exporting HTTP networking primitives for benchmark execution.
 module Benchmark.Network
-  ( initNetwork
+  ( BenchmarkEnv (..)
+  , initNetwork
   , runBenchmark
   , runBenchmarkDuration
   , timedRequest
@@ -11,7 +13,8 @@ where
 
 import Benchmark.Network.Auth (addAuth, readToken)
 import Benchmark.Network.Exec
-  ( runBenchmark
+  ( BenchmarkEnv (..)
+  , runBenchmark
   , runBenchmarkDuration
   )
 import Benchmark.Network.Request (initNetwork, prepareRequest, timedRequest)

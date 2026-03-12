@@ -1,3 +1,4 @@
+-- | Tests for Tracing.Client.
 module TracingClientSpec (tracingClientSpec) where
 
 import Data.Aeson (Value (..), encode, object, (.=))

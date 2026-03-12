@@ -1,3 +1,4 @@
+-- | Terminal output formatting for distributed trace analysis results.
 module Tracing.Report
   ( printTraceAnalysis
   , printSpanTable
@@ -17,6 +18,7 @@ import Stats.Common qualified as Stats
 import Text.Printf (printf)
 import Tracing.Types (Milliseconds (..), Span (..), SpanAggregation (..), Trace (..), nsToMs)
 
+-- | Print a summary of all traces: count, total spans, and a span duration table.
 printTraceAnalysis :: [Trace] -> IO ()
 printTraceAnalysis traces = do
   let allSpans = concatMap traceSpans traces
@@ -27,6 +29,7 @@ printTraceAnalysis traces = do
   putStrLn ""
   printSpanTable aggregations
 
+-- | Print a table of span aggregations sorted by p95 latency (top 20).
 printSpanTable :: [SpanAggregation] -> IO ()
 printSpanTable [] = putStrLn "No spans to display."
 printSpanTable aggs = do
@@ -44,6 +47,7 @@ printSpanTable aggs = do
   putStrLn $ replicate 120 '-'
   mapM_ (putStrLn . formatSpanRow) (take 20 sorted_aggs)
 
+-- | Format a single span aggregation as a fixed-width table row.
 formatSpanRow :: SpanAggregation -> String
 formatSpanRow SpanAggregation {..} =
   printf

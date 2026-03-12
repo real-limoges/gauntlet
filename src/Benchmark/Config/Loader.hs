@@ -1,3 +1,4 @@
+-- | Configuration loading and validation from JSON/YAML files.
 module Benchmark.Config.Loader
   ( loadConfig
   , loadNwayConfig
@@ -18,9 +19,11 @@ import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
 import Data.Text.IO qualified as TIO
 
+-- | Load and validate an A\/B benchmark config from a JSON\/YAML file.
 loadConfig :: FilePath -> IO (Either String TestConfig)
 loadConfig = loadConfigAs
 
+-- | Load and validate an N-way benchmark config from a JSON\/YAML file.
 loadNwayConfig :: FilePath -> IO (Either String NwayConfig)
 loadNwayConfig = loadConfigAs
 
@@ -55,6 +58,7 @@ toEndpoint baseUrl spec =
         , validate = specValidate spec
         }
 
+-- | Validate an A\/B 'TestConfig' (positive iterations, non-empty payloads, etc.).
 validateConfig :: TestConfig -> Either PerfTestError TestConfig
 validateConfig cfg = do
   when (null (payloads cfg)) $
@@ -66,6 +70,7 @@ validateConfig cfg = do
   validateCommon (payloads cfg) (settings cfg)
   Right cfg
 
+-- | Validate an 'NwayConfig' (at least two targets, non-empty payloads).
 validateNwayConfig :: NwayConfig -> Either PerfTestError NwayConfig
 validateNwayConfig cfg = do
   when (null (nwayPayloads cfg)) $

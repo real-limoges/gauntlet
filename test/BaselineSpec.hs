@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Report.Baseline.
 module BaselineSpec (baselineSpec) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
@@ -202,22 +203,11 @@ handleBaselineSpec =
     hbStats = mockStats 50.0 5.0
     hbTimestamp = "2024-01-01T00-00-00" :: T.Text
 
-cleanTest :: String -> IO () -> TestTree
-cleanTest name action = testCase name $ withCleanEnv action
-
 makeTestLogger :: IO (Logger, IORef [(LogLevel, T.Text)])
 makeTestLogger = do
   logRef <- newIORef ([] :: [(LogLevel, T.Text)])
   let logger = makeCapturingLogger Debug logRef
   pure (logger, logRef)
-
-withCleanEnv :: IO () -> IO ()
-withCleanEnv action = do
-  unsetEnv "GITLAB_CI"
-  unsetEnv "GITHUB_ACTIONS"
-  action
-  unsetEnv "GITLAB_CI"
-  unsetEnv "GITHUB_ACTIONS"
 
 inTempDir :: IO a -> IO a
 inTempDir action = do

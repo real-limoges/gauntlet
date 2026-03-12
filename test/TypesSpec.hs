@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Types.
 module TypesSpec (typesSpec) where
 
 import Benchmark.Types

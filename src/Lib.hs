@@ -1,5 +1,6 @@
 {- HLINT ignore "Use exitSuccess" -}
 
+-- | Main entry point: CLI dispatch and benchmark orchestration.
 module Lib (run) where
 
 import Control.Monad (forM_)
@@ -32,6 +33,7 @@ import Benchmark.Types.Config (NamedTarget (..), Settings (..))
 import Runner (runSingle)
 import Runner.Nway (runNway)
 
+-- | Parse CLI arguments and dispatch to the appropriate benchmark command.
 run :: IO ()
 run = do
   cmd <- parseArgs

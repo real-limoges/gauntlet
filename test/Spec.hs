@@ -1,3 +1,4 @@
+-- | Test suite entry point.
 module Main where
 
 import Test.Tasty

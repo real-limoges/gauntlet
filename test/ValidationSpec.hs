@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Execution.Validation.
 module ValidationSpec (validationSpec) where
 
 import Benchmark.Execution.Validation (validateResponse, validateResponses)

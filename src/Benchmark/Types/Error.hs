@@ -1,3 +1,4 @@
+-- | Typed error variants for benchmark failures and network errors.
 module Benchmark.Types.Error
   ( PerfTestError (..)
   , formatError
@@ -12,6 +13,7 @@ import Data.Text.IO qualified as TIO
 import System.Exit (exitFailure)
 import System.IO (stderr)
 
+-- | Typed error variants for benchmark failures.
 data PerfTestError
   = ConfigParseError Text
   | ConfigValidationError Text
@@ -34,6 +36,7 @@ data PerfTestError
 
 instance Exception PerfTestError
 
+-- | Render a 'PerfTestError' as a human-readable error message.
 formatError :: PerfTestError -> Text
 formatError (ConfigParseError msg) = "Config parse error: " <> msg
 formatError (ConfigValidationError msg) = "Config validation error: " <> msg
@@ -49,5 +52,6 @@ formatError (TlsError url reason) = "TLS error (" <> url <> "): " <> reason
 formatError (HttpError url code) = "HTTP " <> T.pack (show code) <> " from " <> url
 formatError (UnknownNetworkError msg) = "Network error: " <> msg
 
+-- | Print the error to stderr and exit with code 2.
 exitWithError :: PerfTestError -> IO a
 exitWithError err = TIO.hPutStrLn stderr ("Error: " <> formatError err) >> exitFailure

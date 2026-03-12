@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Reporter.
 module ReporterSpec (reporterSpec) where
 
 import Benchmark.Reporter (Reporter (..), combineReporters, noOpReporter)

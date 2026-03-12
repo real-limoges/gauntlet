@@ -1,3 +1,4 @@
+-- | Tests for Runner.Nway.
 module NwaySpec (nwaySpec) where
 
 import Benchmark.Config.Loader (validateNwayConfig)

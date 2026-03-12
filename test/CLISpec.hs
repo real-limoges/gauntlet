@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Config.CLI.
 module CLISpec (cliSpec) where
 
 import Benchmark.Config.CLI

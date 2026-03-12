@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Execution.RateLimiter.
 module RateLimiterSpec (rateLimiterSpec) where
 
 import Benchmark.Execution.RateLimiter (currentTargetRps, makeLimiter, waitForSlot)

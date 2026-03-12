@@ -1,3 +1,4 @@
+-- | Tests for Tracing.Types.
 module TracingSpec (tracingSpec) where
 
 import TastyCompat (shouldBe, shouldSatisfy)

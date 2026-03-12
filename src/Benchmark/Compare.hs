@@ -1,3 +1,4 @@
+-- | Offline comparison of previously saved benchmark results.
 module Benchmark.Compare (runCompare) where
 
 import Benchmark.Reporter (Reporter (..))

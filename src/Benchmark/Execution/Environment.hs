@@ -1,3 +1,4 @@
+-- | Git branch switching, docker-compose orchestration, and health-check polling.
 module Benchmark.Execution.Environment
   ( setupEnvironment
   , waitForHealth

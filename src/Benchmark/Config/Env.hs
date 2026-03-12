@@ -1,3 +1,4 @@
+-- | Environment variable loading from .env files and config interpolation.
 module Benchmark.Config.Env
   ( parseEnvFile
   , loadEnvVars

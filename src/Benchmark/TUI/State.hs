@@ -1,3 +1,4 @@
+-- | TUI state types, event definitions, and state update logic.
 module Benchmark.TUI.State
   ( -- * Types
     TUIState (..)
@@ -37,6 +38,7 @@ data BenchmarkEvent
   | BenchmarkFailed Text
   deriving (Show, Eq)
 
+-- | Descriptive statistics computed over the rolling window of recent requests.
 data RollingStats = RollingStats
   { rsMeanMs :: Double
   , rsP50Ms :: Double
@@ -47,6 +49,7 @@ data RollingStats = RollingStats
   }
   deriving (Show, Eq)
 
+-- | Mutable state for the Brick TUI, updated on each 'BenchmarkEvent'.
 data TUIState = TUIState
   { tsTarget :: Text
   , tsCurrentEndpoint :: Text
@@ -71,6 +74,7 @@ data TUIState = TUIState
   }
   deriving (Show, Eq)
 
+-- | Construct an initial 'TUIState' with zero progress counters.
 initialState :: Text -> Int -> Int -> TUIState
 initialState target total endpoints =
   TUIState
@@ -96,6 +100,7 @@ initialState target total endpoints =
     , tsCurrentStep = Nothing
     }
 
+-- | Apply a 'BenchmarkEvent' to the TUI state, updating counters and rolling stats.
 updateState :: UTCTime -> BenchmarkEvent -> TUIState -> TUIState
 updateState now event state = case event of
   RequestCompleted durationNs statusCode ->
