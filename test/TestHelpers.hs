@@ -17,9 +17,9 @@ import Benchmark.Types
 import Control.Monad (when)
 import Data.ByteString.Lazy qualified as LBS
 import Data.IORef
-import Data.Time (UTCTime (..), fromGregorian)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
+import Data.Time (UTCTime (..), fromGregorian)
 import Data.Word (Word64)
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Log (Logger (..))
