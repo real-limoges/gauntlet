@@ -1,3 +1,4 @@
+-- | Real-time Brick-based terminal UI for live benchmark progress.
 module Benchmark.TUI
   ( runTUI
   , TUIState

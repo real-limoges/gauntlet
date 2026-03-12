@@ -1,3 +1,4 @@
+-- | Request endpoint and HTTP response data types.
 module Benchmark.Types.Response
   ( -- * Request/Response
     Endpoint (..)
@@ -129,6 +130,7 @@ data ValidationSummary = ValidationSummary
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)
 
+-- | An HTTP endpoint to benchmark, with method, URL, optional body, headers, and validation.
 data Endpoint = Endpoint
   { method :: Text
   , url :: Text
@@ -139,6 +141,7 @@ data Endpoint = Endpoint
   }
   deriving stock (Show, Eq)
 
+-- | Result of a single benchmarked HTTP request.
 data TestingResponse = TestingResponse
   { durationNs :: Nanoseconds
   , statusCode :: Int

@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Report.Output.
 module OutputSpec (outputSpec) where
 
 import Benchmark.Report.Output

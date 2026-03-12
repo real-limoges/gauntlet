@@ -1,3 +1,4 @@
+-- | Tests for JSON serialization of benchmark types.
 module TypesJsonSpec (typesJsonSpec) where
 
 import Benchmark.Types

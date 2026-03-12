@@ -1,3 +1,4 @@
+-- | Command-line argument parsing for benchmark subcommands.
 module Benchmark.Config.CLI
   ( parseArgs
   , Command (..)
@@ -6,7 +7,7 @@ module Benchmark.Config.CLI
   )
 where
 
-import Benchmark.Types (OutputFormat (..))
+import Benchmark.Types (ChartsSettings (..), OutputFormat (..))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Options.Applicative
@@ -20,16 +21,19 @@ data BaselineMode
     SaveAndCompare Text Text
   deriving (Show, Eq)
 
+-- | Top-level CLI command (benchmark, compare, validate, etc.).
 data Command
   = BenchmarkNway
       { configPath :: FilePath
       , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
+      , chartsConfig :: Maybe ChartsSettings
       }
   | BenchmarkSingle
       { configPath :: FilePath
       , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
+      , chartsConfig :: Maybe ChartsSettings
       }
   | Compare
       { compareFileA :: FilePath
@@ -41,6 +45,7 @@ data Command
       }
   deriving (Show, Eq)
 
+-- | Parse command-line arguments into a 'Command'.
 parseArgs :: IO Command
 parseArgs = execParser opts
   where
@@ -52,6 +57,7 @@ parseArgs = execParser opts
             <> header ""
         )
 
+-- | Optparse-applicative parser for 'Command'.
 commandParser :: Parser Command
 commandParser =
   subparser
@@ -121,13 +127,43 @@ outputFormatParser = do
     buildOutputFormat (Just "markdown") path = OutputMarkdown path
     buildOutputFormat _ _ = OutputTerminal
 
+chartsParser :: Parser (Maybe ChartsSettings)
+chartsParser = optional $ buildCharts <$> chartsOption <*> chartsDirOption
+  where
+    chartsOption =
+      strOption
+        ( long "charts"
+            <> metavar "TYPES"
+            <> help "Chart types to generate (comma-separated, e.g. kde,cdf,violin or 'all')"
+        )
+    chartsDirOption =
+      optional $
+        strOption
+          ( long "charts-dir"
+              <> metavar "DIR"
+              <> help "Output directory for charts (default: same as CSV output)"
+          )
+    buildCharts :: String -> Maybe FilePath -> ChartsSettings
+    buildCharts types dir =
+      ChartsSettings
+        { chartsTypes = map T.pack $ splitOn ',' types
+        , chartsDir = dir
+        }
+    splitOn :: Char -> String -> [String]
+    splitOn _ [] = []
+    splitOn sep s =
+      let (w, rest) = break (== sep) s
+       in w : case rest of
+            [] -> []
+            (_ : rs) -> splitOn sep rs
+
 benchmarkNwayOptions :: Parser Command
 benchmarkNwayOptions =
-  BenchmarkNway <$> configOption <*> baselineModeParser <*> outputFormatParser
+  BenchmarkNway <$> configOption <*> baselineModeParser <*> outputFormatParser <*> chartsParser
 
 benchmarkSingleOptions :: Parser Command
 benchmarkSingleOptions =
-  BenchmarkSingle <$> configOption <*> baselineModeParser <*> outputFormatParser
+  BenchmarkSingle <$> configOption <*> baselineModeParser <*> outputFormatParser <*> chartsParser
 
 compareOptions :: Parser Command
 compareOptions =

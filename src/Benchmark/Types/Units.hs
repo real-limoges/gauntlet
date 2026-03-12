@@ -1,3 +1,4 @@
+-- | Type-safe time unit newtypes: Nanoseconds and Milliseconds.
 module Benchmark.Types.Units
   ( Nanoseconds (..)
   , Milliseconds (..)

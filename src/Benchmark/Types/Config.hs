@@ -1,3 +1,4 @@
+-- | Configuration data types: test settings, targets, payloads, and load modes.
 module Benchmark.Types.Config
   ( -- * Configuration
     TestConfig (..)
@@ -23,6 +24,9 @@ module Benchmark.Types.Config
 
     -- * Output Format
   , OutputFormat (..)
+
+    -- * Charts
+  , ChartsSettings (..)
   )
 where
 
@@ -36,14 +40,17 @@ import Data.Aeson
   , fieldLabelModifier
   , genericParseJSON
   , genericToJSON
+  , object
   , withObject
   , (.:)
+  , (.=)
   )
 import Data.Aeson.Types (Parser)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
+-- | Top-level A\/B benchmark configuration (two targets, git branches, settings, payloads).
 data TestConfig = TestConfig
   { targets :: Targets
   , git :: Targets
@@ -53,6 +60,7 @@ data TestConfig = TestConfig
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
 
+-- | N-way benchmark configuration (multiple named targets).
 data NwayConfig = NwayConfig
   { nwayTargets :: [NamedTarget]
   , nwaySettings :: Settings
@@ -187,7 +195,7 @@ data LoadMode
     LoadRampUp Double Double Double
   | -- | Step load — sequential steps, each with its own RPS and duration
     LoadStepLoad [LoadStep]
-  | -- | Poissonly Distributed Load
+  | -- | Poisson-distributed load
     LoadPoissonRps Double
   deriving stock (Show, Eq)
 
@@ -201,6 +209,13 @@ instance FromJSON LoadMode where
       "stepLoad" -> LoadStepLoad <$> o .: "steps"
       "poissonRps" -> LoadPoissonRps <$> o .: "targetRps"
       _ -> fail $ "Unknown load mode: " ++ show mode
+
+instance ToJSON LoadMode where
+  toJSON LoadUnthrottled = object ["mode" .= ("unthrottled" :: Text)]
+  toJSON (LoadConstantRps rps) = object ["mode" .= ("constantRps" :: Text), "targetRps" .= rps]
+  toJSON (LoadRampUp s e d) = object ["mode" .= ("rampUp" :: Text), "startRps" .= s, "endRps" .= e, "durationSecs" .= d]
+  toJSON (LoadStepLoad steps) = object ["mode" .= ("stepLoad" :: Text), "steps" .= steps]
+  toJSON (LoadPoissonRps rps) = object ["mode" .= ("poissonRps" :: Text), "targetRps" .= rps]
 
 -- | Compute total requests for a load mode given a fallback iteration count.
 totalRequestsForMode :: LoadMode -> Int -> Int
@@ -224,6 +239,7 @@ loadModeDurationSecs (LoadRampUp _ _ d) = d
 loadModeDurationSecs (LoadStepLoad steps) = sum (map loadStepDurationSecs steps)
 loadModeDurationSecs _ = 0
 
+-- | Runtime settings controlling iterations, concurrency, timeouts, and optional features.
 data Settings = Settings
   { iterations :: Int
   , concurrency :: Int
@@ -262,6 +278,7 @@ data TempoSettings = TempoSettings
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
 
+-- | Specification for a single HTTP payload within a benchmark.
 data PayloadSpec = PayloadSpec
   { specName :: Text
   , specMethod :: Text
@@ -286,4 +303,13 @@ data OutputFormat
     OutputTerminal
   | -- | Also write a markdown report to the given file path
     OutputMarkdown FilePath
+  deriving stock (Show, Eq)
+
+-- | Settings for chart generation via the plot reporter.
+data ChartsSettings = ChartsSettings
+  { chartsTypes :: [Text]
+  -- ^ Chart types to generate (e.g. ["kde", "cdf"]) or ["all"]
+  , chartsDir :: Maybe FilePath
+  -- ^ Output directory; Nothing = same directory as CSV
+  }
   deriving stock (Show, Eq)

@@ -1,3 +1,4 @@
+-- | Fetches and reports Grafana Tempo traces for benchmark time windows.
 module Runner.Tracing (runTraceAnalysis) where
 
 import Benchmark.Report.Output (resultsDir)

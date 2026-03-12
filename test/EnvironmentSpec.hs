@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Execution.Environment.
 module EnvironmentSpec (environmentSpec) where
 
 import Benchmark.Execution.Environment (waitForHealth)

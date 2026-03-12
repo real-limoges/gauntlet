@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Network.Request.
 module RequestSpec (requestSpec) where
 
 import Benchmark.Network (initNetwork, prepareRequest, timedRequest)

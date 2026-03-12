@@ -1,3 +1,4 @@
+-- | Run context initialization and environment setup helpers.
 module Runner.Context
   ( RunContext (..)
   , initContext
@@ -22,16 +23,24 @@ import Network.HTTP.Client (Manager)
 import System.Clock (Clock (Realtime), getTime, toNanoSecs)
 import Tracing.Types qualified as TT
 
+-- | Shared state threaded through every benchmark phase.
 data RunContext = RunContext
   { rcSettings :: Settings
+  -- ^ Benchmark configuration
   , rcManager :: Manager
   -- ^ HTTP manager for all requests (benchmark + Tempo trace fetching)
   , rcToken :: Text
+  -- ^ Bearer token for authenticated endpoints (empty when no auth configured)
   , rcCsvFile :: FilePath
+  -- ^ Path to the CSV latency output file
   , rcTimestamp :: String
+  -- ^ ISO-8601 timestamp string identifying this run
   , rcEventChan :: Maybe (TChan BenchmarkEvent)
+  -- ^ Optional TUI event channel for real-time progress
   , rcLogger :: Logger
+  -- ^ Logger with configured verbosity level
   , rcTargetName :: Text
+  -- ^ Name of the current target being benchmarked
   }
 
 -- | Initialise a 'RunContext' from benchmark settings.

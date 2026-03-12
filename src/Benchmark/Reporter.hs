@@ -1,3 +1,4 @@
+-- | Reporter abstraction for composable benchmark output backends.
 module Benchmark.Reporter
   ( Reporter (..)
   , noOpReporter
@@ -9,12 +10,14 @@ import Benchmark.Types
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 
+-- | Record of callbacks for reporting benchmark results.
 data Reporter = Reporter
   { reportSingle :: Text -> BenchmarkStats -> [ValidationSummary] -> IO ()
   , reportNWay :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> [ValidationSummary] -> IO ()
   , reportRegression :: RegressionResult -> IO ()
   }
 
+-- | A reporter that discards all output.
 noOpReporter :: Reporter
 noOpReporter =
   Reporter
@@ -23,6 +26,7 @@ noOpReporter =
     , reportRegression = \_ -> pure ()
     }
 
+-- | Sequence two reporters so both receive every event.
 combineReporters :: [Reporter] -> Reporter
 combineReporters rs =
   Reporter

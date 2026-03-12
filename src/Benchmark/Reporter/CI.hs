@@ -1,3 +1,4 @@
+-- | Reporter backend for CI artifact generation.
 module Benchmark.Reporter.CI (ciReporter) where
 
 import Benchmark.Report.CI

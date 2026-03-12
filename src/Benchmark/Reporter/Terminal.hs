@@ -1,3 +1,4 @@
+-- | Reporter backend for terminal output.
 module Benchmark.Reporter.Terminal
   ( terminalReporter
   ) where
@@ -6,6 +7,7 @@ import Benchmark.Report (printNwayReport, printSingleBenchmarkReport, printValid
 import Benchmark.Report.Baseline (printRegressionResult)
 import Benchmark.Reporter (Reporter (..))
 
+-- | Reporter that prints benchmark results, validation summaries, and regression reports to the terminal.
 terminalReporter :: Reporter
 terminalReporter =
   Reporter

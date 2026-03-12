@@ -1,3 +1,4 @@
+-- | Per-response validation of status codes and JSON field assertions.
 module Benchmark.Execution.Validation
   ( validateResponse
   , validateResponses

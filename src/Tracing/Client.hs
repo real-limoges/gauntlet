@@ -1,3 +1,4 @@
+-- | Grafana Tempo HTTP client: TraceQL queries, trace fetching, and span aggregation.
 module Tracing.Client
   ( fetchTracesForTimeRange
   , parseSearchResponse
@@ -15,10 +16,11 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Text.Encoding (encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Network.HTTP.Client (Manager, Request, httpLbs, parseRequest, responseBody)
 import Network.HTTP.Client qualified as Client
 import Network.HTTP.Types.Status (statusCode)
+import Network.HTTP.Types.URI qualified as URI
 import Text.Read (readMaybe)
 import Tracing.Types
 
@@ -97,18 +99,11 @@ addAuthHeader cfg req = case tempoAuthToken cfg of
             : Client.requestHeaders req
       }
 
+-- | Percent-encode a Text value for use in URL query strings.
 urlEncode :: Text -> Text
-urlEncode = T.concatMap encodeChar
-  where
-    encodeChar c
-      | c == ' ' = "%20"
-      | c == '"' = "%22"
-      | c == '{' = "%7B"
-      | c == '}' = "%7D"
-      | c == '=' = "%3D"
-      | c == '&' = "%26"
-      | otherwise = T.singleton c
+urlEncode = decodeUtf8 . URI.urlEncode True . encodeUtf8
 
+-- | Decode a Tempo search API JSON response into a 'TempoSearchResponse'.
 parseSearchResponse :: LBS.ByteString -> Either String TempoSearchResponse
 parseSearchResponse body = do
   val <- eitherDecode body
@@ -138,6 +133,7 @@ parseTraceMetadata = withObject "TraceMetadata" $ \o -> do
       , metaDurationMs = durationMs
       }
 
+-- | Decode a Tempo trace detail JSON response (OTLP format) into a 'Trace'.
 parseTraceResponse :: Text -> LBS.ByteString -> Either String Trace
 parseTraceResponse traceId body = do
   val <- eitherDecode body

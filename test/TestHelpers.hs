@@ -1,3 +1,4 @@
+-- | Shared test fixtures and helper functions.
 module TestHelpers
   ( makeResult
   , makeErrorResult
@@ -10,6 +11,8 @@ module TestHelpers
   , mockPercentileComparison
   , captureStdout
   , makeCapturingLogger
+  , cleanTest
+  , withCleanEnv
   )
 where
 
@@ -23,13 +26,17 @@ import Data.Time (UTCTime (..), fromGregorian)
 import Data.Word (Word64)
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Log (Logger (..))
+import System.Environment (unsetEnv)
 import System.IO (hClose, hFlush, hSetEncoding, stdout, utf8)
 import System.IO.Temp (withSystemTempFile)
+import Test.Tasty (TestTree)
+import Test.Tasty.HUnit (testCase)
 import Tracing.Types
 
 epoch :: UTCTime
 epoch = UTCTime (fromGregorian 2000 1 1) 0
 
+-- | Build a successful 200 response with the given duration in nanoseconds.
 makeResult :: Integer -> TestingResponse
 makeResult ns =
   TestingResponse
@@ -40,6 +47,7 @@ makeResult ns =
     , requestedAt = epoch
     }
 
+-- | Build a failed response with the given error message and zero duration.
 makeErrorResult :: String -> TestingResponse
 makeErrorResult msg =
   TestingResponse
@@ -50,6 +58,7 @@ makeErrorResult msg =
     , requestedAt = epoch
     }
 
+-- | Build a successful response with the given status code and body.
 makeResponseWithBody :: Int -> LBS.ByteString -> TestingResponse
 makeResponseWithBody status body =
   TestingResponse
@@ -60,6 +69,7 @@ makeResponseWithBody status body =
     , requestedAt = epoch
     }
 
+-- | Build a BenchmarkStats with 30 successful requests, given mean and stddev.
 mockStats :: Double -> Double -> BenchmarkStats
 mockStats mean dev =
   BenchmarkStats
@@ -76,6 +86,7 @@ mockStats mean dev =
     , esMs = mean + 3 * dev
     }
 
+-- | A valid TestConfig with primary\/candidate targets, git branches, and one payload.
 makeValidConfig :: TestConfig
 makeValidConfig =
   TestConfig
@@ -116,6 +127,7 @@ makeValidConfig =
         ]
     }
 
+-- | Build a Span with the given operation name and duration in nanoseconds.
 makeSpan :: Text -> Word64 -> Span
 makeSpan name duration =
   Span
@@ -131,6 +143,7 @@ makeSpan name duration =
     , spanAttributes = Map.empty
     }
 
+-- | Build a Baseline with the given name, a fixed timestamp, and the provided stats.
 makeBaseline :: Text -> BenchmarkStats -> Baseline
 makeBaseline name stats =
   Baseline
@@ -188,3 +201,16 @@ makeCapturingLogger minLevel ref =
     , logAction = \(level, _, msg) ->
         when (level >= minLevel) $ modifyIORef ref ((level, msg) :)
     }
+
+-- | Create a test case that cleans CI environment variables before and after.
+cleanTest :: String -> IO () -> TestTree
+cleanTest name action = testCase name $ withCleanEnv action
+
+-- | Unset both CI env vars before and after an action to avoid cross-test contamination.
+withCleanEnv :: IO () -> IO ()
+withCleanEnv action = do
+  unsetEnv "GITLAB_CI"
+  unsetEnv "GITHUB_ACTIONS"
+  action
+  unsetEnv "GITLAB_CI"
+  unsetEnv "GITHUB_ACTIONS"

@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Report.
 module ReportSpec (reportSpec) where
 
 import Benchmark.Report

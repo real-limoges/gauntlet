@@ -1,3 +1,4 @@
+-- | Validation error formatting for human-readable output.
 module Benchmark.Report.Formatting
   ( formatValidationError
   ) where

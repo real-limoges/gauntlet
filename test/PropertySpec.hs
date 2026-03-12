@@ -1,3 +1,4 @@
+-- | Property-based tests for statistical invariants.
 module PropertySpec (propertySpec) where
 
 import Benchmark.Report.Baseline (compareToBaseline)

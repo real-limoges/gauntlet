@@ -1,3 +1,4 @@
+-- | Statistical result types: descriptive stats and Bayesian comparison outputs.
 module Benchmark.Types.Stats
   ( BenchmarkStats (..)
   , BayesianComparison (..)

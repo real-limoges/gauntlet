@@ -1,3 +1,4 @@
+-- | Markdown report generation for benchmark results and regressions.
 module Benchmark.Report.Markdown
   ( markdownSingleReport
   , markdownMultipleReport

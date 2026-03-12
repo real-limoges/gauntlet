@@ -1,3 +1,4 @@
+-- | Re-exports all benchmark type definitions.
 module Benchmark.Types
   ( -- * Request/Response Types
     Endpoint (..)
@@ -51,6 +52,7 @@ module Benchmark.Types
 
     -- * Output Format
   , OutputFormat (..)
+  , ChartsSettings (..)
 
     -- * Error Handling
   , PerfTestError (..)

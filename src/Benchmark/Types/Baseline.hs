@@ -1,3 +1,4 @@
+-- | Types for baseline storage and regression detection results.
 module Benchmark.Types.Baseline
   ( Baseline (..)
   , RegressionThresholds (..)

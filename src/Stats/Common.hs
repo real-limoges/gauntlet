@@ -1,3 +1,4 @@
+-- | Shared statistical utilities: percentiles, standard deviation, and variance.
 module Stats.Common
   ( -- * Descriptive Statistics
     percentile

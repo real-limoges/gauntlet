@@ -1,3 +1,4 @@
+-- | Tests for Runner.Context.
 module ContextSpec (contextSpec) where
 
 import Benchmark.TUI.State (BenchmarkEvent (..))

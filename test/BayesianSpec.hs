@@ -1,3 +1,4 @@
+-- | Tests for Bayesian comparison in Stats.Benchmark.
 module BayesianSpec (bayesianSpec) where
 
 import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..))

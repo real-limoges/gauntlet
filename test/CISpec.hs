@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.Report.CI.
 module CISpec (ciSpec) where
 
 import Benchmark.Report.CI
@@ -10,6 +11,7 @@ import System.IO.Temp (withSystemTempFile)
 import TastyCompat (shouldBe, shouldReturn, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)
 import Test.Tasty.HUnit (testCase)
+import TestHelpers (cleanTest, withCleanEnv)
 
 ciSpec :: TestTree
 ciSpec =
@@ -60,22 +62,9 @@ ciSpec =
         ]
     ]
 
--- | Create a test case that cleans environment variables before/after.
-cleanTest :: String -> IO () -> TestTree
-cleanTest name action = testCase name $ withCleanEnv action
-
 -- ---------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------
-
--- | Unset both CI env vars before and after each test.
-withCleanEnv :: IO () -> IO ()
-withCleanEnv action = do
-  unsetEnv "GITLAB_CI"
-  unsetEnv "GITHUB_ACTIONS"
-  action
-  unsetEnv "GITLAB_CI"
-  unsetEnv "GITHUB_ACTIONS"
 
 mockPassed :: RegressionResult
 mockPassed =

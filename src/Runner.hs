@@ -1,14 +1,17 @@
+-- | Single-endpoint benchmark runner.
 module Runner (runSingle) where
 
 import Benchmark.Config.CLI (BaselineMode)
 import Benchmark.Config.Loader (buildEndpoints)
 import Benchmark.Report.Baseline (handleBaseline)
 import Benchmark.Report.Output (initOutputFiles)
-import Benchmark.Reporter (Reporter (..))
+import Benchmark.Reporter (Reporter (..), combineReporters)
+import Benchmark.Reporter.Plot (plotReporter)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
 import Benchmark.Types
-  ( PerfTestError (..)
+  ( ChartsSettings
+  , PerfTestError (..)
   , RunResult (..)
   , Settings (..)
   , Targets (..)
@@ -26,9 +29,13 @@ import Runner.Tracing (runTraceAnalysis)
 import Stats.Benchmark (calculateStats)
 
 -- | Run single-target benchmark without comparison.
-runSingle :: Reporter -> BaselineMode -> TestConfig -> IO RunResult
-runSingle reporter baselineMode cfg = do
+runSingle :: Reporter -> BaselineMode -> Maybe ChartsSettings -> TestConfig -> IO RunResult
+runSingle reporter baselineMode mCharts cfg = do
   (csvFile, timestamp) <- initOutputFiles
+
+  let fullReporter = case mCharts of
+        Nothing -> reporter
+        Just cs -> combineReporters [reporter, plotReporter cs csvFile]
 
   let eps = buildEndpoints (candidate (targets cfg)) (payloads cfg)
       setts = settings cfg
@@ -82,8 +89,8 @@ runSingle reporter baselineMode cfg = do
 
       let stats = calculateStats results
 
-      reportSingle reporter targetUrl stats validSummaries
+      reportSingle fullReporter targetUrl stats validSummaries
 
       runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
 
-      handleBaseline reporter (rcLogger ctx) baselineMode (T.pack timestamp) stats
+      handleBaseline fullReporter (rcLogger ctx) baselineMode (T.pack timestamp) stats

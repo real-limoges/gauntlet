@@ -1,3 +1,4 @@
+-- | Terminal output formatting for benchmark results and comparisons.
 module Benchmark.Report
   ( printMultipleBenchmarkReport
   , printSingleBenchmarkReport
@@ -22,6 +23,7 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Text.Printf (printf)
 
+-- | Print a tabulated comparison of multiple benchmark results to stdout.
 printMultipleBenchmarkReport ::
   Text -> Text -> BenchmarkStats -> BenchmarkStats -> BayesianComparison -> IO ()
 printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
@@ -71,6 +73,7 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
     (pctCredibleUpper p99)
   printf "P99 Regression Probability: %.2f%%\n" (probPctRegression p99 * 100.0)
 
+-- | Print a single target's benchmark statistics to stdout.
 printSingleBenchmarkReport :: Text -> BenchmarkStats -> IO ()
 printSingleBenchmarkReport name stats = do
   putStrLn ""
@@ -171,10 +174,22 @@ printStats stats = do
 printHeader :: String -> IO ()
 printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
 
-{-| Look up stats for a target by name.
-INVARIANT: callers guarantee the key exists (constructed from the same target list).
--}
+-- | Look up stats for a target by name, defaulting to zero stats if missing.
 lookupStats :: Text -> Map Text BenchmarkStats -> BenchmarkStats
-lookupStats name m = case Map.lookup name m of
-  Just v -> v
-  Nothing -> error $ "lookupStats: missing key " <> show name
+lookupStats = Map.findWithDefault emptyStats
+
+emptyStats :: BenchmarkStats
+emptyStats =
+  BenchmarkStats
+    { totalRequests = 0
+    , countSuccess = 0
+    , countFailure = 0
+    , meanMs = 0
+    , stdDevMs = 0
+    , minMs = 0
+    , maxMs = 0
+    , p50Ms = 0
+    , p95Ms = 0
+    , p99Ms = 0
+    , esMs = 0
+    }

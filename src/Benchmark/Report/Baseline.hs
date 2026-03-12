@@ -1,3 +1,4 @@
+-- | Baseline persistence and regression detection with configurable thresholds.
 module Benchmark.Report.Baseline
   ( saveBaseline
   , loadBaseline
@@ -147,6 +148,7 @@ doBaselineComparison reporter stats baseline = do
     then return RunSuccess
     else return $ RunRegression regression
 
+-- | Print a regression result summary to stdout.
 printRegressionResult :: RegressionResult -> IO ()
 printRegressionResult regression = do
   putStrLn ""

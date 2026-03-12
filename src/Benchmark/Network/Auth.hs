@@ -1,3 +1,4 @@
+-- | Bearer token reading and authentication header injection.
 module Benchmark.Network.Auth (readToken, addAuth) where
 
 import Benchmark.Types (Endpoint (..), PerfTestError (..))
@@ -11,7 +12,7 @@ readToken :: FilePath -> IO (Either PerfTestError Text)
 readToken path = do
   result <- try (TIO.readFile path) :: IO (Either SomeException Text)
   return $ case result of
-    Left err -> Left (TokenReadError path (show err))
+    Left err -> Left (TokenReadError (T.pack path) (T.pack (show err)))
     Right raw -> Right (T.strip raw)
 
 {-| Prepend an @Authorization: Bearer <token>@ header to an endpoint.

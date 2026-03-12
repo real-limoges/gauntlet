@@ -1,6 +1,7 @@
+-- | End-to-end integration tests for HTTP operations.
 module Integration (integrationSpec) where
 
-import Benchmark.Network
+import Benchmark.Network hiding (prepareRequest)
 import Benchmark.Report.Baseline
 import Benchmark.Types
 import Control.Concurrent.QSem (newQSem)
@@ -43,7 +44,8 @@ integrationSpec = withResource setupManager (\_ -> pure ()) $ \getMgr ->
             mgr <- getMgr
             mockJson "{}" $ \port -> do
               sem <- newQSem 4
-              results <- runBenchmark testSettings sem mgr 5 1 (endpoint port) Nothing
+              let env = BenchmarkEnv testSettings sem mgr 1 Nothing
+              results <- runBenchmark env 5 (endpoint port) Nothing
               length results `shouldBe` 5
               all ((== 200) . statusCode) results `shouldBe` True
         ]

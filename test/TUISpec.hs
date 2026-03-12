@@ -1,3 +1,4 @@
+-- | Tests for Benchmark.TUI.
 module TUISpec (tuiStateSpec, tuiWidgetsSpec) where
 
 import Benchmark.TUI.State

@@ -1,3 +1,4 @@
+-- | Tests for Runner.Warmup.
 module WarmupSpec (warmupSpec) where
 
 import Benchmark.Types

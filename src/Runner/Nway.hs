@@ -1,15 +1,18 @@
+-- | N-way benchmark comparison orchestration.
 module Runner.Nway (runNway, allPairComparisons) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Config.Loader (buildEndpoints)
 import Benchmark.Report.Baseline (handleBaseline)
 import Benchmark.Report.Output (initOutputFiles)
-import Benchmark.Reporter (Reporter (..))
+import Benchmark.Reporter (Reporter (..), combineReporters)
+import Benchmark.Reporter.Plot (plotReporter)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
 import Benchmark.Types
   ( BayesianComparison
   , BenchmarkStats
+  , ChartsSettings
   , NamedTarget (..)
   , NwayConfig (..)
   , PerfTestError (..)
@@ -45,19 +48,22 @@ data NwayResult = NwayResult
   }
 
 -- | Run benchmarks against N named targets and compare all pairs.
-runNway :: Reporter -> BaselineMode -> NwayConfig -> IO RunResult
-runNway reporter baselineMode cfg = do
+runNway :: Reporter -> BaselineMode -> Maybe ChartsSettings -> NwayConfig -> IO RunResult
+runNway reporter baselineMode mCharts cfg = do
   (csvFile, timestamp) <- initOutputFiles
 
-  let setts = nwaySettings cfg
+  let fullReporter = case mCharts of
+        Nothing -> reporter
+        Just cs -> combineReporters [reporter, plotReporter cs csvFile]
+      setts = nwaySettings cfg
       eps = buildEndpoints "" (nwayPayloads cfg)
       numEndpoints = length eps
       perTargetRequests = iterations setts * numEndpoints
 
   isTerm <- hIsTerminalDevice stdin
   if isTerm
-    then runNwayWithTUI reporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints
-    else runNwayNoTUI reporter baselineMode cfg csvFile timestamp setts
+    then runNwayWithTUI fullReporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints
+    else runNwayNoTUI fullReporter baselineMode cfg csvFile timestamp setts
 
 -- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
 allPairComparisons :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)]
@@ -143,7 +149,7 @@ runAllTargets ctx cfg eventChan = do
 
     startNs <- getNowNs
     let ctxWithTarget = ctx {rcTargetName = targetName t}
-    (timings, validSummaries) <- benchmarkEndpoints ctxWithTarget (T.unpack (targetName t)) targetEps
+    (timings, validSummaries) <- benchmarkEndpoints ctxWithTarget (targetName t) targetEps
     endNs <- getNowNs
 
     pure

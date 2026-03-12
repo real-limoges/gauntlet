@@ -1,3 +1,4 @@
+-- | CSV and JSON serialization of benchmark latency data.
 module Benchmark.Report.Output
   ( initOutputFiles
   , writeLatenciesWithTarget
@@ -30,16 +31,18 @@ initOutputFiles = do
   writeFile csvFile "target_name,payload_id,url,method,status_code,latency_ms,timestamp_iso\n"
   return (csvFile, timestamp)
 
--- | Write latencies with a target name prefix.
+-- | Append CSV rows for all endpoint results under the given target name.
 writeLatenciesWithTarget :: FilePath -> Text -> [(Int, Endpoint, [TestingResponse])] -> IO ()
 writeLatenciesWithTarget csvFile target results = do
   let builder = foldMap (formatResultBuilder target) results
   TLIO.appendFile csvFile (toLazyText builder)
 
+-- | Build CSV rows for a single endpoint's responses, prefixed by target name.
 formatResultBuilder :: Text -> (Int, Endpoint, [TestingResponse]) -> Builder
 formatResultBuilder target (idx, ep, responses) =
   foldMap (formatRow target idx ep) responses
 
+-- | Format a single response as one CSV row: target, payload id, url, method, status, latency_ms, timestamp.
 formatRow :: Text -> Int -> Endpoint -> TestingResponse -> Builder
 formatRow target idx ep r =
   mconcat

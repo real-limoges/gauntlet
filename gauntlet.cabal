@@ -1,10 +1,14 @@
 cabal-version: 3.12
 name:               gauntlet
 version:            0.1.0.0
-license:            NONE
+license:            MIT
+license-file:       LICENSE
 author:             Real Limoges
 maintainer:         b.real.limoges@gmail.com
 build-type:         Simple
+synopsis:           Statistically rigorous HTTP performance benchmarking
+description:        HTTP benchmarking tool with Bayesian A/B analysis, distributed tracing, and CI/CD integration.
+category:           Testing, Benchmarking
 
 
 common warnings
@@ -58,6 +62,7 @@ library
                           Benchmark.Network.Exec
                           Benchmark.Network.Request
                           Benchmark.Reporter.CI
+                          Benchmark.Reporter.Plot
                           Benchmark.Reporter.Terminal
                           Benchmark.TUI
                           Benchmark.Types.Baseline

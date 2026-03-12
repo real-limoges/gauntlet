@@ -1,3 +1,4 @@
+-- | Tests for Runner.Loop.
 module LoopSpec (loopSpec) where
 
 import Benchmark.Types
