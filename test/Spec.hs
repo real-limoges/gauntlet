@@ -12,9 +12,12 @@ import ConfigSpec (configSpec)
 import ContextSpec (contextSpec)
 import EnvSpec (envSpec)
 import EnvironmentSpec (environmentSpec)
+import ExecSpec (execSpec)
+import FormattingSpec (formattingSpec)
 import Integration (integrationSpec)
 import LoadControlIntegrationSpec (loadControlIntegrationSpec)
 import LogSpec (logSpec)
+import LoopSpec (loopSpec)
 import MarkdownSpec (markdownSpec)
 import NwayIntegrationSpec (nwayIntegrationSpec)
 import NwaySpec (nwaySpec)
@@ -30,6 +33,7 @@ import TUISpec (tuiStateSpec, tuiWidgetsSpec)
 import TracingClientSpec (tracingClientSpec)
 import TracingReportSpec (tracingReportSpec)
 import TracingSpec (tracingSpec)
+import TypesConfigSpec (typesConfigSpec)
 import TypesJsonSpec (typesJsonSpec)
 import TypesSpec (typesSpec)
 import ValidationSpec (validationSpec)
@@ -73,4 +77,8 @@ main =
         , warmupSpec
         , rateLimiterSpec
         , loadControlIntegrationSpec
+        , execSpec
+        , formattingSpec
+        , loopSpec
+        , typesConfigSpec
         ]

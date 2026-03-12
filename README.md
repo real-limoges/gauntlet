@@ -27,8 +27,6 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 - **Earth Mover's Distance** - 1-Wasserstein distance for distribution comparison
 - **Credible Intervals** - 95% Bayesian credible intervals for mean differences
 - **Expected Shortfall** - Mean latency of the worst 1% of requests (E[X | X > p99])
-- **Anderson-Darling Test** - Tail-sensitive two-sample test (Scholz-Stephens 1987)
-- **Mann-Whitney U / KS Tests** - Non-parametric distribution comparison
 
 ### 🔍 Observability
 - **Real-time TUI** - Live progress tracking with Brick-based terminal UI
