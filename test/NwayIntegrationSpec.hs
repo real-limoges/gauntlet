@@ -26,7 +26,7 @@ nwayIntegrationSpec =
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  result <- runNway noOpReporter NoBaseline cfg
+                  result <- runNway noOpReporter NoBaseline Nothing cfg
                   result `shouldBe` RunSuccess
         , testCase "returns RunSuccess with 3 targets" $
             withNwayEnv $ \tokenPath ->
@@ -34,14 +34,14 @@ nwayIntegrationSpec =
                 mockJson "{}" $ \port2 ->
                   mockJson "{}" $ \port3 -> do
                     let cfg = makeTestNwayConfig tokenPath [port1, port2, port3]
-                    result <- runNway noOpReporter NoBaseline cfg
+                    result <- runNway noOpReporter NoBaseline Nothing cfg
                     result `shouldBe` RunSuccess
         , testCase "report contains target names" $
             withNwayEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  _ <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline cfg
+                  _ <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
                   content <- readFile "endpoint_analysis.md"
                   content `shouldContain` "target-1"
                   content `shouldContain` "target-2"
@@ -50,7 +50,7 @@ nwayIntegrationSpec =
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  _ <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline cfg
+                  _ <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
                   content <- readFile "endpoint_analysis.md"
                   content `shouldContain` "Ranking"
         , testCase "writes endpoint_analysis.md" $
@@ -58,7 +58,7 @@ nwayIntegrationSpec =
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  result <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline cfg
+                  result <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
                   result `shouldBe` RunSuccess
                   exists <- doesFileExist "endpoint_analysis.md"
                   exists `shouldBe` True
@@ -70,7 +70,7 @@ nwayIntegrationSpec =
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  _ <- runNway noOpReporter NoBaseline cfg
+                  _ <- runNway noOpReporter NoBaseline Nothing cfg
                   exists <- doesDirectoryExist "results"
                   exists `shouldBe` True
                   files <- listDirectory "results"
@@ -92,14 +92,14 @@ nwayIntegrationSpec =
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfigWithMethod tokenPath [port1, port2] "POST"
-                  result <- runNway noOpReporter NoBaseline cfg
+                  result <- runNway noOpReporter NoBaseline Nothing cfg
                   result `shouldBe` RunSuccess
         , testCase "SaveBaseline creates per-target baseline files" $
             withNwayEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
                   let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  result <- runNway noOpReporter (SaveBaseline "test") cfg
+                  result <- runNway noOpReporter (SaveBaseline "test") Nothing cfg
                   result `shouldBe` RunSuccess
                   doesFileExist "baselines/test--target-1.json" `shouldReturn` True
                   doesFileExist "baselines/test--target-2.json" `shouldReturn` True

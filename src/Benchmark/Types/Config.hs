@@ -23,6 +23,9 @@ module Benchmark.Types.Config
 
     -- * Output Format
   , OutputFormat (..)
+
+    -- * Charts
+  , ChartsSettings (..)
   )
 where
 
@@ -295,4 +298,13 @@ data OutputFormat
     OutputTerminal
   | -- | Also write a markdown report to the given file path
     OutputMarkdown FilePath
+  deriving stock (Show, Eq)
+
+-- | Settings for chart generation via the plot reporter.
+data ChartsSettings = ChartsSettings
+  { chartsTypes :: [Text]
+  -- ^ Chart types to generate (e.g. ["kde", "cdf"]) or ["all"]
+  , chartsDir :: Maybe FilePath
+  -- ^ Output directory; Nothing = same directory as CSV
+  }
   deriving stock (Show, Eq)

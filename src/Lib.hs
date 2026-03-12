@@ -20,7 +20,8 @@ import Benchmark.Reporter.CI (ciReporter)
 import Benchmark.Reporter.Markdown (markdownReporter)
 import Benchmark.Reporter.Terminal (terminalReporter)
 import Benchmark.Types
-  ( NwayConfig (..)
+  ( ChartsSettings
+  , NwayConfig (..)
   , OutputFormat (..)
   , PerfTestError (..)
   , RunResult (..)
@@ -42,13 +43,14 @@ run = do
             , markdownReporter <$> getMarkdownPath cmd
             , Just ci
             ]
+  let charts = getChartsConfig cmd
   result <- case cmd of
-    BenchmarkNway path baseline _ -> do
+    BenchmarkNway path baseline _ _ -> do
       cfg <- loadAndValidateNwayConfig path
-      runNway reporter baseline cfg
-    BenchmarkSingle path baseline _ -> do
+      runNway reporter baseline charts cfg
+    BenchmarkSingle path baseline _ _ -> do
       cfg <- loadAndValidateConfig path
-      runSingle reporter baseline cfg
+      runSingle reporter baseline charts cfg
     Compare fileA fileB ->
       runCompare reporter fileA fileB
     Validate cfgPath doCheck ->
@@ -70,9 +72,14 @@ loadAndValidateNwayConfig :: FilePath -> IO NwayConfig
 loadAndValidateNwayConfig = loadAndValidate loadNwayConfig validateNwayConfig
 
 getMarkdownPath :: Command -> Maybe FilePath
-getMarkdownPath (BenchmarkNway _ _ fmt) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
-getMarkdownPath (BenchmarkSingle _ _ fmt) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
+getMarkdownPath (BenchmarkNway _ _ fmt _) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
+getMarkdownPath (BenchmarkSingle _ _ fmt _) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
 getMarkdownPath _ = Nothing
+
+getChartsConfig :: Command -> Maybe ChartsSettings
+getChartsConfig (BenchmarkNway _ _ _ c) = c
+getChartsConfig (BenchmarkSingle _ _ _ c) = c
+getChartsConfig _ = Nothing
 
 loadAndValidate :: (FilePath -> IO (Either String a)) -> (a -> Either PerfTestError a) -> FilePath -> IO a
 loadAndValidate load validate path = do

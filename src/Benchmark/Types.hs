@@ -51,6 +51,7 @@ module Benchmark.Types
 
     -- * Output Format
   , OutputFormat (..)
+  , ChartsSettings (..)
 
     -- * Error Handling
   , PerfTestError (..)

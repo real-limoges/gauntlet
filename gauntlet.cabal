@@ -59,6 +59,7 @@ library
                           Benchmark.Network.Exec
                           Benchmark.Network.Request
                           Benchmark.Reporter.CI
+                          Benchmark.Reporter.Plot
                           Benchmark.Reporter.Terminal
                           Benchmark.TUI
                           Benchmark.Types.Baseline
