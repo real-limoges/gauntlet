@@ -45,7 +45,9 @@ typesConfigSpec =
         , testCase "LoadStepLoad sums step durations" $
             loadModeDurationSecs
               ( LoadStepLoad
-                  [LoadStep {loadStepRps = 10, loadStepDurationSecs = 5}, LoadStep {loadStepRps = 20, loadStepDurationSecs = 10}]
+                  [ LoadStep {loadStepRps = 10, loadStepDurationSecs = 5}
+                  , LoadStep {loadStepRps = 20, loadStepDurationSecs = 10}
+                  ]
               )
               `shouldBe` 15.0
         , testCase "LoadUnthrottled returns 0" $

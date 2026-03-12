@@ -21,7 +21,7 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 - **Connection Pooling** - Efficient HTTP connection reuse
 
 ### 📊 Statistical Analysis
-- **Bayesian Comparison** - Direct probability answers ("95% chance candidate is faster")
+- **Bayesian Comparison** - Three probability metrics: P(candidate faster, means), P(single request faster), P(candidate less jittery)
 - **Effect Size Calculation** - Cohen's d for practical significance
 - **Percentile Analysis** - P50, P95, P99 with Maritz-Jarrett standard errors
 - **Earth Mover's Distance** - 1-Wasserstein distance for distribution comparison

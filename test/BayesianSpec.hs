@@ -58,4 +58,23 @@ bayesianSpec =
             credibleIntervalLower result `shouldSatisfy` (not . isNaN)
             credibleIntervalUpper result `shouldSatisfy` (not . isNaN)
         ]
+    , testGroup
+        "probBLessJittery"
+        [ testCase "equal stddev returns ~0.5" $ do
+            let result = compareBayesian (mockStats 100.0 10.0) (mockStats 100.0 10.0)
+            probBLessJittery result `shouldSatisfy` (\p -> p > 0.4 && p < 0.6)
+        , testCase "A more jittery than B returns >0.5" $ do
+            let result = compareBayesian (mockStats 100.0 20.0) (mockStats 100.0 5.0)
+            probBLessJittery result `shouldSatisfy` (> 0.5)
+        , testCase "B more jittery than A returns <0.5" $ do
+            let result = compareBayesian (mockStats 100.0 5.0) (mockStats 100.0 20.0)
+            probBLessJittery result `shouldSatisfy` (< 0.5)
+        , testCase "zero stddev returns 0.5" $ do
+            let result = compareBayesian (mockStats 100.0 0.0) (mockStats 100.0 0.0)
+            probBLessJittery result `shouldBe` 0.5
+        , testCase "n=1 (countSuccess=1) returns 0.5" $ do
+            let s = (mockStats 100.0 10.0) {countSuccess = 1}
+            let result = compareBayesian s s
+            probBLessJittery result `shouldBe` 0.5
+        ]
     ]

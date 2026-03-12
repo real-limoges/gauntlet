@@ -43,6 +43,7 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
 
   printf "Probability Candidate is Faster (means):   %.2f%%\n" (probBFasterThanA bayes * 100.0)
   printf "Probability Single Request Faster:          %.2f%%\n" (probSingleRequestFaster bayes * 100.0)
+  printf "Probability Candidate Less Jittery:         %.2f%%\n" (probBLessJittery bayes * 100.0)
   printf "Mean Difference: %.2f ms\n" (meanDifference bayes)
   printf
     "95%% Credible Interval: [%.2f ms, %.2f ms]\n"
