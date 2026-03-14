@@ -2,7 +2,7 @@
 module Benchmark.Reporter.Markdown (markdownReporter) where
 
 import Benchmark.Report.Markdown
-  ( markdownNwayReport
+  ( markdownBenchmarkReport
   , markdownRegressionReport
   , markdownSingleReport
   , markdownValidationReport
@@ -18,9 +18,9 @@ markdownReporter path =
         TIO.writeFile path $
           markdownSingleReport targetUrl stats
             <> markdownValidationReport valids
-    , reportNWay = \namedStats pairs valids ->
+    , reportBenchmark = \namedStats pairs valids ->
         TIO.writeFile path $
-          markdownNwayReport namedStats pairs
+          markdownBenchmarkReport namedStats pairs
             <> markdownValidationReport valids
     , reportRegression = TIO.appendFile path . markdownRegressionReport
     }

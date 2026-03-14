@@ -1,6 +1,6 @@
 EXE = $(shell cabal list-bin gauntlet-exe)
 
-.PHONY: build test clean format repl benchmark-nway benchmark-single help
+.PHONY: build test clean format repl benchmark benchmark-single help
 
 build:
 	cabal build --enable-optimization=2 gauntlet-exe
@@ -17,11 +17,11 @@ format:
 repl:
 	cabal repl
 
-benchmark-nway: build
-	$(EXE) benchmark-nway --config config.json
+benchmark: build
+	$(EXE) benchmark --config config.json
 
 benchmark-single: build
 	$(EXE) benchmark-single --config config.json
 
 help:
-	@echo "Available targets: build, test, clean, format, repl, benchmark-nway, benchmark-single"
+	@echo "Available targets: build, test, clean, format, repl, benchmark, benchmark-single"

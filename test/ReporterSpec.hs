@@ -48,7 +48,7 @@ countingReporter :: Text -> IORef [Text] -> Reporter
 countingReporter name ref =
   Reporter
     { reportSingle = \_ _ _ -> modifyIORef ref (name :)
-    , reportNWay = \_ _ _ -> modifyIORef ref (name :)
+    , reportBenchmark = \_ _ _ -> modifyIORef ref (name :)
     , reportRegression = \_ -> modifyIORef ref (name :)
     }
 
@@ -62,8 +62,8 @@ noOpReporterSpec =
     "noOpReporter"
     [ testCase "reportSingle does not crash" $
         reportSingle noOpReporter "http://example.com" sampleStats []
-    , testCase "reportNWay does not crash" $
-        reportNWay noOpReporter Map.empty [] []
+    , testCase "reportBenchmark does not crash" $
+        reportBenchmark noOpReporter Map.empty [] []
     , testCase "reportRegression does not crash" $
         reportRegression noOpReporter sampleRegressionResult
     ]
@@ -79,7 +79,7 @@ combineReportersSpec =
     [ testCase "empty list produces no-op reporter" $ do
         let r = combineReporters []
         reportSingle r "http://example.com" sampleStats []
-        reportNWay r Map.empty [] []
+        reportBenchmark r Map.empty [] []
         reportRegression r sampleRegressionResult
     , testCase "reportSingle invokes all reporters" $ do
         ref <- newIORef []
@@ -87,10 +87,10 @@ combineReportersSpec =
         reportSingle r "http://example.com" sampleStats []
         calls <- readIORef ref
         length calls `shouldBe` 2
-    , testCase "reportNWay invokes all reporters" $ do
+    , testCase "reportBenchmark invokes all reporters" $ do
         ref <- newIORef []
         let r = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
-        reportNWay r Map.empty [] []
+        reportBenchmark r Map.empty [] []
         calls <- readIORef ref
         length calls `shouldBe` 2
     , testCase "reportRegression invokes all reporters" $ do
@@ -123,13 +123,13 @@ markdownReporterSpec =
           reportSingle r "http://example.com" sampleStats []
           content <- TIO.readFile path
           content `shouldSatisfy` (not . null . show)
-    , testCase "reportNWay writes non-empty file" $
+    , testCase "reportBenchmark writes non-empty file" $
         withSystemTempFile "report.md" $ \path h -> do
           hClose h
           let r = markdownReporter path
               namedStats = Map.fromList [("primary", sampleStats), ("candidate", sampleStats)]
               pairs = [("primary", "candidate", sampleBayes)]
-          reportNWay r namedStats pairs []
+          reportBenchmark r namedStats pairs []
           content <- TIO.readFile path
           content `shouldSatisfy` (not . null . show)
     , testCase "reportRegression appends rather than overwrites" $

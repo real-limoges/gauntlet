@@ -3,7 +3,7 @@ module Benchmark.Report
   ( printMultipleBenchmarkReport
   , printSingleBenchmarkReport
   , printValidationSummary
-  , printNwayReport
+  , printBenchmarkReport
   , lookupStats
   )
 where
@@ -106,11 +106,11 @@ printValidationSummary summaries = do
     when (length allErrors > 10) $
       printf "  ... and %d more unique error(s)\n" (length allErrors - 10)
 
--- | Print N-way comparison report: ranking table followed by per-pair comparisons.
-printNwayReport :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> IO ()
-printNwayReport namedStats pairs = do
+-- | Print comparison report: ranking table followed by per-pair comparisons.
+printBenchmarkReport :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> IO ()
+printBenchmarkReport namedStats pairs = do
   putStrLn ""
-  printHeader "N-Way Benchmark Report"
+  printHeader "Benchmark Report"
 
   -- Ranking table sorted by mean
   putStrLn ""

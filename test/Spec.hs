@@ -7,6 +7,8 @@ import Test.Tasty.Runners (NumThreads (..))
 import AuthSpec (authSpec)
 import BaselineSpec (baselineSpec)
 import BayesianSpec (bayesianSpec)
+import BenchmarkIntegrationSpec (benchmarkIntegrationSpec)
+import BenchmarkRunnerSpec (benchmarkRunnerSpec)
 import CISpec (ciSpec)
 import CLISpec (cliSpec)
 import ConfigSpec (configSpec)
@@ -20,8 +22,6 @@ import LoadControlIntegrationSpec (loadControlIntegrationSpec)
 import LogSpec (logSpec)
 import LoopSpec (loopSpec)
 import MarkdownSpec (markdownSpec)
-import NwayIntegrationSpec (nwayIntegrationSpec)
-import NwaySpec (nwaySpec)
 import OutputSpec (outputSpec)
 import PropertySpec (propertySpec)
 import RateLimiterSpec (rateLimiterSpec)
@@ -67,8 +67,8 @@ main =
         , contextSpec
         , tracingClientSpec
         , integrationSpec
-        , nwaySpec
-        , nwayIntegrationSpec
+        , benchmarkRunnerSpec
+        , benchmarkIntegrationSpec
         , typesSpec
         , reportSpec
         , reporterSpec

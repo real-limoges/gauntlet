@@ -1,59 +1,64 @@
--- | Tests for Runner.Nway.
-module NwaySpec (nwaySpec) where
+-- | Tests for Runner.Benchmark.
+module BenchmarkRunnerSpec (benchmarkRunnerSpec) where
 
-import Benchmark.Config.Loader (validateNwayConfig)
+import Benchmark.Config.Loader (validateBenchmarkConfig)
 import Benchmark.Types
 import Data.Text (Text)
 import Data.Text qualified as T
-import Runner.Nway (allPairComparisons)
+import Runner.Benchmark (allPairComparisons)
 import TastyCompat (shouldBe, textShouldContain)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
 import TestHelpers (mockStats)
 
-nwaySpec :: TestTree
-nwaySpec =
+benchmarkRunnerSpec :: TestTree
+benchmarkRunnerSpec =
   testGroup
-    "N-Way Benchmarking"
+    "Benchmark Runner"
     [ testGroup
-        "validateNwayConfig"
-        [ testCase "rejects configs with fewer than 2 targets" $ do
-            let cfg = makeNwayConfig [NamedTarget "a" "http://a" Nothing]
-            case validateNwayConfig cfg of
+        "validateBenchmarkConfig"
+        [ testCase "rejects configs with no targets" $ do
+            let cfg = makeBenchmarkConfig []
+            case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) ->
-                msg `shouldBe` "Must have at least 2 targets"
+                msg `shouldBe` "Must have at least 1 target"
               _ -> assertFailure "Expected ConfigValidationError"
+        , testCase "accepts config with 1 target" $ do
+            let cfg = makeBenchmarkConfig [NamedTarget "a" "http://a" Nothing]
+            case validateBenchmarkConfig cfg of
+              Right _ -> pure ()
+              Left err -> assertFailure $ "Expected success but got: " ++ show err
         , testCase "rejects empty payloads" $ do
             let cfg =
-                  NwayConfig
-                    { nwayTargets =
+                  BenchmarkConfig
+                    { benchTargets =
                         [ NamedTarget "a" "http://a" Nothing
                         , NamedTarget "b" "http://b" Nothing
                         ]
-                    , nwaySettings = defaultSettings
-                    , nwayPayloads = []
+                    , benchSettings = defaultSettings
+                    , benchPayloads = []
                     }
-            case validateNwayConfig cfg of
+            case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) ->
                 msg `shouldBe` "No payloads defined in config"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects invalid HTTP methods" $ do
             let cfg =
-                  NwayConfig
-                    { nwayTargets =
+                  BenchmarkConfig
+                    { benchTargets =
                         [ NamedTarget "a" "http://a" Nothing
                         , NamedTarget "b" "http://b" Nothing
                         ]
-                    , nwaySettings = defaultSettings
-                    , nwayPayloads = [PayloadSpec "test" "INVALID" "/path" Nothing Nothing Nothing]
+                    , benchSettings = defaultSettings
+                    , benchPayloads = [PayloadSpec "test" "INVALID" "/path" Nothing Nothing Nothing]
                     }
-            case validateNwayConfig cfg of
+            case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) ->
                 msg `textShouldContain` "Invalid HTTP method"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts valid 2-target config" $ do
-            let cfg = makeNwayConfig [NamedTarget "a" "http://a" Nothing, NamedTarget "b" "http://b" Nothing]
-            validateNwayConfig cfg `shouldBe` Right cfg
+            let cfg = makeBenchmarkConfig [NamedTarget "a" "http://a" Nothing, NamedTarget "b" "http://b" Nothing]
+            validateBenchmarkConfig cfg `shouldBe` Right cfg
         ]
     , testGroup
         "allPairComparisons"
@@ -98,12 +103,12 @@ defaultSettings =
     , loadMode = Nothing
     }
 
-makeNwayConfig :: [NamedTarget] -> NwayConfig
-makeNwayConfig ts =
-  NwayConfig
-    { nwayTargets = ts
-    , nwaySettings = defaultSettings
-    , nwayPayloads = [PayloadSpec "test" "GET" "/api/test" Nothing Nothing Nothing]
+makeBenchmarkConfig :: [NamedTarget] -> BenchmarkConfig
+makeBenchmarkConfig ts =
+  BenchmarkConfig
+    { benchTargets = ts
+    , benchSettings = defaultSettings
+    , benchPayloads = [PayloadSpec "test" "GET" "/api/test" Nothing Nothing Nothing]
     }
 
 makePairStats :: Int -> [(Text, BenchmarkStats)]

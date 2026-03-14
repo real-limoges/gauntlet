@@ -65,7 +65,7 @@ typesJsonSpec =
             (decode (LBS8.pack "\"trace\"") :: Maybe LogLevel) `shouldBe` Nothing
         ]
     , testGroup
-        "NwayConfig FromJSON"
+        "BenchmarkConfig FromJSON"
         [ testCase "decodes valid config" $ do
             let json =
                   LBS8.pack $
@@ -76,10 +76,10 @@ typesJsonSpec =
                       , "  \"payloads\": [{\"name\": \"p\", \"method\": \"GET\", \"path\": \"/\"}]"
                       , "}"
                       ]
-            (decode json :: Maybe NwayConfig) `shouldSatisfy` isJust
+            (decode json :: Maybe BenchmarkConfig) `shouldSatisfy` isJust
         , testCase "missing required key fails" $ do
             let json = LBS8.pack "{\"targets\": []}"
-            (decode json :: Maybe NwayConfig) `shouldBe` Nothing
+            (decode json :: Maybe BenchmarkConfig) `shouldBe` Nothing
         ]
     , testGroup
         "NamedTarget FromJSON"

@@ -76,12 +76,12 @@ reportSpec =
           namedStats = Map.fromList [("target-a", statsA), ("target-b", statsB)]
           pairs = [("target-a", "target-b", mockBayesianComparison)]
        in testGroup
-            "printNwayReport"
+            "printBenchmarkReport"
             [ testCase "contains Ranking header" $ do
-                output <- captureStdout $ printNwayReport namedStats pairs
+                output <- captureStdout $ printBenchmarkReport namedStats pairs
                 output `shouldSatisfy` ("Ranking" `isInfixOf`)
             , testCase "sorts targets by mean in ranking" $ do
-                output <- captureStdout $ printNwayReport namedStats pairs
+                output <- captureStdout $ printBenchmarkReport namedStats pairs
                 -- In the ranking section, target-b (mean=45) gets rank 1, target-a (mean=50) gets rank 2
                 -- Look for "1" before target-b and "2" before target-a in the ranking lines
                 let rankingLines = takeWhile (not . ("Pairwise" `isInfixOf`)) (lines output)
@@ -90,7 +90,7 @@ reportSpec =
                 hasRank1B `shouldBe` True
                 hasRank2A `shouldBe` True
             , testCase "contains Pairwise Comparisons header" $ do
-                output <- captureStdout $ printNwayReport namedStats pairs
+                output <- captureStdout $ printBenchmarkReport namedStats pairs
                 output `shouldSatisfy` ("Pairwise Comparisons" `isInfixOf`)
             ]
     ]

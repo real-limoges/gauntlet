@@ -16,10 +16,10 @@ cabal build            # Alternative build command
 
 ### Running Benchmarks
 ```bash
-make benchmark-nway    # Run N-way comparison benchmark (requires config.json)
-make benchmark-single   # Run single benchmark (requires config.json)
+make benchmark         # Run benchmark (requires config.json)
+make benchmark-single  # Run single benchmark (requires config.json)
 # Direct execution
-cabal run gauntlet-exe -- benchmark-nway --config config.json
+cabal run gauntlet-exe -- benchmark --config config.json
 ```
 
 ### Testing
@@ -46,7 +46,7 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 
 **Key Components:**
 - `Types.hs` - Core data types: `Endpoint`, `BenchmarkStats`, `BayesianComparison`, `TestConfig`, `PerfTestError` (with typed network error variants: `NetworkTimeout`, `ConnectionRefused`, `TlsError`, `HttpError`, `UnknownNetworkError`)
-- `Config/Loader.hs` - Loads YAML/JSON config, builds endpoint definitions from payloads; exports `loadNwayConfig`, `validateNwayConfig`
+- `Config/Loader.hs` - Loads YAML/JSON config, builds endpoint definitions from payloads; exports `loadBenchmarkConfig`, `validateBenchmarkConfig`
 - `Config/CLI.hs` - Command-line argument parsing
 - `Config/Env.hs` - `.env` / `.env.local` loading and `${VAR}` interpolation in config JSON before decode
 - `Execution/Environment.hs` - Git branch switching, docker-compose orchestration, health-check polling
@@ -56,12 +56,12 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 - `Network/Exec.hs` - Request execution with retry logic
 - `Network/Request.hs` - Nanosecond-precision timed request wrapper; `categorizeNetworkError` maps `HttpException` to typed `PerfTestError` variants
 - `TUI.hs` + `TUI/State.hs` + `TUI/Widgets.hs` - Real-time Brick-based terminal UI
-- `Report.hs` - Terminal output formatting; also exports `printNwayReport`
+- `Report.hs` - Terminal output formatting; also exports `printBenchmarkReport`
 - `Report/Formatting.hs` - Validation error formatting (`formatValidationError`)
-- `Report/Markdown.hs` - Markdown report generation for CI artifacts; also exports `markdownNwayReport`
+- `Report/Markdown.hs` - Markdown report generation for CI artifacts; also exports `markdownBenchmarkReport`
 - `Report/Baseline.hs` - Saves/loads baselines, regression detection with configurable thresholds
 - `Report/CI.hs` - GitLab CI and GitHub Actions integration
-- `Report/Output.hs` - CSV/JSON serialization; exports `initNwayOutputFiles`, `writeLatenciesWithTarget`
+- `Report/Output.hs` - CSV/JSON serialization; exports `initOutputFiles`, `writeLatenciesWithTarget`
 - `Reporter.hs` - `Reporter` record, `combineReporters`, `noOpReporter`
 - `Reporter/Terminal.hs` - Wraps `Report.hs` functions into reporter interface
 - `Reporter/Markdown.hs` - Writes markdown report to a file path; replaces old `writeMarkdownReport`
@@ -95,12 +95,12 @@ Optional Grafana Tempo integration for analyzing distributed traces.
 Orchestrates the full benchmark lifecycle, split into sub-modules.
 
 **Key Components:**
-- `Runner.hs` - Top-level entry points: `runNway`, `runSingle`
+- `Runner.hs` - Top-level entry points: `runSingle`
 - `Runner/Context.hs` - `RunContext` record, `initContext`, `setupOrFail` (git switch + docker-compose)
 - `Runner/Loop.hs` - Concurrent benchmark loops with STM channels
 - `Runner/Warmup.hs` - Warmup request execution
 - `Runner/Tracing.hs` - Fetches and prints Tempo traces for the benchmark time window
-- `Runner/Nway.hs` - N-way comparison orchestration: `runNway`, `allPairComparisons`
+- `Runner/Benchmark.hs` - Multi-target benchmark orchestration: `runBenchmark`, `allPairComparisons`
 
 ### Core Entry Points
 - `Lib.hs` - Main dispatcher: parses CLI, loads config, routes to Runner
@@ -132,7 +132,7 @@ Terminal/JSON/CSV/Markdown Output + Exit Code (0=success, 1=regression, 2=error)
 **Framework:** Tasty with tasty-hunit and tasty-quickcheck for property-based testing
 
 **Test Types:**
-- **Unit Tests:** StatsSpec, BayesianSpec, ConfigSpec, BaselineSpec, TracingSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, ExecSpec, FormattingSpec, LogSpec, LoopSpec, MarkdownSpec, NwaySpec, OutputSpec, RateLimiterSpec, ReportSpec, TypesConfigSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
+- **Unit Tests:** StatsSpec, BayesianSpec, ConfigSpec, BaselineSpec, TracingSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, ExecSpec, FormattingSpec, LogSpec, LoopSpec, MarkdownSpec, BenchmarkRunnerSpec, OutputSpec, RateLimiterSpec, ReportSpec, TypesConfigSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
 - **Integration Tests:** Integration.hs uses `MockServer.hs` to test HTTP operations end-to-end
 - **Property Tests:** PropertySpec.hs verifies statistical invariants (percentile ordering, stat bounds)
 - **UI Tests:** TUISpec.hs for Brick widget/state testing

@@ -23,13 +23,7 @@ data BaselineMode
 
 -- | Top-level CLI command (benchmark, compare, validate, etc.).
 data Command
-  = BenchmarkNway
-      { configPath :: FilePath
-      , baselineMode :: BaselineMode
-      , outputFormat :: OutputFormat
-      , chartsConfig :: Maybe ChartsSettings
-      }
-  | BenchmarkSingle
+  = Benchmark
       { configPath :: FilePath
       , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
@@ -61,8 +55,9 @@ parseArgs = execParser opts
 commandParser :: Parser Command
 commandParser =
   subparser
-    ( command "benchmark-nway" (info benchmarkNwayOptions (progDesc "Run N-way benchmark comparison"))
-        <> command "benchmark-single" (info benchmarkSingleOptions (progDesc "Run single-target benchmark"))
+    ( command
+        "benchmark"
+        (info benchmarkOptions (progDesc "Run benchmark (single or multi-target based on config)"))
         <> command "compare" (info compareOptions (progDesc "Compare two saved benchmark results"))
         <> command "validate" (info validateOptions (progDesc "Validate config without running benchmarks"))
     )
@@ -157,13 +152,9 @@ chartsParser = optional $ buildCharts <$> chartsOption <*> chartsDirOption
             [] -> []
             (_ : rs) -> splitOn sep rs
 
-benchmarkNwayOptions :: Parser Command
-benchmarkNwayOptions =
-  BenchmarkNway <$> configOption <*> baselineModeParser <*> outputFormatParser <*> chartsParser
-
-benchmarkSingleOptions :: Parser Command
-benchmarkSingleOptions =
-  BenchmarkSingle <$> configOption <*> baselineModeParser <*> outputFormatParser <*> chartsParser
+benchmarkOptions :: Parser Command
+benchmarkOptions =
+  Benchmark <$> configOption <*> baselineModeParser <*> outputFormatParser <*> chartsParser
 
 compareOptions :: Parser Command
 compareOptions =

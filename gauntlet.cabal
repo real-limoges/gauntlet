@@ -29,7 +29,7 @@ library
                           Log
                           Runner.Context
                           Runner.Loop
-                          Runner.Nway
+                          Runner.Benchmark
                           Runner.Warmup
                           Stats.Common
                           Stats.Benchmark
@@ -136,8 +136,8 @@ test-suite            gauntlet-test
                     , EnvSpec
                     , EnvironmentSpec
                     , LoadControlIntegrationSpec
-                    , NwayIntegrationSpec
-                    , NwaySpec
+                    , BenchmarkIntegrationSpec
+                    , BenchmarkRunnerSpec
                     , RateLimiterSpec
                     , BayesianSpec
                     , CISpec

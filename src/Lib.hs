@@ -15,23 +15,24 @@ import System.IO (hPutStrLn, stderr)
 
 import Benchmark.Compare (runCompare)
 import Benchmark.Config.CLI (Command (..), parseArgs)
-import Benchmark.Config.Loader (loadConfig, loadNwayConfig, validateConfig, validateNwayConfig)
+import Benchmark.Config.Loader (loadBenchmarkConfig, validateBenchmarkConfig)
 import Benchmark.Reporter (combineReporters)
 import Benchmark.Reporter.CI (ciReporter)
 import Benchmark.Reporter.Markdown (markdownReporter)
 import Benchmark.Reporter.Terminal (terminalReporter)
 import Benchmark.Types
-  ( ChartsSettings
-  , NwayConfig (..)
+  ( BenchmarkConfig (..)
+  , ChartsSettings
   , OutputFormat (..)
   , PerfTestError (..)
   , RunResult (..)
-  , TestConfig
+  , Targets (..)
+  , TestConfig (..)
   , exitWithError
   )
 import Benchmark.Types.Config (NamedTarget (..), Settings (..))
 import Runner (runSingle)
-import Runner.Nway (runNway)
+import Runner.Benchmark (runBenchmark)
 
 -- | Parse CLI arguments and dispatch to the appropriate benchmark command.
 run :: IO ()
@@ -47,12 +48,12 @@ run = do
             ]
   let charts = getChartsConfig cmd
   result <- case cmd of
-    BenchmarkNway path baseline _ _ -> do
-      cfg <- loadAndValidateNwayConfig path
-      runNway reporter baseline charts cfg
-    BenchmarkSingle path baseline _ _ -> do
-      cfg <- loadAndValidateConfig path
-      runSingle reporter baseline charts cfg
+    Benchmark path baseline _ _ -> do
+      cfg <- loadAndValidateBenchmarkConfig path
+      case benchTargets cfg of
+        [] -> exitWithError (ConfigParseError "no targets defined in config")
+        [t] -> runSingle reporter baseline charts (toTestConfig t cfg)
+        _ -> runBenchmark reporter baseline charts cfg
     Compare fileA fileB ->
       runCompare reporter fileA fileB
     Validate cfgPath doCheck ->
@@ -67,21 +68,27 @@ exitWithResult RunSuccess = exitWith ExitSuccess
 exitWithResult (RunRegression _) = exitWith (ExitFailure 1)
 exitWithResult (RunError _) = exitWith (ExitFailure 2)
 
-loadAndValidateConfig :: FilePath -> IO TestConfig
-loadAndValidateConfig = loadAndValidate loadConfig validateConfig
-
-loadAndValidateNwayConfig :: FilePath -> IO NwayConfig
-loadAndValidateNwayConfig = loadAndValidate loadNwayConfig validateNwayConfig
+loadAndValidateBenchmarkConfig :: FilePath -> IO BenchmarkConfig
+loadAndValidateBenchmarkConfig = loadAndValidate loadBenchmarkConfig validateBenchmarkConfig
 
 getMarkdownPath :: Command -> Maybe FilePath
-getMarkdownPath (BenchmarkNway _ _ fmt _) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
-getMarkdownPath (BenchmarkSingle _ _ fmt _) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
+getMarkdownPath (Benchmark _ _ fmt _) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
 getMarkdownPath _ = Nothing
 
 getChartsConfig :: Command -> Maybe ChartsSettings
-getChartsConfig (BenchmarkNway _ _ _ c) = c
-getChartsConfig (BenchmarkSingle _ _ _ c) = c
+getChartsConfig (Benchmark _ _ _ c) = c
 getChartsConfig _ = Nothing
+
+toTestConfig :: NamedTarget -> BenchmarkConfig -> TestConfig
+toTestConfig t cfg =
+  TestConfig
+    { targets = Targets {primary = targetUrl t, candidate = targetUrl t}
+    , git = Targets {primary = branch, candidate = branch}
+    , settings = benchSettings cfg
+    , payloads = benchPayloads cfg
+    }
+  where
+    branch = fromMaybe "" (targetBranch t)
 
 loadAndValidate :: (FilePath -> IO (Either String a)) -> (a -> Either PerfTestError a) -> FilePath -> IO a
 loadAndValidate load validate path = do
@@ -93,19 +100,19 @@ loadAndValidate load validate path = do
 -- | Validate a config file without running any benchmarks.
 runValidate :: FilePath -> Bool -> IO RunResult
 runValidate cfgPath doCheck = do
-  res <- loadNwayConfig cfgPath
+  res <- loadBenchmarkConfig cfgPath
   case res of
     Left err -> do
       hPutStrLn stderr $ "Config error: " <> err
       pure (RunError (ConfigParseError (T.pack err)))
-    Right cfg -> case validateNwayConfig cfg of
+    Right cfg -> case validateBenchmarkConfig cfg of
       Left err -> do
         hPutStrLn stderr $ "Validation error: " <> show err
         pure (RunError err)
       Right validCfg -> do
-        let setts = nwaySettings validCfg
-            targets = nwayTargets validCfg
-            payloads = nwayPayloads validCfg
+        let setts = benchSettings validCfg
+            targets = benchTargets validCfg
+            payloads = benchPayloads validCfg
             hcPath = fromMaybe "/health" (healthCheckPath setts)
         putStrLn "Config OK"
         putStrLn $ "Targets (" <> show (length targets) <> "):"

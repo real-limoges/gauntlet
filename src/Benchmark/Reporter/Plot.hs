@@ -15,7 +15,7 @@ plotReporter :: ChartsSettings -> FilePath -> Reporter
 plotReporter settings csvFile =
   Reporter
     { reportSingle = \_ _ _ -> generateCharts settings csvFile
-    , reportNWay = \_ _ _ -> generateCharts settings csvFile
+    , reportBenchmark = \_ _ _ -> generateCharts settings csvFile
     , reportRegression = \_ -> pure ()
     }
 

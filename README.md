@@ -14,7 +14,7 @@ A Haskell-based performance testing tool that goes beyond simple request/second 
 
 ### Core Capabilities
 - **A/B Comparison Testing** - Compare two API versions with statistical rigor
-- **N-Way Comparison Testing** - Compare multiple API targets simultaneously
+- **Multi-Target Comparison Testing** - Compare multiple API targets simultaneously
 - **Bayesian Statistical Analysis** - Get probability distributions, not just p-values
 - **Nanosecond Precision** - High-resolution timing for accurate latency measurement
 - **Concurrent Execution** - Configurable concurrency with STM-based coordination
@@ -136,7 +136,7 @@ Save as `config.json`.
 ### 2. Run the benchmark
 
 ```bash
-cabal run gauntlet-exe -- benchmark-nway --config config.json
+cabal run gauntlet-exe -- benchmark --config config.json
 ```
 
 ### 3. View results
@@ -178,8 +178,8 @@ For a comprehensive walkthrough of all features, configuration options (with exp
 ### Available Commands
 
 ```bash
-# Run N-way comparison benchmark (supports 2+ targets)
-cabal run gauntlet-exe -- benchmark-nway --config config.json
+# Run benchmark (supports 1+ targets)
+cabal run gauntlet-exe -- benchmark --config config.json
 
 # Run single endpoint benchmark
 cabal run gauntlet-exe -- benchmark-single --config config.json
@@ -237,7 +237,7 @@ cabal run gauntlet-exe -- benchmark-single --config config.json
 }
 ```
 
-### N-Way Configuration
+### Multi-Target Configuration
 
 ```json
 {
@@ -261,7 +261,7 @@ cabal run gauntlet-exe -- benchmark-single --config config.json
 }
 ```
 
-N-way targets are an array of objects with `name`, `url`, and optional `branch` fields. All pairwise Bayesian comparisons are computed automatically.
+Targets are an array of objects with `name`, `url`, and optional `branch` fields. All pairwise Bayesian comparisons are computed automatically.
 
 ### Full Configuration
 
@@ -440,14 +440,14 @@ Two distinct probability metrics are reported:
 ### Example 1: Simple Health Check
 
 ```bash
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark \
   --config examples/minimal.json
 ```
 
 ### Example 2: A/B API Comparison with Markdown Report
 
 ```bash
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark \
   --config examples/ab-comparison.json \
   --output markdown \
   --report-path results/report.md
@@ -457,12 +457,12 @@ cabal run gauntlet-exe -- benchmark-nway \
 
 ```bash
 # Save baseline
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark \
   --config examples/simple-benchmark.json \
   --save-baseline prod-baseline
 
 # Compare against baseline (exits 1 if regression detected)
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark \
   --config examples/simple-benchmark.json \
   --compare-baseline prod-baseline
 ```
@@ -474,7 +474,7 @@ cabal run gauntlet-exe -- benchmark-nway \
 mkdir -p .secrets
 echo "Bearer your-token-here" > .secrets/token.txt
 
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark \
   --config examples/api-with-auth.json
 ```
 
@@ -556,7 +556,7 @@ gauntlet/
 │   ├── Runner/             # Benchmark orchestration
 │   │   ├── Context.hs      # RunContext, initContext, setupOrFail
 │   │   ├── Loop.hs         # Concurrent benchmark loops
-│   │   ├── Nway.hs         # N-way comparison orchestration
+│   │   ├── Benchmark.hs    # Multi-target benchmark orchestration
 │   │   ├── Warmup.hs       # Warmup execution
 │   │   └── Tracing.hs      # Tempo trace fetching
 │   ├── Stats/              # Statistical analysis
@@ -577,8 +577,8 @@ gauntlet/
 │   ├── FrequentistSpec.hs  # Frequentist tests and EMD
 │   ├── ConfigSpec.hs       # Config parsing tests
 │   ├── BaselineSpec.hs     # Baseline tests
-│   ├── NwaySpec.hs         # N-way comparison tests
-│   ├── NwayIntegrationSpec.hs  # N-way end-to-end tests
+│   ├── BenchmarkRunnerSpec.hs  # Benchmark runner tests
+│   ├── BenchmarkIntegrationSpec.hs  # Benchmark end-to-end tests
 │   ├── TracingSpec.hs      # Tracing analysis tests
 │   ├── TracingClientSpec.hs    # Tempo client tests
 │   ├── TracingQuerySpec.hs     # TraceQL query tests
@@ -699,7 +699,7 @@ performance-test:
   stage: test
   script:
     - cabal build
-    - cabal run gauntlet-exe -- benchmark-nway \
+    - cabal run gauntlet-exe -- benchmark \
         --config config.json \
         --compare-baseline prod-baseline
   artifacts:
@@ -733,7 +733,7 @@ jobs:
       - name: Run benchmark
         run: |
           cabal build
-          cabal run gauntlet-exe -- benchmark-nway \
+          cabal run gauntlet-exe -- benchmark \
             --config config.json \
             --compare-baseline prod-baseline \
             --output markdown \
@@ -751,7 +751,7 @@ jobs:
 Use `--output markdown` to write a full report covering stats, Bayesian analysis, and validation results:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-nway \
+cabal run gauntlet-exe -- benchmark \
   --config config.json \
   --output markdown \
   --report-path /tmp/report.md
