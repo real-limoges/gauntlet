@@ -26,5 +26,5 @@ runCompare reporter fileA fileB = do
           cmp = compareBayesian statsA statsB
           statsMap = Map.fromList [(nameA, statsA), (nameB, statsB)]
           pairs = [(nameA, nameB, cmp)]
-      reportNWay reporter statsMap pairs []
+      reportBenchmark reporter statsMap pairs []
       pure RunSuccess

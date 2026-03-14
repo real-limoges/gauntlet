@@ -2,7 +2,7 @@
 module Benchmark.Types.Config
   ( -- * Configuration
     TestConfig (..)
-  , NwayConfig (..)
+  , BenchmarkConfig (..)
   , Targets (..)
   , NamedTarget (..)
   , Settings (..)
@@ -60,19 +60,19 @@ data TestConfig = TestConfig
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
 
--- | N-way benchmark configuration (multiple named targets).
-data NwayConfig = NwayConfig
-  { nwayTargets :: [NamedTarget]
-  , nwaySettings :: Settings
-  , nwayPayloads :: [PayloadSpec]
+-- | Benchmark configuration (one or more named targets).
+data BenchmarkConfig = BenchmarkConfig
+  { benchTargets :: [NamedTarget]
+  , benchSettings :: Settings
+  , benchPayloads :: [PayloadSpec]
   }
   deriving stock (Show, Eq, Generic)
 
-instance FromJSON NwayConfig where
+instance FromJSON BenchmarkConfig where
   parseJSON =
     genericParseJSON
       defaultOptions
-        { fieldLabelModifier = dropFieldPrefix "nway"
+        { fieldLabelModifier = dropFieldPrefix "bench"
         }
 
 -- | Primary and candidate target URLs or git branches.
@@ -83,7 +83,7 @@ data Targets = Targets
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON)
 
--- | Single named target in N-Way run
+-- | Single named target in a benchmark run
 data NamedTarget = NamedTarget
   { targetName :: Text
   , targetUrl :: Text

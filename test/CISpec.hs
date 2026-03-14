@@ -5,13 +5,13 @@ import Benchmark.Report.CI
 import Benchmark.Types (MetricRegression (..), RegressionResult (..))
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
-import System.Environment (setEnv, unsetEnv)
+import System.Environment (setEnv)
 import System.IO (hClose)
 import System.IO.Temp (withSystemTempFile)
 import TastyCompat (shouldBe, shouldReturn, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)
 import Test.Tasty.HUnit (testCase)
-import TestHelpers (cleanTest, withCleanEnv)
+import TestHelpers (cleanTest)
 
 ciSpec :: TestTree
 ciSpec =

@@ -2,7 +2,7 @@
 module Benchmark.Report.Markdown
   ( markdownSingleReport
   , markdownMultipleReport
-  , markdownNwayReport
+  , markdownBenchmarkReport
   , markdownRegressionReport
   , markdownValidationReport
   ) where
@@ -60,11 +60,11 @@ markdownMultipleReport primaryLabel candidateLabel primary candidate bayes =
       ++ ["", "### Bayesian Analysis", ""]
       ++ bayesTable bayes
 
--- | Markdown report for an N-way comparison with ranking and per-pair detail.
-markdownNwayReport :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> Text
-markdownNwayReport namedStats pairs =
+-- | Markdown report for a multi-target comparison with ranking and per-pair detail.
+markdownBenchmarkReport :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> Text
+markdownBenchmarkReport namedStats pairs =
   T.unlines $
-    [ "## N-Way Benchmark Report"
+    [ "## Benchmark Report"
     , ""
     , "### Ranking (by mean latency)"
     , ""

@@ -1,5 +1,5 @@
--- | N-way benchmark comparison orchestration.
-module Runner.Nway (runNway, allPairComparisons) where
+-- | Benchmark comparison orchestration.
+module Runner.Benchmark (runBenchmark, allPairComparisons) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Config.Loader (buildEndpoints)
@@ -11,10 +11,10 @@ import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
 import Benchmark.Types
   ( BayesianComparison
+  , BenchmarkConfig (..)
   , BenchmarkStats
   , ChartsSettings
   , NamedTarget (..)
-  , NwayConfig (..)
   , PerfTestError (..)
   , RegressionResult (..)
   , RunResult (..)
@@ -39,7 +39,7 @@ import Stats.Benchmark (calculateStats, compareBayesian)
 import System.IO (hIsTerminalDevice, stdin)
 import Tracing.Types qualified as TT
 
-data NwayResult = NwayResult
+data BenchmarkResult = BenchmarkResult
   { nrName :: Text
   , nrStats :: BenchmarkStats
   , nrValidations :: [ValidationSummary]
@@ -47,23 +47,23 @@ data NwayResult = NwayResult
   , nrEndNs :: TT.Nanoseconds
   }
 
--- | Run benchmarks against N named targets and compare all pairs.
-runNway :: Reporter -> BaselineMode -> Maybe ChartsSettings -> NwayConfig -> IO RunResult
-runNway reporter baselineMode mCharts cfg = do
+-- | Run benchmarks against named targets and compare all pairs.
+runBenchmark :: Reporter -> BaselineMode -> Maybe ChartsSettings -> BenchmarkConfig -> IO RunResult
+runBenchmark reporter baselineMode mCharts cfg = do
   (csvFile, timestamp) <- initOutputFiles
 
   let fullReporter = case mCharts of
         Nothing -> reporter
         Just cs -> combineReporters [reporter, plotReporter cs csvFile]
-      setts = nwaySettings cfg
-      eps = buildEndpoints "" (nwayPayloads cfg)
+      setts = benchSettings cfg
+      eps = buildEndpoints "" (benchPayloads cfg)
       numEndpoints = length eps
       perTargetRequests = iterations setts * numEndpoints
 
   isTerm <- hIsTerminalDevice stdin
   if isTerm
-    then runNwayWithTUI fullReporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints
-    else runNwayNoTUI fullReporter baselineMode cfg csvFile timestamp setts
+    then runBenchmarkWithTUI fullReporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints
+    else runBenchmarkNoTUI fullReporter baselineMode cfg csvFile timestamp setts
 
 -- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
 allPairComparisons :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)]
@@ -74,24 +74,24 @@ allPairComparisons ((nameA, statsA) : rest) =
   ]
     ++ allPairComparisons rest
 
--- | Run N-way benchmarks with TUI display.
-runNwayWithTUI ::
+-- | Run benchmarks with TUI display.
+runBenchmarkWithTUI ::
   Reporter ->
   BaselineMode ->
-  NwayConfig ->
+  BenchmarkConfig ->
   FilePath ->
   String ->
   Settings ->
   Int ->
   Int ->
   IO RunResult
-runNwayWithTUI reporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints = do
+runBenchmarkWithTUI reporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints = do
   eventChan <- newTChanIO
   let tuiState = initialState "Starting..." perTargetRequests numEndpoints
   ctx <- initContext setts csvFile timestamp (Just eventChan)
 
   benchmarkWork <- async $ do
-    result <- (try (runAllTargets ctx cfg (Just eventChan)) :: IO (Either SomeException [NwayResult]))
+    result <- (try (runAllTargets ctx cfg (Just eventChan)) :: IO (Either SomeException [BenchmarkResult]))
     case result of
       Right val -> do
         emitEvent (Just eventChan) BenchmarkFinished
@@ -115,26 +115,26 @@ runNwayWithTUI reporter baselineMode cfg csvFile timestamp setts perTargetReques
       results <- wait benchmarkWork
       postAnalysis reporter (rcLogger ctx) (rcManager ctx) baselineMode setts timestamp results
 
--- | Run N-way benchmarks without TUI (headless/CI mode).
-runNwayNoTUI ::
+-- | Run benchmarks without TUI (headless/CI mode).
+runBenchmarkNoTUI ::
   Reporter ->
   BaselineMode ->
-  NwayConfig ->
+  BenchmarkConfig ->
   FilePath ->
   String ->
   Settings ->
   IO RunResult
-runNwayNoTUI reporter baselineMode cfg csvFile timestamp setts = do
+runBenchmarkNoTUI reporter baselineMode cfg csvFile timestamp setts = do
   ctx <- initContext setts csvFile timestamp Nothing
   results <- runAllTargets ctx cfg Nothing
   postAnalysis reporter (rcLogger ctx) (rcManager ctx) baselineMode setts timestamp results
 
 -- | Execute benchmarks for all targets.
-runAllTargets :: RunContext -> NwayConfig -> Maybe (TChan BenchmarkEvent) -> IO [NwayResult]
+runAllTargets :: RunContext -> BenchmarkConfig -> Maybe (TChan BenchmarkEvent) -> IO [BenchmarkResult]
 runAllTargets ctx cfg eventChan = do
-  let setts = nwaySettings cfg
-  forM (zip [1 ..] (nwayTargets cfg)) $ \(idx, t) -> do
-    let targetEps = buildEndpoints (targetUrl t) (nwayPayloads cfg)
+  let setts = benchSettings cfg
+  forM (zip [1 ..] (benchTargets cfg)) $ \(idx, t) -> do
+    let targetEps = buildEndpoints (targetUrl t) (benchPayloads cfg)
         totalReqs = iterations setts * length targetEps
 
     emitEvent eventChan (TargetStarted (targetName t) idx totalReqs)
@@ -153,7 +153,7 @@ runAllTargets ctx cfg eventChan = do
     endNs <- getNowNs
 
     pure
-      NwayResult
+      BenchmarkResult
         { nrName = targetName t
         , nrStats = calculateStats timings
         , nrValidations = validSummaries
@@ -169,25 +169,26 @@ postAnalysis ::
   BaselineMode ->
   Settings ->
   String ->
-  [NwayResult] ->
+  [BenchmarkResult] ->
   IO RunResult
 postAnalysis reporter logger mgr baselineMode setts timestamp results = do
   let namedStats = Map.fromList [(nrName r, nrStats r) | r <- results]
       pairs = allPairComparisons [(nrName r, nrStats r) | r <- results]
       validAll = concatMap nrValidations results
 
-  reportNWay reporter namedStats pairs validAll
+  reportBenchmark reporter namedStats pairs validAll
 
   forM_ results $ \r -> do
     logInfo logger $ "\n#----- Traces: " <> nrName r <> " -----#"
     runTraceAnalysis logger mgr setts timestamp (nrStartNs r) (nrEndNs r)
 
-  handleNwayBaseline reporter logger baselineMode (T.pack timestamp) namedStats
+  handleBenchmarkBaseline reporter logger baselineMode (T.pack timestamp) namedStats
 
--- | Run baseline operations for each N-way target, aggregate results.
-handleNwayBaseline :: Reporter -> Logger -> BaselineMode -> Text -> Map Text BenchmarkStats -> IO RunResult
-handleNwayBaseline _reporter _logger NoBaseline _timestamp _namedStats = return RunSuccess
-handleNwayBaseline reporter logger mode timestamp namedStats = do
+-- | Run baseline operations for each target, aggregate results.
+handleBenchmarkBaseline ::
+  Reporter -> Logger -> BaselineMode -> Text -> Map Text BenchmarkStats -> IO RunResult
+handleBenchmarkBaseline _reporter _logger NoBaseline _timestamp _namedStats = return RunSuccess
+handleBenchmarkBaseline reporter logger mode timestamp namedStats = do
   results <- forM (Map.toList namedStats) $ \(name, stats) -> do
     let qualifiedMode = qualifyBaselineMode name mode
     handleBaseline reporter logger qualifiedMode timestamp stats

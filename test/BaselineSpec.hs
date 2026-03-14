@@ -10,7 +10,6 @@ import Data.List (find)
 import Data.Text qualified as T
 import Log (Logger)
 import System.Directory (createDirectoryIfMissing, getCurrentDirectory, setCurrentDirectory)
-import System.Environment (unsetEnv)
 import System.IO.Temp (withSystemTempDirectory)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)

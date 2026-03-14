@@ -68,8 +68,8 @@ Change `logLevel` to control output verbosity:
 - `"warning"` - Only warnings and errors
 - `"error"` - Only critical errors
 
-### `nway-comparison.json`
-**N-way comparison** - Compare multiple API targets simultaneously.
+### `comparison.json`
+**Multi-target comparison** - Compare multiple API targets simultaneously.
 - 3 named targets: prod, staging, dev
 - All pairwise Bayesian comparisons computed automatically
 - Targets specified as an array of `{name, url}` objects
@@ -80,7 +80,7 @@ Change `logLevel` to control output verbosity:
 **Step load profile** - Ramp requests up and back down in discrete steps.
 - 4 steps: 10 → 50 → 100 → 50 RPS
 - Duration-based (`iterations` ignored; total requests derived from schedule)
-- Uses `benchmark-nway` with two named targets
+- Uses `benchmark` with two named targets
 
 **Use case:** Stress testing, finding saturation points, validating autoscaling.
 
@@ -196,12 +196,12 @@ cabal run gauntlet-exe -- benchmark-single --config examples/minimal.json
 cabal run gauntlet-exe -- benchmark-single --config examples/ab-comparison.json
 ```
 
-### N-way Comparison
-Configs with `targets: [...]` use `benchmark-nway`:
+### Multi-Target Comparison
+Configs with `targets: [...]` use `benchmark`:
 
 ```bash
-cabal run gauntlet-exe -- benchmark-nway --config examples/nway-comparison.json
-cabal run gauntlet-exe -- benchmark-nway --config examples/load-modes.json
+cabal run gauntlet-exe -- benchmark --config examples/comparison.json
+cabal run gauntlet-exe -- benchmark --config examples/load-modes.json
 ```
 
 ### With Baseline Comparison

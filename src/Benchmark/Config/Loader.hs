@@ -1,10 +1,10 @@
 -- | Configuration loading and validation from JSON/YAML files.
 module Benchmark.Config.Loader
   ( loadConfig
-  , loadNwayConfig
+  , loadBenchmarkConfig
   , buildEndpoints
   , validateConfig
-  , validateNwayConfig
+  , validateBenchmarkConfig
   )
 where
 
@@ -23,9 +23,9 @@ import Data.Text.IO qualified as TIO
 loadConfig :: FilePath -> IO (Either String TestConfig)
 loadConfig = loadConfigAs
 
--- | Load and validate an N-way benchmark config from a JSON\/YAML file.
-loadNwayConfig :: FilePath -> IO (Either String NwayConfig)
-loadNwayConfig = loadConfigAs
+-- | Load and validate a benchmark config from a JSON\/YAML file.
+loadBenchmarkConfig :: FilePath -> IO (Either String BenchmarkConfig)
+loadBenchmarkConfig = loadConfigAs
 
 loadConfigAs :: FromJSON a => FilePath -> IO (Either String a)
 loadConfigAs path = do
@@ -70,19 +70,19 @@ validateConfig cfg = do
   validateCommon (payloads cfg) (settings cfg)
   Right cfg
 
--- | Validate an 'NwayConfig' (at least two targets, non-empty payloads).
-validateNwayConfig :: NwayConfig -> Either PerfTestError NwayConfig
-validateNwayConfig cfg = do
-  when (null (nwayPayloads cfg)) $
+-- | Validate a 'BenchmarkConfig' (at least one target, non-empty payloads).
+validateBenchmarkConfig :: BenchmarkConfig -> Either PerfTestError BenchmarkConfig
+validateBenchmarkConfig cfg = do
+  when (null (benchPayloads cfg)) $
     Left $
       ConfigValidationError "No payloads defined in config"
-  validateCommon (nwayPayloads cfg) (nwaySettings cfg)
-  when (length (nwayTargets cfg) < 2) $
+  validateCommon (benchPayloads cfg) (benchSettings cfg)
+  when (null (benchTargets cfg)) $
     Left $
-      ConfigValidationError "Must have at least 2 targets"
+      ConfigValidationError "Must have at least 1 target"
   Right cfg
 
--- | Shared validation logic for both single and N-way configs.
+-- | Shared validation logic for both single and multi-target configs.
 validateCommon :: [PayloadSpec] -> Settings -> Either PerfTestError ()
 validateCommon ps setts = do
   when (concurrency setts <= 0) $

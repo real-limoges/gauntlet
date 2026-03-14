@@ -6,7 +6,7 @@ import Benchmark.Types
 import Data.Aeson (toJSON)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
-import Runner.Nway (allPairComparisons)
+import Runner.Benchmark (allPairComparisons)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)
@@ -58,11 +58,11 @@ markdownSpec =
                 ]
         ]
     , testGroup
-        "markdownNwayReport"
+        "markdownBenchmarkReport"
         [ testCase "renders 2-target report with ranking and pair" $ do
             let namedStats = Map.fromList [("alpha", mockStats 10 1), ("beta", mockStats 20 2)]
                 pairs = allPairComparisons (Map.toList namedStats)
-                md = markdownNwayReport namedStats pairs
+                md = markdownBenchmarkReport namedStats pairs
             md `shouldSatisfy` T.isInfixOf "Ranking"
             md `shouldSatisfy` T.isInfixOf "| # | Target |"
             md `shouldSatisfy` T.isInfixOf "alpha"
@@ -76,7 +76,7 @@ markdownSpec =
                     , ("slow", mockStats 100 10)
                     ]
                 pairs = allPairComparisons (Map.toList namedStats)
-                md = markdownNwayReport namedStats pairs
+                md = markdownBenchmarkReport namedStats pairs
             -- All 3 target names present
             md `shouldSatisfy` T.isInfixOf "fast"
             md `shouldSatisfy` T.isInfixOf "medium"

@@ -1,5 +1,5 @@
--- | Integration tests for N-way comparison.
-module NwayIntegrationSpec (nwayIntegrationSpec) where
+-- | Integration tests for benchmark comparison.
+module BenchmarkIntegrationSpec (benchmarkIntegrationSpec) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Reporter (noOpReporter)
@@ -7,7 +7,7 @@ import Benchmark.Reporter.Markdown (markdownReporter)
 import Benchmark.Types
 import Data.Text qualified as T
 import MockServer (mockJson)
-import Runner.Nway (runNway)
+import Runner.Benchmark (runBenchmark)
 import System.Directory (doesDirectoryExist, doesFileExist, listDirectory, withCurrentDirectory)
 import System.IO (hClose, hFlush)
 import System.IO.Temp (withSystemTempDirectory, withSystemTempFile)
@@ -15,51 +15,51 @@ import TastyCompat (shouldBe, shouldContain, shouldReturn, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
 
-nwayIntegrationSpec :: TestTree
-nwayIntegrationSpec =
+benchmarkIntegrationSpec :: TestTree
+benchmarkIntegrationSpec =
   testGroup
-    "N-Way Integration"
+    "Benchmark Integration"
     [ sequentialTestGroup
-        "runNway"
+        "runBenchmark"
         AllSucceed
         [ testCase "returns RunSuccess with 2 targets" $
-            withNwayEnv $ \tokenPath ->
+            withBenchmarkEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  result <- runNway noOpReporter NoBaseline Nothing cfg
+                  let cfg = makeTestBenchmarkConfig tokenPath [port1, port2]
+                  result <- runBenchmark noOpReporter NoBaseline Nothing cfg
                   result `shouldBe` RunSuccess
         , testCase "returns RunSuccess with 3 targets" $
-            withNwayEnv $ \tokenPath ->
+            withBenchmarkEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 ->
                   mockJson "{}" $ \port3 -> do
-                    let cfg = makeTestNwayConfig tokenPath [port1, port2, port3]
-                    result <- runNway noOpReporter NoBaseline Nothing cfg
+                    let cfg = makeTestBenchmarkConfig tokenPath [port1, port2, port3]
+                    result <- runBenchmark noOpReporter NoBaseline Nothing cfg
                     result `shouldBe` RunSuccess
         , testCase "report contains target names" $
-            withNwayEnv $ \tokenPath ->
+            withBenchmarkEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  _ <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
+                  let cfg = makeTestBenchmarkConfig tokenPath [port1, port2]
+                  _ <- runBenchmark (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
                   content <- readFile "endpoint_analysis.md"
                   content `shouldContain` "target-1"
                   content `shouldContain` "target-2"
         , testCase "report contains ranking table" $
-            withNwayEnv $ \tokenPath ->
+            withBenchmarkEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  _ <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
+                  let cfg = makeTestBenchmarkConfig tokenPath [port1, port2]
+                  _ <- runBenchmark (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
                   content <- readFile "endpoint_analysis.md"
                   content `shouldContain` "Ranking"
         , testCase "writes endpoint_analysis.md" $
-            withNwayEnv $ \tokenPath ->
+            withBenchmarkEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  result <- runNway (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
+                  let cfg = makeTestBenchmarkConfig tokenPath [port1, port2]
+                  result <- runBenchmark (markdownReporter "endpoint_analysis.md") NoBaseline Nothing cfg
                   result `shouldBe` RunSuccess
                   exists <- doesFileExist "endpoint_analysis.md"
                   exists `shouldBe` True
@@ -67,11 +67,11 @@ nwayIntegrationSpec =
                   content `shouldContain` "target-1"
                   content `shouldContain` "target-2"
         , testCase "creates results directory with correct CSV output" $
-            withNwayEnv $ \tokenPath ->
+            withBenchmarkEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  _ <- runNway noOpReporter NoBaseline Nothing cfg
+                  let cfg = makeTestBenchmarkConfig tokenPath [port1, port2]
+                  _ <- runBenchmark noOpReporter NoBaseline Nothing cfg
                   exists <- doesDirectoryExist "results"
                   exists `shouldBe` True
                   files <- listDirectory "results"
@@ -89,18 +89,18 @@ nwayIntegrationSpec =
                       T.isInfixOf "target-2" csvContents `shouldBe` True
                     [] -> assertFailure "No CSV files found"
         , testCase "handles POST endpoints" $
-            withNwayEnv $ \tokenPath ->
+            withBenchmarkEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfigWithMethod tokenPath [port1, port2] "POST"
-                  result <- runNway noOpReporter NoBaseline Nothing cfg
+                  let cfg = makeTestBenchmarkConfigWithMethod tokenPath [port1, port2] "POST"
+                  result <- runBenchmark noOpReporter NoBaseline Nothing cfg
                   result `shouldBe` RunSuccess
         , testCase "SaveBaseline creates per-target baseline files" $
-            withNwayEnv $ \tokenPath ->
+            withBenchmarkEnv $ \tokenPath ->
               mockJson "{}" $ \port1 ->
                 mockJson "{}" $ \port2 -> do
-                  let cfg = makeTestNwayConfig tokenPath [port1, port2]
-                  result <- runNway noOpReporter (SaveBaseline "test") Nothing cfg
+                  let cfg = makeTestBenchmarkConfig tokenPath [port1, port2]
+                  result <- runBenchmark noOpReporter (SaveBaseline "test") Nothing cfg
                   result `shouldBe` RunSuccess
                   doesFileExist "baselines/test--target-1.json" `shouldReturn` True
                   doesFileExist "baselines/test--target-2.json" `shouldReturn` True
@@ -110,9 +110,9 @@ nwayIntegrationSpec =
 -- Helpers
 
 -- | Run an action inside a fresh temp directory with a temp token file.
-withNwayEnv :: (FilePath -> IO a) -> IO a
-withNwayEnv action =
-  withSystemTempDirectory "nway-test" $ \tmpDir ->
+withBenchmarkEnv :: (FilePath -> IO a) -> IO a
+withBenchmarkEnv action =
+  withSystemTempDirectory "benchmark-test" $ \tmpDir ->
     withCurrentDirectory tmpDir $
       withTempToken $ \tokenPath ->
         action tokenPath
@@ -142,10 +142,10 @@ makeTestSettings tokenPath =
     , loadMode = Nothing
     }
 
-makeTestNwayConfig :: FilePath -> [Int] -> NwayConfig
-makeTestNwayConfig tokenPath ports =
-  NwayConfig
-    { nwayTargets =
+makeTestBenchmarkConfig :: FilePath -> [Int] -> BenchmarkConfig
+makeTestBenchmarkConfig tokenPath ports =
+  BenchmarkConfig
+    { benchTargets =
         [ NamedTarget
             { targetName = T.pack ("target-" ++ show i)
             , targetUrl = T.pack ("http://127.0.0.1:" ++ show port)
@@ -153,11 +153,11 @@ makeTestNwayConfig tokenPath ports =
             }
         | (i, port) <- zip [(1 :: Int) ..] ports
         ]
-    , nwaySettings = makeTestSettings tokenPath
-    , nwayPayloads = [PayloadSpec "test" "GET" "/" Nothing Nothing Nothing]
+    , benchSettings = makeTestSettings tokenPath
+    , benchPayloads = [PayloadSpec "test" "GET" "/" Nothing Nothing Nothing]
     }
 
-makeTestNwayConfigWithMethod :: FilePath -> [Int] -> T.Text -> NwayConfig
-makeTestNwayConfigWithMethod tokenPath ports method =
-  let cfg = makeTestNwayConfig tokenPath ports
-   in cfg {nwayPayloads = [PayloadSpec "test" method "/" Nothing Nothing Nothing]}
+makeTestBenchmarkConfigWithMethod :: FilePath -> [Int] -> T.Text -> BenchmarkConfig
+makeTestBenchmarkConfigWithMethod tokenPath ports method =
+  let cfg = makeTestBenchmarkConfig tokenPath ports
+   in cfg {benchPayloads = [PayloadSpec "test" method "/" Nothing Nothing Nothing]}

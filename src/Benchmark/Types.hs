@@ -22,7 +22,7 @@ module Benchmark.Types
 
     -- * Configuration
   , TestConfig (..)
-  , NwayConfig (..)
+  , BenchmarkConfig (..)
   , Targets (..)
   , NamedTarget (..)
   , Settings (..)

@@ -3,7 +3,7 @@ module Benchmark.Reporter.Terminal
   ( terminalReporter
   ) where
 
-import Benchmark.Report (printNwayReport, printSingleBenchmarkReport, printValidationSummary)
+import Benchmark.Report (printBenchmarkReport, printSingleBenchmarkReport, printValidationSummary)
 import Benchmark.Report.Baseline (printRegressionResult)
 import Benchmark.Reporter (Reporter (..))
 
@@ -14,8 +14,8 @@ terminalReporter =
     { reportSingle = \targetUrl stats valids -> do
         printSingleBenchmarkReport targetUrl stats
         printValidationSummary valids
-    , reportNWay = \namedStats pairs valids -> do
-        printNwayReport namedStats pairs
+    , reportBenchmark = \namedStats pairs valids -> do
+        printBenchmarkReport namedStats pairs
         printValidationSummary valids
     , reportRegression = printRegressionResult
     }
