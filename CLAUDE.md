@@ -17,7 +17,6 @@ cabal build            # Alternative build command
 ### Running Benchmarks
 ```bash
 make benchmark         # Run benchmark (requires config.json)
-make benchmark-single  # Run single benchmark (requires config.json)
 # Direct execution
 cabal run gauntlet-exe -- benchmark --config config.json
 ```
@@ -62,10 +61,12 @@ Core benchmarking engine that handles HTTP requests, concurrent execution, and a
 - `Report/Baseline.hs` - Saves/loads baselines, regression detection with configurable thresholds
 - `Report/CI.hs` - GitLab CI and GitHub Actions integration
 - `Report/Output.hs` - CSV/JSON serialization; exports `initOutputFiles`, `writeLatenciesWithTarget`
+- `Compare.hs` - Offline comparison of saved benchmark results; exports `runCompare`
 - `Reporter.hs` - `Reporter` record, `combineReporters`, `noOpReporter`
 - `Reporter/Terminal.hs` - Wraps `Report.hs` functions into reporter interface
 - `Reporter/Markdown.hs` - Writes markdown report to a file path; replaces old `writeMarkdownReport`
 - `Reporter/CI.hs` - CI integration behind reporter interface; wraps `Report/CI.hs`
+- `Reporter/Plot.hs` - Chart generation (KDE, CDF, violin plots)
 - `Types/` - Type sub-modules: `Baseline.hs`, `Config.hs`, `Error.hs`, `Internal.hs`, `Response.hs`, `Stats.hs`, `Units.hs`
 
 ### 2. Stats/ Module (Statistical Analysis)
@@ -105,20 +106,16 @@ Orchestrates the full benchmark lifecycle, split into sub-modules.
 ### Core Entry Points
 - `Lib.hs` - Main dispatcher: parses CLI, loads config, routes to Runner
 
-## Data Flow (A/B Benchmark)
+## Data Flow
 
 ```
 CLI Parse → Config Load → Endpoint Build
     ↓
-Git Switch (candidate branch) → docker-compose up → Health Check
+For each target (sequentially via runBenchmark):
+  Optional Git Switch → docker-compose up → Health Check
+  Concurrent Execution (STM channels, QSem) → Nanosecond-timed Responses
     ↓
-Concurrent Execution (STM channels, QSem) → Nanosecond-timed Responses
-    ↓
-Git Switch (primary branch) → docker-compose up → Health Check
-    ↓
-Concurrent Execution → Nanosecond-timed Responses
-    ↓
-Statistical Analysis → Bayesian Comparison → Report
+Statistical Analysis → Bayesian Comparison (allPairComparisons) → Report
     ↓
 Optional: Fetch Traces → Aggregate Spans → Trace Report
     ↓
@@ -132,7 +129,7 @@ Terminal/JSON/CSV/Markdown Output + Exit Code (0=success, 1=regression, 2=error)
 **Framework:** Tasty with tasty-hunit and tasty-quickcheck for property-based testing
 
 **Test Types:**
-- **Unit Tests:** StatsSpec, BayesianSpec, ConfigSpec, BaselineSpec, TracingSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, ExecSpec, FormattingSpec, LogSpec, LoopSpec, MarkdownSpec, BenchmarkRunnerSpec, OutputSpec, RateLimiterSpec, ReportSpec, TypesConfigSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
+- **Unit Tests:** StatsSpec, StatsCommonSpec, BayesianSpec, ConfigSpec, BaselineSpec, TracingSpec, TracingClientSpec, TracingReportSpec, AuthSpec, CISpec, CLISpec, ContextSpec, EnvSpec, EnvironmentSpec, ExecSpec, FormattingSpec, LogSpec, LoopSpec, MarkdownSpec, BenchmarkRunnerSpec, OutputSpec, RateLimiterSpec, ReportSpec, ReporterSpec, RequestSpec, TypesConfigSpec, TypesJsonSpec, TypesSpec, ValidationSpec, WarmupSpec
 - **Integration Tests:** Integration.hs uses `MockServer.hs` to test HTTP operations end-to-end
 - **Property Tests:** PropertySpec.hs verifies statistical invariants (percentile ordering, stat bounds)
 - **UI Tests:** TUISpec.hs for Brick widget/state testing
@@ -146,8 +143,8 @@ Terminal/JSON/CSV/Markdown Output + Exit Code (0=success, 1=regression, 2=error)
 Benchmarks are configured via JSON/YAML files. See `Benchmark.Config` for parsing logic.
 
 **Key Config Elements:**
-- `targets.primary` / `targets.candidate` - Target HTTP base URLs for A/B testing
-- `git.primary` / `git.candidate` - Git branch names to switch before each phase
+- `targets` - Array of `{name, url, branch?}` objects (primary format, supports 1+ targets); alternatively an object with `primary`/`candidate` string URLs for simple A/B
+- `git.primary` / `git.candidate` - Git branch names to switch before each phase (object format only)
 - `settings.iterations` - Number of requests to execute
 - `settings.concurrency` - Concurrent request limit
 - `settings.secrets` - Path to file containing the Bearer token

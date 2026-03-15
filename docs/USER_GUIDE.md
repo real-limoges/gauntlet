@@ -4,10 +4,7 @@
 
 Gauntlet is an HTTP performance benchmarking tool. It sends real HTTP requests to your services, measures latency at nanosecond precision, and uses Bayesian statistics to give you direct probability answers like "there is a 94% chance the candidate is faster." No more squinting at averages and hoping the difference is real.
 
-Gauntlet supports two modes:
-
-- **N-way comparison** (`benchmark-nway`) — benchmark 2+ services side-by-side with all-pairs statistical comparison
-- **Single benchmark** (`benchmark-single`) — benchmark one service, optionally compare to a saved baseline
+The single `benchmark` command handles any number of targets: one target with optional baseline comparison, two targets with A/B analysis, or 2+ targets with all-pairs statistical comparison. The mode is determined automatically from the config.
 
 ## Quick Start
 
@@ -37,11 +34,7 @@ Create a config file (`config.json`):
 Then run:
 
 ```bash
-# A/B comparison between primary and candidate
-gauntlet benchmark-nway --config config.json
-
-# Single-target benchmark (useful with baselines)
-gauntlet benchmark-single --config config.json
+gauntlet benchmark --config config.json
 ```
 
 That's it. The rest of this guide explains every config option and what the output means.
@@ -81,7 +74,7 @@ This keeps secrets and environment-specific URLs out of committed config files w
 
 The structure depends on which mode you're using.
 
-**A/B mode** (`benchmark-single` or `benchmark-nway` with two targets):
+**A/B mode** (`benchmark` with two targets):
 
 ```json
 "targets": {
@@ -92,7 +85,7 @@ The structure depends on which mode you're using.
 
 The "primary" is your baseline — production, the current version, whatever you consider the reference. The "candidate" is what you're evaluating. This asymmetry matters because statistical results are framed as "probability candidate is faster than primary."
 
-**N-way mode** (`benchmark-nway` with 2+ targets):
+**Multi-target mode** (`benchmark` with 2+ targets):
 
 ```json
 "targets": [
@@ -185,7 +178,12 @@ Controls the rate at which requests are sent. Defaults to `unthrottled` (as fast
 }
 ```
 
-When using `constantRps`, `rampUp`, or `stepLoad`, the `iterations` setting controls how many total requests are sent — the benchmark ends when either the iteration count is reached or the load duration expires, whichever comes first.
+**Poisson RPS** — random inter-arrival times following a Poisson process (more realistic traffic simulation):
+```json
+"loadMode": {"mode": "poissonRps", "targetRps": 100}
+```
+
+When using `constantRps`, `rampUp`, `stepLoad`, or `poissonRps`, the `iterations` setting controls how many total requests are sent — the benchmark ends when either the iteration count is reached or the load duration expires, whichever comes first.
 
 #### `healthCheckPath` / `healthCheckTimeout`
 
@@ -308,21 +306,9 @@ Why report both? The first tells you about the *system* — is one version funda
 
 **Tail analysis** — Comparison of p95 and p99 percentiles between targets, with Maritz-Jarrett standard errors. This tells you whether the tail behavior differs, not just the averages.
 
-### Frequentist cross-checks
+### Ranking table
 
-Gauntlet appends three frequentist tests as independent cross-checks:
-
-| Test | What it detects |
-|---|---|
-| **Mann-Whitney U** | Non-parametric test with no distribution assumptions. "Are the two distributions stochastically different?" Robust to outliers and non-normal data. |
-| **Kolmogorov-Smirnov** | Sensitive to any distributional difference — shape, location, or spread. |
-| **Anderson-Darling** | Like KS but more sensitive to tail differences, which is where performance issues often hide. |
-
-Why all three? Each captures different aspects. If all three agree, you have high confidence. If they disagree, it's worth investigating further — for example, the distributions might have the same median but different tails.
-
-### N-way ranking table
-
-In N-way mode, targets are ranked by mean latency with pairwise comparisons for every pair. This gives you a quick leaderboard plus detailed statistical evidence for each ranking.
+In multi-target mode, targets are ranked by mean latency with pairwise comparisons for every pair. This gives you a quick leaderboard plus detailed statistical evidence for each ranking.
 
 ### CSV output
 
@@ -331,7 +317,7 @@ Raw latency data is written to `results/latencies-<timestamp>.csv` with one row 
 ### Markdown reports
 
 ```bash
-gauntlet benchmark-nway --config config.json --output markdown --report-path results/report.md
+gauntlet benchmark --config config.json --output markdown --report-path results/report.md
 ```
 
 Produces the same content as terminal output but in markdown, suitable for CI artifacts, PR comments, or archival.
@@ -342,13 +328,13 @@ Baselines let you save benchmark results and compare future runs against them.
 
 ```bash
 # Save current results as a named baseline
-gauntlet benchmark-nway --config config.json --save-baseline v1.0
+gauntlet benchmark --config config.json --save-baseline v1.0
 
 # Compare a future run against the saved baseline
-gauntlet benchmark-nway --config config.json --compare-baseline v1.0
+gauntlet benchmark --config config.json --compare-baseline v1.0
 
 # Both at once: save as v1.1, compare against v1.0
-gauntlet benchmark-nway --config config.json --save-baseline v1.1 --compare-baseline v1.0
+gauntlet benchmark --config config.json --save-baseline v1.1 --compare-baseline v1.0
 ```
 
 Baselines are stored as JSON files in `baselines/<name>.json`. When comparing, gauntlet checks mean, p50, p95, and p99 against regression thresholds:
@@ -389,7 +375,7 @@ The sequence is:
 
 This eliminates the manual process of deploying each version separately. The health check polling ensures you're not benchmarking a service that's still starting up.
 
-In N-way mode, an optional `branch` field per target triggers a git switch for that target's benchmark phase.
+In multi-target mode, an optional `branch` field per target triggers a git switch for that target's benchmark phase.
 
 ## CI/CD Integration
 
@@ -406,7 +392,7 @@ Example CI usage:
 ```yaml
 # GitHub Actions
 - name: Run performance benchmark
-  run: gauntlet benchmark-nway --config bench.json --compare-baseline main --output markdown --report-path results/report.md
+  run: gauntlet benchmark --config bench.json --compare-baseline main --output markdown --report-path results/report.md
 
 - name: Upload report
   if: always()
@@ -458,7 +444,7 @@ The simplest possible config — two targets, 100 requests, 10 concurrent:
 }
 ```
 
-### N-way comparison
+### Multi-target comparison
 
 Compare three environments against each other:
 
