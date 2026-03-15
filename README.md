@@ -178,12 +178,8 @@ For a comprehensive walkthrough of all features, configuration options (with exp
 ### Available Commands
 
 ```bash
-# Run benchmark (supports 1+ targets)
+# Run benchmark (supports 1+ targets; mode determined automatically from config)
 cabal run gauntlet-exe -- benchmark --config config.json
-
-# Run single endpoint benchmark
-cabal run gauntlet-exe -- benchmark-single --config config.json
-
 ```
 
 ### Command-Line Options
@@ -350,7 +346,7 @@ Targets are an array of objects with `name`, `url`, and optional `branch` fields
 | `payloads[].headers` | object | - | Custom HTTP headers (key/value map) |
 | `payloads[].validate.status` | int | - | Expected HTTP status code |
 | `payloads[].validate.fields` | object | - | Dot-path field assertions (`present: true` or `eq: value`) |
-| `settings.loadMode` | object | `unthrottled` | Load control mode (see below) |
+| `settings.loadMode` | object | `unthrottled` | Load control mode: `unthrottled`, `constantRps`, `rampUp`, `stepLoad`, `poissonRps` |
 
 **Load Control Modes:**
 
@@ -370,6 +366,9 @@ Targets are an array of objects with `name`, `url`, and optional `branch` fields
   {"rps": 100, "durationSecs": 30},
   {"rps": 200, "durationSecs": 30}
 ]}
+
+// Poisson RPS — random inter-arrival times (realistic traffic simulation)
+{"mode": "poissonRps", "targetRps": 100}
 ```
 
 **Environment variable expansion:** Any config value can contain `${VAR}` references, which are expanded before JSON parsing. Variables are resolved from (highest priority first): `.env.local`, `.env`, process environment. Missing variables fail fast with a clear error.
@@ -423,11 +422,6 @@ Two distinct probability metrics are reported:
 - Measures "cost" to transform one distribution into another
 - Scale: 0 (identical) to 1 (completely different)
 - Useful for detecting distribution shifts beyond mean differences
-
-**Anderson-Darling Test (Scholz-Stephens 1987)**
-- Two-sample test more sensitive to tail differences than KS
-- Minimum sample size: 5 per group
-- Complements Mann-Whitney U (rank-based) and KS (CDF-based) tests
 
 **Expected Shortfall (ES)**
 - `esMs` = E[X | X > p99]: mean latency of the worst 1% of requests
@@ -551,8 +545,9 @@ gauntlet/
 │   │   │   ├── Formatting.hs  # Validation error formatting
 │   │   │   ├── Markdown.hs    # Markdown report generation
 │   │   │   └── Output.hs   # JSON/CSV serialization
+│   │   ├── Compare.hs      # Offline comparison of saved benchmark results
 │   │   ├── Reporter.hs     # Reporter record, combineReporters, noOpReporter
-│   │   └── Reporter/       # Built-in reporters (Terminal, Markdown, CI)
+│   │   └── Reporter/       # Built-in reporters (Terminal, Markdown, CI, Plot)
 │   ├── Runner/             # Benchmark orchestration
 │   │   ├── Context.hs      # RunContext, initContext, setupOrFail
 │   │   ├── Loop.hs         # Concurrent benchmark loops
@@ -561,7 +556,7 @@ gauntlet/
 │   │   └── Tracing.hs      # Tempo trace fetching
 │   ├── Stats/              # Statistical analysis
 │   │   ├── Common.hs       # Percentiles, std dev
-│   │   └── Benchmark.hs    # Bayesian + frequentist comparison
+│   │   └── Benchmark.hs    # Bayesian comparison
 │   ├── Tracing/            # Grafana Tempo integration
 │   │   ├── Types.hs        # Trace data structures
 │   │   ├── Client.hs       # Tempo HTTP client (query construction + execution)
@@ -569,19 +564,17 @@ gauntlet/
 │   ├── Log.hs              # Structured logging
 │   ├── Runner.hs           # Top-level entry points
 │   └── Lib.hs              # Main dispatcher
-├── test/                   # Test suite (Tasty, 35 files)
+├── test/                   # Test suite (Tasty, 39 files)
 │   ├── Spec.hs             # Test suite entry point
 │   ├── StatsSpec.hs        # Statistical tests
 │   ├── StatsCommonSpec.hs  # Common stats utilities
 │   ├── BayesianSpec.hs     # Bayesian analysis tests
-│   ├── FrequentistSpec.hs  # Frequentist tests and EMD
 │   ├── ConfigSpec.hs       # Config parsing tests
 │   ├── BaselineSpec.hs     # Baseline tests
 │   ├── BenchmarkRunnerSpec.hs  # Benchmark runner tests
 │   ├── BenchmarkIntegrationSpec.hs  # Benchmark end-to-end tests
 │   ├── TracingSpec.hs      # Tracing analysis tests
 │   ├── TracingClientSpec.hs    # Tempo client tests
-│   ├── TracingQuerySpec.hs     # TraceQL query tests
 │   ├── TracingReportSpec.hs    # Trace report tests
 │   ├── AuthSpec.hs         # Auth token tests
 │   ├── CISpec.hs           # CI integration tests
@@ -589,12 +582,18 @@ gauntlet/
 │   ├── ContextSpec.hs      # RunContext tests
 │   ├── EnvSpec.hs          # Env var expansion tests
 │   ├── EnvironmentSpec.hs  # Environment setup tests
+│   ├── ExecSpec.hs         # Request execution tests
+│   ├── FormattingSpec.hs   # Validation error formatting tests
 │   ├── LoadControlIntegrationSpec.hs  # Load control tests
 │   ├── LogSpec.hs          # Logging tests
+│   ├── LoopSpec.hs         # Benchmark loop tests
 │   ├── MarkdownSpec.hs     # Markdown report tests
 │   ├── OutputSpec.hs       # CSV/JSON output tests
 │   ├── RateLimiterSpec.hs  # Rate limiter tests
 │   ├── ReportSpec.hs       # Terminal report tests
+│   ├── ReporterSpec.hs     # Reporter interface tests
+│   ├── RequestSpec.hs      # HTTP request tests
+│   ├── TypesConfigSpec.hs  # Config type tests
 │   ├── TypesJsonSpec.hs    # JSON serialization tests
 │   ├── TypesSpec.hs        # Type tests
 │   ├── ValidationSpec.hs   # Validation tests
@@ -658,15 +657,11 @@ cabal test --test-show-details=direct
 ```
 CLI Parse → Config Load → Endpoint Build
     ↓
-Git Switch (candidate) → docker-compose up → Health Check
+For each target (sequentially):
+  Optional Git Switch → docker-compose up → Health Check
+  Warmup → Concurrent Execution (STM) → Nanosecond-timed Responses
     ↓
-Warmup → Concurrent Execution (STM) → Nanosecond-timed Responses
-    ↓
-Git Switch (primary) → docker-compose up → Health Check
-    ↓
-Warmup → Concurrent Execution (STM) → Nanosecond-timed Responses
-    ↓
-Statistical Analysis → Bayesian + Frequentist Comparison → Report
+Statistical Analysis → Bayesian Comparison (all pairs) → Report
     ↓
 Optional: Fetch Traces → Aggregate Spans → Trace Report
     ↓
