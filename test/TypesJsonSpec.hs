@@ -3,9 +3,9 @@ module TypesJsonSpec (typesJsonSpec) where
 
 import Benchmark.Types
 import Data.Aeson (ToJSON (..), decode, encode)
-import Data.Maybe (isJust)
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Map.Strict qualified as Map
+import Data.Maybe (isJust)
 import TastyCompat (Expectation, shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
@@ -136,4 +136,3 @@ roundTripLogLevel :: LogLevel -> LBS8.ByteString -> Expectation
 roundTripLogLevel level expectedJson = do
   encode level `shouldBe` expectedJson
   (decode expectedJson :: Maybe LogLevel) `shouldBe` Just level
-

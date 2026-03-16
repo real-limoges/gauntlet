@@ -203,12 +203,16 @@ configSpec =
               Left (ConfigValidationError msg) -> msg `textShouldContain` "targetRps"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects rampUp with startRps=0" $ do
-            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp (RampUpConfig 0 100 60))}}
+            let cfg =
+                  makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp (RampUpConfig 0 100 60))}}
             case validateConfig cfg of
               Left (ConfigValidationError msg) -> msg `textShouldContain` "startRps"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects rampUp with negative durationSecs" $ do
-            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp (RampUpConfig 10 100 (-1)))}}
+            let cfg =
+                  makeValidConfig
+                    { settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp (RampUpConfig 10 100 (-1)))}
+                    }
             case validateConfig cfg of
               Left (ConfigValidationError msg) -> msg `textShouldContain` "durationSecs"
               _ -> assertFailure "Expected ConfigValidationError"
@@ -228,7 +232,10 @@ configSpec =
               Left (ConfigValidationError msg) -> msg `textShouldContain` "step durationSecs"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts valid rampUp" $ do
-            let cfg = makeValidConfig {settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp (RampUpConfig 10 100 60))}}
+            let cfg =
+                  makeValidConfig
+                    { settings = (settings makeValidConfig) {loadMode = Just (LoadRampUp (RampUpConfig 10 100 60))}
+                    }
             validateConfig cfg `shouldBe` Right cfg
         , testCase "accepts valid stepLoad" $ do
             let cfg =

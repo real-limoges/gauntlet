@@ -14,9 +14,9 @@ import Benchmark.Types
   , defaultLogLevel
   )
 import Control.Concurrent (newQSem)
-import Log (makeLogger)
 import Data.Text qualified as T
 import Data.Time (diffUTCTime, getCurrentTime)
+import Log (makeLogger)
 import MockServer (mockJson)
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)

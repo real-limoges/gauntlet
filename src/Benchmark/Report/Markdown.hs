@@ -84,7 +84,10 @@ markdownBenchmarkReport namedStats pairs =
       let statsA = lookupStats nameA namedStats
           statsB = lookupStats nameB namedStats
        in ["", "---", ""]
-            ++ T.lines (markdownMultipleReport ComparisonReport {crNameA = nameA, crNameB = nameB, crStatsA = statsA, crStatsB = statsB, crBayes = bayes})
+            ++ T.lines
+              ( markdownMultipleReport
+                  ComparisonReport {crNameA = nameA, crNameB = nameB, crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
+              )
 
 -- | Markdown report for a regression comparison against a saved baseline.
 markdownRegressionReport :: RegressionResult -> Text

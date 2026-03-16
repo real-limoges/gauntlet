@@ -16,9 +16,18 @@ import Benchmark.Types
   , TestConfig (..)
   )
 import Control.Concurrent.STM (newTChanIO)
+import Control.Monad (unless)
 import Data.Text qualified as T
 import Runner.Benchmark (withTUI)
-import Runner.Context (Branch (..), RunContext (..), ServiceUrl (..), emitEvent, getNowNs, initContext, setupOrFail)
+import Runner.Context
+  ( Branch (..)
+  , RunContext (..)
+  , ServiceUrl (..)
+  , emitEvent
+  , getNowNs
+  , initContext
+  , setupOrFail
+  )
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
 import Stats.Benchmark (calculateStats)
@@ -47,14 +56,20 @@ runSingle reporter baselineMode mCharts cfg = do
 
   (results, validSummaries, startNs, endNs) <- withTUI eventChan tuiState $ do
     startNs <- getNowNs
-    emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
-    setupOrFail
-      (rcManager ctx)
-      setts
-      (Branch $ candidate $ git cfg)
-      (ServiceUrl $ candidate $ targets cfg)
-      (Just ["--profile", "testing", "up", "-d", "--build"])
-    emitEvent (Just eventChan) (StatusMessage $ "Running " <> targetUrl <> " (" <> candidate (git cfg) <> ")")
+    let branch = candidate (git cfg)
+    unless (T.null branch) $ do
+      emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> branch <> "...")
+      setupOrFail
+        (rcManager ctx)
+        setts
+        (Branch branch)
+        (ServiceUrl $ candidate $ targets cfg)
+        (Just ["--profile", "testing", "up", "-d", "--build"])
+    emitEvent
+      (Just eventChan)
+      ( StatusMessage $
+          "Running " <> targetUrl <> maybe "" (\b -> " (" <> b <> ")") (if T.null branch then Nothing else Just branch)
+      )
     (benchResults, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
     endNs <- getNowNs
     return (benchResults, validSummaries, startNs, endNs)

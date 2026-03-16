@@ -226,7 +226,13 @@ instance FromJSON LoadMode where
 instance ToJSON LoadMode where
   toJSON LoadUnthrottled = object ["mode" .= ("unthrottled" :: Text)]
   toJSON (LoadConstantRps rps) = object ["mode" .= ("constantRps" :: Text), "targetRps" .= rps]
-  toJSON (LoadRampUp RampUpConfig {..}) = object ["mode" .= ("rampUp" :: Text), "startRps" .= rampStartRps, "endRps" .= rampEndRps, "durationSecs" .= rampDurationSecs]
+  toJSON (LoadRampUp RampUpConfig {..}) =
+    object
+      [ "mode" .= ("rampUp" :: Text)
+      , "startRps" .= rampStartRps
+      , "endRps" .= rampEndRps
+      , "durationSecs" .= rampDurationSecs
+      ]
   toJSON (LoadStepLoad steps) = object ["mode" .= ("stepLoad" :: Text), "steps" .= steps]
   toJSON (LoadPoissonRps rps) = object ["mode" .= ("poissonRps" :: Text), "targetRps" .= rps]
 

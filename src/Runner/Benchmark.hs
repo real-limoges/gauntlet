@@ -31,7 +31,15 @@ import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Log (Logger, logInfo)
-import Runner.Context (Branch (..), RunContext (..), ServiceUrl (..), emitEvent, getNowNs, initContext, setupOrFail)
+import Runner.Context
+  ( Branch (..)
+  , RunContext (..)
+  , ServiceUrl (..)
+  , emitEvent
+  , getNowNs
+  , initContext
+  , setupOrFail
+  )
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
 import Stats.Benchmark (calculateStats, compareBayesian)
@@ -140,7 +148,12 @@ runAllTargets ctx cfg eventChan = do
     case targetBranch t of
       Just branch | not (T.null branch) -> do
         emitEvent eventChan (StatusMessage $ "Setting up " <> branch <> "...")
-        setupOrFail (rcManager ctx) setts (Branch branch) (ServiceUrl (targetUrl t)) (Just ["--profile", "testing", "up", "-d", "--build"])
+        setupOrFail
+          (rcManager ctx)
+          setts
+          (Branch branch)
+          (ServiceUrl (targetUrl t))
+          (Just ["--profile", "testing", "up", "-d", "--build"])
       _ -> return ()
 
     emitEvent eventChan (StatusMessage $ "Benchmarking " <> targetName t)

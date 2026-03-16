@@ -123,8 +123,28 @@ compareBayesian statsA statsB =
         , credibleIntervalUpper = ciUpper muDiff varA varB countA countB
         , effectSize = cohenD muDiff varA varB countA countB
         , relativeEffect = if muA > 0 then (muDiff / muA) * 100 else 0
-        , p95Comparison = comparePercentile PercentileInput {piQuantile = 0.95, piValueA = p95Ms statsA, piValueB = p95Ms statsB, piStdDevA = sdA, piStdDevB = sdB, piCountA = countA, piCountB = countB}
-        , p99Comparison = comparePercentile PercentileInput {piQuantile = 0.99, piValueA = p99Ms statsA, piValueB = p99Ms statsB, piStdDevA = sdA, piStdDevB = sdB, piCountA = countA, piCountB = countB}
+        , p95Comparison =
+            comparePercentile
+              PercentileInput
+                { piQuantile = 0.95
+                , piValueA = p95Ms statsA
+                , piValueB = p95Ms statsB
+                , piStdDevA = sdA
+                , piStdDevB = sdB
+                , piCountA = countA
+                , piCountB = countB
+                }
+        , p99Comparison =
+            comparePercentile
+              PercentileInput
+                { piQuantile = 0.99
+                , piValueA = p99Ms statsA
+                , piValueB = p99Ms statsB
+                , piStdDevA = sdA
+                , piStdDevB = sdB
+                , piCountA = countA
+                , piCountB = countB
+                }
         }
   where
     -- P(mean_B < mean_A) using population-level standard error σ/√n
