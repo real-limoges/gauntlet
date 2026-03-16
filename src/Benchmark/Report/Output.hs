@@ -9,10 +9,10 @@ module Benchmark.Report.Output
 
 import Benchmark.Types (Endpoint (..), Nanoseconds (..), TestingResponse (..))
 import Data.Text (Text)
-import Data.Text.Lazy.Builder (Builder, toLazyText)
-import Data.Text.Lazy.Builder qualified as B
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
+import Data.Text.Lazy.Builder (Builder, toLazyText)
+import Data.Text.Lazy.Builder qualified as B
 import Data.Text.Lazy.IO qualified as TLIO
 import Data.Time (defaultTimeLocale, formatTime, getZonedTime)
 import Data.Time.Format.ISO8601 (iso8601Show)

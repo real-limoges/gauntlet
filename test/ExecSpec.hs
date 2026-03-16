@@ -9,10 +9,10 @@ import Benchmark.Network
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types
 import Control.Concurrent (newQSem)
-import Log (makeLogger)
 import Control.Concurrent.STM (TChan, atomically, newTChanIO, readTChan)
 import Control.Monad (replicateM)
 import Data.Text qualified as T
+import Log (makeLogger)
 import MockServer (mockCountedRequests, mockJson, mockStatus)
 import Network.HTTP.Types (status200, status500)
 import TastyCompat (shouldBe)

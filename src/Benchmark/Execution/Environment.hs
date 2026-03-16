@@ -37,7 +37,8 @@ For example, pass @Just ["--profile", "testing", "up", "-d"]@ for the candidate 
 Uses 'proc' instead of shell strings to prevent shell injection attacks
 from malicious branch names containing metacharacters.
 -}
-setupEnvironment :: Manager -> Settings -> Branch -> ServiceUrl -> Maybe [String] -> IO (Either PerfTestError ())
+setupEnvironment ::
+  Manager -> Settings -> Branch -> ServiceUrl -> Maybe [String] -> IO (Either PerfTestError ())
 setupEnvironment mgr setts (Branch branch) (ServiceUrl serviceName) composeArgs = do
   let hcPath = fromMaybe "/health" (healthCheckPath setts)
       hcTimeout = fromMaybe 60 (healthCheckTimeout setts)
@@ -68,8 +69,10 @@ setupEnvironment mgr setts (Branch branch) (ServiceUrl serviceName) composeArgs 
           IO (Either IOException (ExitCode, String, String))
       case r of
         Left ex ->
-          return $ Left $ EnvironmentSetupError $
-            "Could not run docker-compose: " <> T.pack (show ex) <> "\nIs docker-compose installed and in your PATH?"
+          return $
+            Left $
+              EnvironmentSetupError $
+                "Could not run docker-compose: " <> T.pack (show ex) <> "\nIs docker-compose installed and in your PATH?"
         Right (ExitFailure _, _, stderr) ->
           return $ Left $ EnvironmentSetupError $ "docker-compose up failed: " <> T.strip (T.pack stderr)
         Right (ExitSuccess, _, _) -> return (Right ())

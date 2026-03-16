@@ -50,8 +50,9 @@ formatForCI GitHub result = do
   putStrLn ""
   printRegressionMetrics id id result
 
--- | Print per-metric lines and pass/fail summary.
--- Takes colorizers for "bad" (red) and "good" (green) text respectively.
+{-| Print per-metric lines and pass/fail summary.
+Takes colorizers for "bad" (red) and "good" (green) text respectively.
+-}
 printRegressionMetrics :: (String -> String) -> (String -> String) -> RegressionResult -> IO ()
 printRegressionMetrics colorBad colorGood result = do
   forM_ (regressionMetrics result) $ \m -> do
