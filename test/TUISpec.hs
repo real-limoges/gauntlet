@@ -19,7 +19,7 @@ tuiStateSpec =
         [ testCase "creates state with correct target, totals, and zeroed counters" $ do
             let state = initialState "http://test.example.com" 100 5
             tsTarget state `shouldBe` "http://test.example.com"
-            tsIsTotal state `shouldBe` 100
+            tsTotalIterations state `shouldBe` 100
             tsTotalEndpoints state `shouldBe` 5
             tsCompleted state `shouldBe` 0
             tsSuccessCount state `shouldBe` 0
@@ -119,7 +119,7 @@ tuiStateSpec =
                 newState = updateState now event state
             tsTarget newState `shouldBe` "new-target"
             tsCompleted newState `shouldBe` 0
-            tsIsTotal newState `shouldBe` 50
+            tsTotalIterations newState `shouldBe` 50
             tsSuccessCount newState `shouldBe` 0
             tsErrorCount newState `shouldBe` 0
             tsStartTime newState `shouldBe` Nothing

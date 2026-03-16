@@ -9,6 +9,7 @@ import Benchmark.Network
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types
 import Control.Concurrent (newQSem)
+import Log (makeLogger)
 import Control.Concurrent.STM (TChan, atomically, newTChanIO, readTChan)
 import Control.Monad (replicateM)
 import Data.Text qualified as T
@@ -27,7 +28,7 @@ execSpec =
         mockJson "{}" $ \port -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 1
-          let env = BenchmarkEnv testSettings sem mgr 1 (Just (chan :: TChan BenchmarkEvent))
+          let env = BenchmarkEnv testSettings sem mgr 1 (Just (chan :: TChan BenchmarkEvent)) (makeLogger defaultLogLevel)
           results <- runBenchmark env 5 (testEndpoint port) Nothing
           length results `shouldBe` 5
           events <- replicateM 5 (atomically (readTChan chan))
@@ -36,7 +37,7 @@ execSpec =
         mockStatus status500 $ \port -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 1
-          let env = BenchmarkEnv testSettings sem mgr 1 Nothing
+          let env = BenchmarkEnv testSettings sem mgr 1 Nothing (makeLogger defaultLogLevel)
           results <- runBenchmark env 5 (testEndpoint port) Nothing
           length results `shouldBe` 5
           all (\r -> statusCode r == 500) results `shouldBe` True
@@ -44,7 +45,7 @@ execSpec =
         mockCountedRequests status200 "{}" $ \port readCount -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 4
-          let env = BenchmarkEnv testSettings sem mgr 1 Nothing
+          let env = BenchmarkEnv testSettings sem mgr 1 Nothing (makeLogger defaultLogLevel)
           results <- runBenchmark env 10 (testEndpoint port) Nothing
           length results `shouldBe` 10
           count <- readCount

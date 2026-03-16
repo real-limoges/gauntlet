@@ -11,6 +11,8 @@ import Benchmark.Types (Endpoint (..), Nanoseconds (..), TestingResponse (..))
 import Data.Text (Text)
 import Data.Text.Lazy.Builder (Builder, toLazyText)
 import Data.Text.Lazy.Builder qualified as B
+import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
 import Data.Text.Lazy.IO qualified as TLIO
 import Data.Time (defaultTimeLocale, formatTime, getZonedTime)
 import Data.Time.Format.ISO8601 (iso8601Show)
@@ -27,8 +29,8 @@ initOutputFiles = do
   timestamp <- formatTime defaultTimeLocale "%Y-%m-%dT%H-%M-%S" <$> getZonedTime
   let csvFile = resultsDir ++ "/latencies-" ++ timestamp ++ ".csv"
       logFile = resultsDir ++ "/failures-" ++ timestamp ++ ".log"
-  writeFile logFile ""
-  writeFile csvFile "target_name,payload_id,url,method,status_code,latency_ms,timestamp_iso\n"
+  TIO.writeFile logFile T.empty
+  TIO.writeFile csvFile "target_name,payload_id,url,method,status_code,latency_ms,timestamp_iso\n"
   return (csvFile, timestamp)
 
 -- | Append CSV rows for all endpoint results under the given target name.

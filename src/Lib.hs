@@ -3,6 +3,7 @@
 -- | Main entry point: CLI dispatch and benchmark orchestration.
 module Lib (run) where
 
+import Control.Exception (SomeException, catch)
 import Control.Monad (forM_)
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text qualified as T
@@ -132,14 +133,18 @@ runValidate cfgPath doCheck = do
           else pure RunSuccess
 
 checkEndpoint :: Manager -> T.Text -> NamedTarget -> IO Bool
-checkEndpoint mgr hcPath target = do
-  let url = T.unpack (targetUrl target) <> T.unpack hcPath
-  req <- parseRequest url
-  t0 <- getCurrentTime
-  resp <- httpNoBody req mgr
-  t1 <- getCurrentTime
-  let ms = round (diffUTCTime t1 t0 * 1000) :: Int
-      code = statusCode (responseStatus resp)
-  putStrLn $
-    "  " <> T.unpack (targetName target) <> " " <> url <> " => HTTP " <> show code <> " (" <> show ms <> "ms)"
-  pure (code >= 200 && code < 400)
+checkEndpoint mgr hcPath target =
+  catch go (\(_ :: SomeException) -> putStrLn unreachableMsg >> pure False)
+  where
+    url = T.unpack (targetUrl target) <> T.unpack hcPath
+    unreachableMsg = "  " <> T.unpack (targetName target) <> " " <> url <> " => unreachable"
+    go = do
+      req <- parseRequest url
+      t0 <- getCurrentTime
+      resp <- httpNoBody req mgr
+      t1 <- getCurrentTime
+      let ms = round (diffUTCTime t1 t0 * 1000) :: Int
+          code = statusCode (responseStatus resp)
+      putStrLn $
+        "  " <> T.unpack (targetName target) <> " " <> url <> " => HTTP " <> show code <> " (" <> show ms <> "ms)"
+      pure (code >= 200 && code < 400)

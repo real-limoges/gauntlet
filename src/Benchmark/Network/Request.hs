@@ -4,6 +4,7 @@ module Benchmark.Network.Request
   , prepareRequest
   , timedRequest
   , timedRequestPrepared
+  , categorizeNetworkError
   )
 where
 

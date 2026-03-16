@@ -19,8 +19,8 @@ typesConfigSpec =
             totalRequestsForMode (LoadConstantRps 10) 100 `shouldBe` 100
         , testCase "LoadPoissonRps returns fallback" $
             totalRequestsForMode (LoadPoissonRps 5) 100 `shouldBe` 100
-        , testCase "LoadRampUp 10 20 5 returns 75" $
-            totalRequestsForMode (LoadRampUp 10 20 5) 0 `shouldBe` 75
+        , testCase "LoadRampUp (RampUpConfig 10 20 5) returns 75" $
+            totalRequestsForMode (LoadRampUp (RampUpConfig 10 20 5)) 0 `shouldBe` 75
         , testCase "LoadStepLoad sums rps*duration per step" $
             let steps =
                   [LoadStep {loadStepRps = 10, loadStepDurationSecs = 5}, LoadStep {loadStepRps = 20, loadStepDurationSecs = 3}]
@@ -29,7 +29,7 @@ typesConfigSpec =
     , testGroup
         "isDurationBased"
         [ testCase "LoadRampUp is True" $
-            isDurationBased (LoadRampUp 10 20 5) `shouldBe` True
+            isDurationBased (LoadRampUp (RampUpConfig 10 20 5)) `shouldBe` True
         , testCase "LoadStepLoad is True" $
             isDurationBased (LoadStepLoad []) `shouldBe` True
         , testCase "LoadUnthrottled is False" $
@@ -42,7 +42,7 @@ typesConfigSpec =
     , testGroup
         "loadModeDurationSecs"
         [ testCase "LoadRampUp returns its duration" $
-            loadModeDurationSecs (LoadRampUp 10 20 30) `shouldBe` 30.0
+            loadModeDurationSecs (LoadRampUp (RampUpConfig 10 20 30)) `shouldBe` 30.0
         , testCase "LoadStepLoad sums step durations" $
             loadModeDurationSecs
               ( LoadStepLoad

@@ -7,7 +7,7 @@ module Benchmark.Execution.RateLimiter
   )
 where
 
-import Benchmark.Types.Config (LoadMode (..), LoadStep (..))
+import Benchmark.Types.Config (LoadMode (..), LoadStep (..), RampUpConfig (..))
 import Control.Concurrent (MVar, modifyMVar, newMVar, threadDelay)
 import Control.Monad (when)
 import Data.Time (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
@@ -46,31 +46,24 @@ makeLimiter LoadUnthrottled = pure Nothing
 makeLimiter mode = do
   now <- getCurrentTime
   nextSlot <- newMVar now
-  let (intervalFn, nominalRps) = case mode of
-        LoadPoissonRps rps ->
-          ( \_ -> do
-              u <- randomRIO (1e-9, 1.0)
-              let delay = -(log u / rps)
-              pure (realToFrac delay)
-          , Just rps
-          )
-        LoadConstantRps rps ->
-          (\_ -> pure (realToFrac (1.0 / rps) :: NominalDiffTime), Nothing)
-        LoadRampUp startRps endRps dur ->
-          ( \t -> do
-              let elapsed = realToFrac (diffUTCTime t now) :: Double
-                  progress = min 1.0 (max 0.0 (elapsed / dur))
-                  rps = max 0.1 (startRps + (endRps - startRps) * progress)
-              pure (realToFrac (1.0 / rps) :: NominalDiffTime)
-          , Nothing
-          )
-        LoadStepLoad steps ->
-          ( \t -> do
-              let elapsed = realToFrac (diffUTCTime t now) :: Double
-                  rps = findStepRps steps elapsed
-              pure (realToFrac (1.0 / rps) :: NominalDiffTime)
-          , Nothing
-          )
+  let poissonInterval rps _ = do
+        u <- randomRIO (1e-9, 1.0)
+        pure (realToFrac (-(log u / rps)) :: NominalDiffTime)
+      constantInterval rps _ = pure (realToFrac (1.0 / rps) :: NominalDiffTime)
+      rampInterval RampUpConfig {..} t =
+        let elapsed = realToFrac (diffUTCTime t now) :: Double
+            progress = min 1.0 (max 0.0 (elapsed / rampDurationSecs))
+            rps = max 0.1 (rampStartRps + (rampEndRps - rampStartRps) * progress)
+         in pure (realToFrac (1.0 / rps) :: NominalDiffTime)
+      stepInterval steps t =
+        let elapsed = realToFrac (diffUTCTime t now) :: Double
+            rps = findStepRps steps elapsed
+         in pure (realToFrac (1.0 / rps) :: NominalDiffTime)
+      (intervalFn, nominalRps) = case mode of
+        LoadPoissonRps rps -> (poissonInterval rps, Just rps)
+        LoadConstantRps rps -> (constantInterval rps, Nothing)
+        LoadRampUp cfg -> (rampInterval cfg, Nothing)
+        LoadStepLoad steps -> (stepInterval steps, Nothing)
   pure $
     Just
       RateLimiter

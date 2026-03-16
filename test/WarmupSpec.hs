@@ -66,8 +66,8 @@ makeEndpoint port =
     , validate = Nothing
     }
 
-makeCtxWithWarmup :: Int -> Int -> IO RunContext
-makeCtxWithWarmup _port iters = do
+makeCtxWithWarmupAndLog :: Int -> Int -> IO (RunContext, IORef [(LogLevel, Text)])
+makeCtxWithWarmupAndLog _port iters = do
   mgr <- newManager tlsManagerSettings
   logRef <- newIORef ([] :: [(LogLevel, Text)])
   let setts =
@@ -77,20 +77,15 @@ makeCtxWithWarmup _port iters = do
           }
       logger = makeCapturingLogger Debug logRef
   pure
-    RunContext
-      { rcSettings = setts
-      , rcManager = mgr
-      , rcToken = ""
-      , rcCsvFile = "/dev/null"
-      , rcTimestamp = "test"
-      , rcEventChan = Nothing
-      , rcLogger = logger
-      , rcTargetName = ""
-      }
-
-makeCtxWithWarmupAndLog :: Int -> Int -> IO (RunContext, IORef [(LogLevel, Text)])
-makeCtxWithWarmupAndLog port iters = do
-  logRef <- newIORef ([] :: [(LogLevel, Text)])
-  ctx <- makeCtxWithWarmup port iters
-  let logger = makeCapturingLogger Debug logRef
-  pure (ctx {rcLogger = logger}, logRef)
+    ( RunContext
+        { rcSettings = setts
+        , rcManager = mgr
+        , rcToken = ""
+        , rcCsvFile = "/dev/null"
+        , rcTimestamp = "test"
+        , rcEventChan = Nothing
+        , rcLogger = logger
+        , rcTargetName = ""
+        }
+    , logRef
+    )

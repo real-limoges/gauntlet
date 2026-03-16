@@ -5,6 +5,7 @@ import Benchmark.Execution.RateLimiter (currentTargetRps, makeLimiter, waitForSl
 import Benchmark.Types
   ( LoadMode (..)
   , LoadStep (..)
+  , RampUpConfig (..)
   , isDurationBased
   , loadModeDurationSecs
   , totalRequestsForMode
@@ -13,7 +14,7 @@ import Control.Concurrent.Async (replicateConcurrently_)
 import Data.Time (diffUTCTime, getCurrentTime)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (testCase)
+import Test.Tasty.HUnit (assertFailure, testCase)
 
 rateLimiterSpec :: TestTree
 rateLimiterSpec =
@@ -25,27 +26,27 @@ rateLimiterSpec =
             ml <- makeLimiter LoadUnthrottled
             case ml of
               Nothing -> pure ()
-              Just _ -> error "Expected Nothing"
+              Just _ -> assertFailure "Expected Nothing"
         , testCase "returns Just for LoadConstantRps" $ do
             ml <- makeLimiter (LoadConstantRps 100)
             case ml of
               Just _ -> pure ()
-              Nothing -> error "Expected Just"
+              Nothing -> assertFailure "Expected Just"
         , testCase "returns Just for LoadRampUp" $ do
-            ml <- makeLimiter (LoadRampUp 10 100 60)
+            ml <- makeLimiter (LoadRampUp (RampUpConfig 10 100 60))
             case ml of
               Just _ -> pure ()
-              Nothing -> error "Expected Just"
+              Nothing -> assertFailure "Expected Just"
         , testCase "returns Just for LoadStepLoad" $ do
             ml <- makeLimiter (LoadStepLoad [LoadStep 50 30])
             case ml of
               Just _ -> pure ()
-              Nothing -> error "Expected Just"
+              Nothing -> assertFailure "Expected Just"
         , testCase "returns Just for LoadPoissonRps" $ do
             ml <- makeLimiter (LoadPoissonRps 100)
             case ml of
               Just _ -> pure ()
-              Nothing -> error "Expected Just"
+              Nothing -> assertFailure "Expected Just"
         ]
     , testGroup
         "waitForSlot"
@@ -89,7 +90,7 @@ rateLimiterSpec =
             -- Should be approximately 42
             rps `shouldSatisfy` (\r -> abs (r - 42.0) < 1.0)
         , testCase "reports non-zero RPS for ramp mode" $ do
-            Just limiter <- makeLimiter (LoadRampUp 10 100 60)
+            Just limiter <- makeLimiter (LoadRampUp (RampUpConfig 10 100 60))
             rps <- currentTargetRps limiter
             rps `shouldSatisfy` (> 0)
         , testCase "reports exact configured RPS for poisson mode" $ do
@@ -103,12 +104,12 @@ rateLimiterSpec =
             totalRequestsForMode (LoadConstantRps 50) 1000 `shouldBe` 1000
         , testCase "totalRequestsForMode rampUp computes from schedule" $
             -- (10 + 100) / 2 * 60 = 3300
-            totalRequestsForMode (LoadRampUp 10 100 60) 999 `shouldBe` 3300
+            totalRequestsForMode (LoadRampUp (RampUpConfig 10 100 60)) 999 `shouldBe` 3300
         , testCase "totalRequestsForMode stepLoad sums steps" $
             -- 20*30 + 50*30 = 600 + 1500 = 2100
             totalRequestsForMode (LoadStepLoad [LoadStep 20 30, LoadStep 50 30]) 999 `shouldBe` 2100
         , testCase "isDurationBased is True for rampUp" $
-            isDurationBased (LoadRampUp 10 100 60) `shouldBe` True
+            isDurationBased (LoadRampUp (RampUpConfig 10 100 60)) `shouldBe` True
         , testCase "isDurationBased is True for stepLoad" $
             isDurationBased (LoadStepLoad [LoadStep 50 30]) `shouldBe` True
         , testCase "isDurationBased is False for constant" $
@@ -118,7 +119,7 @@ rateLimiterSpec =
         , testCase "totalRequestsForMode poisson uses fallback" $
             totalRequestsForMode (LoadPoissonRps 50) 1000 `shouldBe` 1000
         , testCase "loadModeDurationSecs for rampUp" $
-            loadModeDurationSecs (LoadRampUp 10 100 60) `shouldSatisfy` (\d -> abs (d - 60) < 0.001)
+            loadModeDurationSecs (LoadRampUp (RampUpConfig 10 100 60)) `shouldSatisfy` (\d -> abs (d - 60) < 0.001)
         , testCase "loadModeDurationSecs for stepLoad" $
             loadModeDurationSecs (LoadStepLoad [LoadStep 20 30, LoadStep 50 45])
               `shouldSatisfy` (\d -> abs (d - 75) < 0.001)

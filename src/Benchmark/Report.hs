@@ -12,6 +12,7 @@ import Benchmark.Report.Formatting (formatValidationError)
 import Benchmark.Types
   ( BayesianComparison (..)
   , BenchmarkStats (..)
+  , ComparisonReport (..)
   , PercentileComparison (..)
   , ValidationSummary (..)
   )
@@ -24,40 +25,39 @@ import Data.Text qualified as T
 import Text.Printf (printf)
 
 -- | Print a tabulated comparison of multiple benchmark results to stdout.
-printMultipleBenchmarkReport ::
-  Text -> Text -> BenchmarkStats -> BenchmarkStats -> BayesianComparison -> IO ()
-printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
+printMultipleBenchmarkReport :: ComparisonReport -> IO ()
+printMultipleBenchmarkReport ComparisonReport {..} = do
   putStrLn ""
   printHeader "Benchmark Report:"
 
-  printf "(%s):" (T.unpack nameA)
+  printf "(%s):" (T.unpack crNameA)
   putStrLn ""
-  printStats statsA
+  printStats crStatsA
 
   putStrLn ""
 
-  printf "(%s):" (T.unpack nameB)
+  printf "(%s):" (T.unpack crNameB)
   putStrLn ""
-  printStats statsB
+  printStats crStatsB
 
   putStrLn ""
   printHeader "Bayesian Analysis"
 
-  printf "Probability Candidate is Faster (means):   %.2f%%\n" (probBFasterThanA bayes * 100.0)
-  printf "Probability Single Request Faster:          %.2f%%\n" (probSingleRequestFaster bayes * 100.0)
-  printf "Probability Candidate Less Jittery:         %.2f%%\n" (probBLessJittery bayes * 100.0)
-  printf "Mean Difference: %.2f ms\n" (meanDifference bayes)
+  printf "Probability Candidate is Faster (means):   %.2f%%\n" (probBFasterThanA crBayes * 100.0)
+  printf "Probability Single Request Faster:          %.2f%%\n" (probSingleRequestFaster crBayes * 100.0)
+  printf "Probability Candidate Less Jittery:         %.2f%%\n" (probBLessJittery crBayes * 100.0)
+  printf "Mean Difference: %.2f ms\n" (meanDifference crBayes)
   printf
     "95%% Credible Interval: [%.2f ms, %.2f ms]\n"
-    (credibleIntervalLower bayes)
-    (credibleIntervalUpper bayes)
-  printf "Effect Size (Cohen's d): %.3f\n" (effectSize bayes)
-  printf "Relative Effect: %.2f%%\n" (relativeEffect bayes)
+    (credibleIntervalLower crBayes)
+    (credibleIntervalUpper crBayes)
+  printf "Effect Size (Cohen's d): %.3f\n" (effectSize crBayes)
+  printf "Relative Effect: %.2f%%\n" (relativeEffect crBayes)
 
   putStrLn ""
   printHeader "Tail Analysis"
 
-  let p95 = p95Comparison bayes
+  let p95 = p95Comparison crBayes
   printf
     "P95 Difference: %.2f ms [%.2f, %.2f]\n"
     (pctDifference p95)
@@ -65,7 +65,7 @@ printMultipleBenchmarkReport nameA nameB statsA statsB bayes = do
     (pctCredibleUpper p95)
   printf "P95 Regression Probability: %.2f%%\n" (probPctRegression p95 * 100.0)
 
-  let p99 = p99Comparison bayes
+  let p99 = p99Comparison crBayes
   printf
     "P99 Difference: %.2f ms [%.2f, %.2f]\n"
     (pctDifference p99)
@@ -149,11 +149,13 @@ printBenchmarkReport namedStats pairs = do
     forM_ pairs $ \(nameA, nameB, bayes) -> do
       putStrLn ""
       printMultipleBenchmarkReport
-        nameA
-        nameB
-        (lookupStats nameA namedStats)
-        (lookupStats nameB namedStats)
-        bayes
+        ComparisonReport
+          { crNameA = nameA
+          , crNameB = nameB
+          , crStatsA = lookupStats nameA namedStats
+          , crStatsB = lookupStats nameB namedStats
+          , crBayes = bayes
+          }
 
 -- ---------------------------------------------------------------------------
 -- Internal helpers

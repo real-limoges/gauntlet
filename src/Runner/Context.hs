@@ -5,10 +5,12 @@ module Runner.Context
   , getNowNs
   , emitEvent
   , setupOrFail
+  , Branch (..)
+  , ServiceUrl (..)
   )
 where
 
-import Benchmark.Execution.Environment (setupEnvironment)
+import Benchmark.Execution.Environment (Branch (..), ServiceUrl (..), setupEnvironment)
 import Benchmark.Network (initNetwork, readToken)
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types (Settings (..), exitWithError)
@@ -64,7 +66,7 @@ initContext setts csvFile timestamp eventChan = do
       }
 
 -- | Set up the git environment or exit with an error.
-setupOrFail :: Manager -> Settings -> Text -> Text -> Maybe [String] -> IO ()
+setupOrFail :: Manager -> Settings -> Branch -> ServiceUrl -> Maybe [String] -> IO ()
 setupOrFail mgr setts branch target composeArgs =
   setupEnvironment mgr setts branch target composeArgs >>= either throwIO return
 

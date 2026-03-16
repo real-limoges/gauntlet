@@ -18,6 +18,7 @@ module Benchmark.Types.Config
     -- * Load Control
   , LoadMode (..)
   , LoadStep (..)
+  , RampUpConfig (..)
   , totalRequestsForMode
   , isDurationBased
   , loadModeDurationSecs
@@ -185,6 +186,18 @@ instance ToJSON LoadStep where
         { fieldLabelModifier = dropFieldPrefix "loadStep"
         }
 
+-- | Ramp-up load configuration.
+data RampUpConfig = RampUpConfig
+  { rampStartRps :: Double
+  -- ^ Starting RPS at the beginning of the ramp
+  , rampEndRps :: Double
+  -- ^ Target RPS at the end of the ramp
+  , rampDurationSecs :: Double
+  -- ^ Duration of the ramp in seconds
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
 -- | Load control mode for pacing request dispatch.
 data LoadMode
   = -- | No throttling — fire as fast as concurrency allows (default)
@@ -192,7 +205,7 @@ data LoadMode
   | -- | Constant RPS — pace iterations at a fixed rate
     LoadConstantRps Double
   | -- | Ramp-up — linearly increase RPS from start to end over a duration
-    LoadRampUp Double Double Double
+    LoadRampUp RampUpConfig
   | -- | Step load — sequential steps, each with its own RPS and duration
     LoadStepLoad [LoadStep]
   | -- | Poisson-distributed load
@@ -205,7 +218,7 @@ instance FromJSON LoadMode where
     case mode of
       "unthrottled" -> pure LoadUnthrottled
       "constantRps" -> LoadConstantRps <$> o .: "targetRps"
-      "rampUp" -> LoadRampUp <$> o .: "startRps" <*> o .: "endRps" <*> o .: "durationSecs"
+      "rampUp" -> LoadRampUp <$> (RampUpConfig <$> o .: "startRps" <*> o .: "endRps" <*> o .: "durationSecs")
       "stepLoad" -> LoadStepLoad <$> o .: "steps"
       "poissonRps" -> LoadPoissonRps <$> o .: "targetRps"
       _ -> fail $ "Unknown load mode: " ++ show mode
@@ -213,7 +226,7 @@ instance FromJSON LoadMode where
 instance ToJSON LoadMode where
   toJSON LoadUnthrottled = object ["mode" .= ("unthrottled" :: Text)]
   toJSON (LoadConstantRps rps) = object ["mode" .= ("constantRps" :: Text), "targetRps" .= rps]
-  toJSON (LoadRampUp s e d) = object ["mode" .= ("rampUp" :: Text), "startRps" .= s, "endRps" .= e, "durationSecs" .= d]
+  toJSON (LoadRampUp RampUpConfig {..}) = object ["mode" .= ("rampUp" :: Text), "startRps" .= rampStartRps, "endRps" .= rampEndRps, "durationSecs" .= rampDurationSecs]
   toJSON (LoadStepLoad steps) = object ["mode" .= ("stepLoad" :: Text), "steps" .= steps]
   toJSON (LoadPoissonRps rps) = object ["mode" .= ("poissonRps" :: Text), "targetRps" .= rps]
 
@@ -222,8 +235,8 @@ totalRequestsForMode :: LoadMode -> Int -> Int
 totalRequestsForMode LoadUnthrottled fallback = fallback
 totalRequestsForMode (LoadConstantRps _) fallback = fallback
 totalRequestsForMode (LoadPoissonRps _) fallback = fallback
-totalRequestsForMode (LoadRampUp startRps endRps dur) _ =
-  round ((startRps + endRps) / 2 * dur)
+totalRequestsForMode (LoadRampUp RampUpConfig {..}) _ =
+  round ((rampStartRps + rampEndRps) / 2 * rampDurationSecs)
 totalRequestsForMode (LoadStepLoad steps) _ =
   sum [round (loadStepRps s * loadStepDurationSecs s) | s <- steps]
 
@@ -235,7 +248,7 @@ isDurationBased _ = False
 
 -- | Total duration in seconds for duration-based modes.
 loadModeDurationSecs :: LoadMode -> Double
-loadModeDurationSecs (LoadRampUp _ _ d) = d
+loadModeDurationSecs (LoadRampUp RampUpConfig {..}) = rampDurationSecs
 loadModeDurationSecs (LoadStepLoad steps) = sum (map loadStepDurationSecs steps)
 loadModeDurationSecs _ = 0
 

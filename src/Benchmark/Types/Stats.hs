@@ -3,10 +3,12 @@ module Benchmark.Types.Stats
   ( BenchmarkStats (..)
   , BayesianComparison (..)
   , PercentileComparison (..)
+  , ComparisonReport (..)
   )
 where
 
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Text (Text)
 import GHC.Generics (Generic)
 
 -- | Descriptive statistics from a benchmark run.
@@ -37,6 +39,15 @@ data PercentileComparison = PercentileComparison
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)
+
+-- | Bundled inputs for a pairwise comparison report.
+data ComparisonReport = ComparisonReport
+  { crNameA :: Text
+  , crNameB :: Text
+  , crStatsA :: BenchmarkStats
+  , crStatsB :: BenchmarkStats
+  , crBayes :: BayesianComparison
+  }
 
 -- | Bayesian A/B comparison results.
 data BayesianComparison = BayesianComparison

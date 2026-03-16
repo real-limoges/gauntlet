@@ -5,6 +5,7 @@ module Stats.Benchmark
 
     -- * Bayesian Comparison
   , compareBayesian
+  , PercentileInput (..)
 
     -- * Distribution Comparison
   , earthMoversDistance
@@ -112,60 +113,72 @@ compareBayesian statsA statsB =
       varB = sdB ** 2
       countA = fromIntegral (countSuccess statsA)
       countB = fromIntegral (countSuccess statsB)
-
       muDiff = muA - muB
-      sigmaDiff = sqrt ((varA / countA) + (varB / countB))
-      probBIsFaster = if sigmaDiff > 0 then standardNormalCDF (muDiff / sigmaDiff) else 0.5
-      ciLower = muDiff - (z95 * sigmaDiff)
-      ciUpper = muDiff + (z95 * sigmaDiff)
-
-      pooledVar =
-        if countA + countB > 2
-          then ((countA - 1) * varA + (countB - 1) * varB) / (countA + countB - 2)
-          else (varA + varB) / 2
-      pooledSd = sqrt pooledVar
-      cohenD = if pooledSd > 0 then muDiff / pooledSd else 0
-
-      relEffect = if muA > 0 then (muDiff / muA) * 100 else 0
-
-      p95Comp = comparePercentile 0.95 (p95Ms statsA) (p95Ms statsB) sdA sdB countA countB
-      p99Comp = comparePercentile 0.99 (p99Ms statsA) (p99Ms statsB) sdA sdB countA countB
-
-      -- P(single request to B is faster than single request to A)
-      -- Uses individual observation variance (σ²), not standard error (σ²/n)
-      sigmaPred = sqrt (varA + varB)
-      probSingle = if sigmaPred > 0 then standardNormalCDF (muDiff / sigmaPred) else 0.5
-
-      -- P(sigma_B < sigma_A): log-normal approximation log(s²) ~ N(log(σ²), 2/(n-1))
-      probLessJittery =
-        if sdA <= 0 || sdB <= 0 || countA <= 1 || countB <= 1
-          then 0.5
-          else
-            let seLogVar = sqrt (2 / (countA - 1) + 2 / (countB - 1))
-                zJitter = (log varA - log varB) / seLogVar
-             in standardNormalCDF zJitter
    in BayesianComparison
-        { probBFasterThanA = probBIsFaster
-        , probSingleRequestFaster = probSingle
-        , probBLessJittery = probLessJittery
+        { probBFasterThanA = probFaster muDiff varA varB countA countB
+        , probSingleRequestFaster = probSingleFaster muDiff varA varB
+        , probBLessJittery = probJitter sdA sdB varA varB countA countB
         , meanDifference = muDiff
-        , credibleIntervalLower = ciLower
-        , credibleIntervalUpper = ciUpper
-        , effectSize = cohenD
-        , relativeEffect = relEffect
-        , p95Comparison = p95Comp
-        , p99Comparison = p99Comp
+        , credibleIntervalLower = ciLower muDiff varA varB countA countB
+        , credibleIntervalUpper = ciUpper muDiff varA varB countA countB
+        , effectSize = cohenD muDiff varA varB countA countB
+        , relativeEffect = if muA > 0 then (muDiff / muA) * 100 else 0
+        , p95Comparison = comparePercentile PercentileInput {piQuantile = 0.95, piValueA = p95Ms statsA, piValueB = p95Ms statsB, piStdDevA = sdA, piStdDevB = sdB, piCountA = countA, piCountB = countB}
+        , p99Comparison = comparePercentile PercentileInput {piQuantile = 0.99, piValueA = p99Ms statsA, piValueB = p99Ms statsB, piStdDevA = sdA, piStdDevB = sdB, piCountA = countA, piCountB = countB}
         }
+  where
+    -- P(mean_B < mean_A) using population-level standard error σ/√n
+    probFaster muDiff varA varB countA countB =
+      let sigmaDiff = sqrt ((varA / countA) + (varB / countB))
+       in if sigmaDiff > 0 then standardNormalCDF (muDiff / sigmaDiff) else 0.5
+
+    ciLower muDiff varA varB countA countB =
+      muDiff - z95 * sqrt ((varA / countA) + (varB / countB))
+
+    ciUpper muDiff varA varB countA countB =
+      muDiff + z95 * sqrt ((varA / countA) + (varB / countB))
+
+    -- Cohen's d using pooled standard deviation
+    cohenD muDiff varA varB countA countB =
+      let pooledVar =
+            if countA + countB > 2
+              then ((countA - 1) * varA + (countB - 1) * varB) / (countA + countB - 2)
+              else (varA + varB) / 2
+          pooledSd = sqrt pooledVar
+       in if pooledSd > 0 then muDiff / pooledSd else 0
+
+    -- P(X_B < X_A) for individual requests, uses σ not σ/√n
+    probSingleFaster muDiff varA varB =
+      let sigmaPred = sqrt (varA + varB)
+       in if sigmaPred > 0 then standardNormalCDF (muDiff / sigmaPred) else 0.5
+
+    -- P(sigma_B < sigma_A) via log-normal approximation log(s²) ~ N(log(σ²), 2/(n-1))
+    probJitter sdA sdB varA varB countA countB
+      | sdA <= 0 || sdB <= 0 || countA <= 1 || countB <= 1 = 0.5
+      | otherwise =
+          let seLogVar = sqrt (2 / (countA - 1) + 2 / (countB - 1))
+              zJitter = (log varA - log varB) / seLogVar
+           in standardNormalCDF zJitter
+
+-- | Inputs for a percentile comparison.
+data PercentileInput = PercentileInput
+  { piQuantile :: Double
+  , piValueA :: Double
+  , piValueB :: Double
+  , piStdDevA :: Double
+  , piStdDevB :: Double
+  , piCountA :: Double
+  , piCountB :: Double
+  }
 
 -- | Compare percentiles between primary and candidate with Maritz-Jarrett SE.
-comparePercentile ::
-  Double -> Double -> Double -> Double -> Double -> Double -> Double -> PercentileComparison
-comparePercentile p pctA pctB sdA sdB nA nB =
-  let k = percentileSEMultiplier p
-      seA = k * sdA / sqrt nA
-      seB = k * sdB / sqrt nB
+comparePercentile :: PercentileInput -> PercentileComparison
+comparePercentile PercentileInput {..} =
+  let k = percentileSEMultiplier piQuantile
+      seA = k * piStdDevA / sqrt piCountA
+      seB = k * piStdDevB / sqrt piCountB
       seDiff = sqrt (seA ** 2 + seB ** 2)
-      diff = pctA - pctB
+      diff = piValueA - piValueB
       zPct = if seDiff > 0 then diff / seDiff else 0
       probRegress = 1 - standardNormalCDF zPct
    in PercentileComparison
@@ -211,12 +224,12 @@ For unequal sizes: uses CDF-based integration.
 -}
 earthMoversDistance :: V.Vector Double -> V.Vector Double -> Double
 earthMoversDistance samplesA samplesB =
-  let sortedA = V.toList $ V.modify VA.sort samplesA
-      sortedB = V.toList $ V.modify VA.sort samplesB
-      nA = length sortedA
-      nB = length sortedB
+  let sortedA = V.modify VA.sort samplesA
+      sortedB = V.modify VA.sort samplesB
+      nA = V.length sortedA
+      nB = V.length sortedB
    in if nA == nB
-        then sum (zipWith (\a b -> abs (a - b)) sortedA sortedB) / fromIntegral nA
+        then V.sum (V.zipWith (\a b -> abs (a - b)) sortedA sortedB) / fromIntegral nA
         else computeEMDGeneral samplesA samplesB
 
 -- | General EMD for unequal sample sizes via CDF integration.

@@ -15,6 +15,7 @@ import Benchmark.Types
   ( Endpoint (..)
   , LoadMode (..)
   , PerfTestError (..)
+  , RampUpConfig (..)
   , Settings (..)
   , TestingResponse
   , ValidationSummary
@@ -67,7 +68,7 @@ runEndpointLoop RunContext {..} endpoints = do
       ( \(idx, ep) -> do
           emitEvent rcEventChan (EndpointStarted (url ep) idx numEndpoints)
           let authorizedEp = addAuth rcToken ep
-              env = BenchmarkEnv rcSettings sem rcManager idx rcEventChan
+              env = BenchmarkEnv rcSettings sem rcManager idx rcEventChan rcLogger
           responses <-
             if isDurationBased mode
               then case mLimiter of
@@ -99,13 +100,13 @@ loadModeLabel :: LoadMode -> String
 loadModeLabel LoadUnthrottled = ""
 loadModeLabel (LoadPoissonRps rps) = " at " ++ show (round rps :: Int) ++ " RPS on average"
 loadModeLabel (LoadConstantRps rps) = " at " ++ show (round rps :: Int) ++ " RPS"
-loadModeLabel (LoadRampUp s e d) =
+loadModeLabel (LoadRampUp RampUpConfig {..}) =
   " ramping "
-    ++ show (round s :: Int)
+    ++ show (round rampStartRps :: Int)
     ++ arrowRight
-    ++ show (round e :: Int)
+    ++ show (round rampEndRps :: Int)
     ++ " RPS over "
-    ++ show (round d :: Int)
+    ++ show (round rampDurationSecs :: Int)
     ++ "s"
 loadModeLabel (LoadStepLoad steps) =
   " with " ++ show (length steps) ++ " load steps"

@@ -13,6 +13,7 @@ module Benchmark.Types
   , BenchmarkStats (..)
   , BayesianComparison (..)
   , PercentileComparison (..)
+  , ComparisonReport (..)
 
     -- * Validation
   , FieldAssertion (..)
@@ -38,6 +39,7 @@ module Benchmark.Types
     -- * Load Control
   , LoadMode (..)
   , LoadStep (..)
+  , RampUpConfig (..)
   , totalRequestsForMode
   , isDurationBased
   , loadModeDurationSecs

@@ -28,7 +28,7 @@ import Benchmark.Types
   , RunResult (..)
   , defaultThresholds
   )
-import Log (Logger, logInfo)
+import Log (Logger, logError, logInfo, logWarning)
 
 -- | Directory where baselines are stored.
 baselineDir :: FilePath
@@ -116,7 +116,7 @@ handleBaseline reporter logger mode timestamp stats = case mode of
     result <- saveBaseline name timestamp stats
     case result of
       Left err -> do
-        logInfo logger $ "Error: " <> T.pack err
+        logWarning logger (T.pack err)
         return RunSuccess
       Right path -> do
         logInfo logger $ "Baseline saved: " <> T.pack path
@@ -125,18 +125,18 @@ handleBaseline reporter logger mode timestamp stats = case mode of
     result <- loadBaseline name
     case result of
       Left err -> do
-        logInfo logger $ "Error: " <> T.pack err
+        logError logger (T.pack err)
         return RunSuccess
       Right baseline -> doBaselineComparison reporter stats baseline
   SaveAndCompare saveName compareName -> do
     saveResult <- saveBaseline saveName timestamp stats
     case saveResult of
-      Left err -> logInfo logger $ "Warning: Failed to save baseline: " <> T.pack err
+      Left err -> logWarning logger ("Failed to save baseline: " <> T.pack err)
       Right path -> logInfo logger $ "Baseline saved: " <> T.pack path
     loadResult <- loadBaseline compareName
     case loadResult of
       Left err -> do
-        logInfo logger $ "Error: " <> T.pack err
+        logError logger (T.pack err)
         return RunSuccess
       Right baseline -> doBaselineComparison reporter stats baseline
 
