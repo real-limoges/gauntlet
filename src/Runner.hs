@@ -7,23 +7,18 @@ import Benchmark.Report.Baseline (handleBaseline)
 import Benchmark.Report.Output (initOutputFiles)
 import Benchmark.Reporter (Reporter (..), combineReporters)
 import Benchmark.Reporter.Plot (plotReporter)
-import Benchmark.TUI (runTUI)
-import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
+import Benchmark.TUI.State (BenchmarkEvent (..), initialState)
 import Benchmark.Types
   ( ChartsSettings
-  , PerfTestError (..)
   , RunResult (..)
   , Settings (..)
   , Targets (..)
   , TestConfig (..)
-  , exitWithError
   )
-import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (newTChanIO)
-import Control.Exception (SomeAsyncException, SomeException, catch, fromException, throwIO, try)
-import Control.Monad (void)
 import Data.Text qualified as T
-import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
+import Runner.Benchmark (withTUI)
+import Runner.Context (Branch (..), RunContext (..), ServiceUrl (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
 import Stats.Benchmark (calculateStats)
@@ -50,47 +45,24 @@ runSingle reporter baselineMode mCharts cfg = do
   baseCtx <- initContext setts csvFile timestamp (Just eventChan)
   let ctx = baseCtx {rcTargetName = targetUrl}
 
-  benchmarkWork <- async $ do
-    let work = do
-          startNs <- getNowNs
-          emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
-          setupOrFail
-            (rcManager ctx)
-            setts
-            (candidate $ git cfg)
-            (candidate $ targets cfg)
-            (Just ["--profile", "testing", "up", "-d", "--build"])
-          emitEvent (Just eventChan) (StatusMessage $ "Running " <> targetUrl <> " (" <> candidate (git cfg) <> ")")
-          (results, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
-          endNs <- getNowNs
-          return (results, validSummaries, startNs, endNs)
-    result <- try work
-    case result of
-      Right val -> do
-        emitEvent (Just eventChan) BenchmarkFinished
-        return val
-      Left ex
-        | Just (_ :: SomeAsyncException) <- fromException ex -> throwIO ex
-        | otherwise -> do
-            emitEvent (Just eventChan) (BenchmarkFailed (T.pack (show ex)))
-            throwIO ex
+  (results, validSummaries, startNs, endNs) <- withTUI eventChan tuiState $ do
+    startNs <- getNowNs
+    emitEvent (Just eventChan) (StatusMessage $ "Setting up " <> candidate (git cfg) <> "...")
+    setupOrFail
+      (rcManager ctx)
+      setts
+      (Branch $ candidate $ git cfg)
+      (ServiceUrl $ candidate $ targets cfg)
+      (Just ["--profile", "testing", "up", "-d", "--build"])
+    emitEvent (Just eventChan) (StatusMessage $ "Running " <> targetUrl <> " (" <> candidate (git cfg) <> ")")
+    (benchResults, validSummaries) <- benchmarkEndpoints ctx "endpoints" eps
+    endNs <- getNowNs
+    return (benchResults, validSummaries, startNs, endNs)
 
-  finalState <- runTUI eventChan tuiState
+  let stats = calculateStats results
 
-  case (tsFinished finalState, tsError finalState) of
-    (False, _) -> do
-      cancel benchmarkWork
-      exitWithError BenchmarkCancelled
-    (True, Just errMsg) -> do
-      void (wait benchmarkWork) `catch` \(_ :: SomeException) -> return ()
-      exitWithError (UnknownNetworkError errMsg)
-    (True, Nothing) -> do
-      (results, validSummaries, startNs, endNs) <- wait benchmarkWork
+  reportSingle fullReporter targetUrl stats validSummaries
 
-      let stats = calculateStats results
+  runTraceAnalysis ctx timestamp startNs endNs
 
-      reportSingle fullReporter targetUrl stats validSummaries
-
-      runTraceAnalysis (rcLogger ctx) (rcManager ctx) setts timestamp startNs endNs
-
-      handleBaseline fullReporter (rcLogger ctx) baselineMode (T.pack timestamp) stats
+  handleBaseline fullReporter (rcLogger ctx) baselineMode (T.pack timestamp) stats

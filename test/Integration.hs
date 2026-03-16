@@ -8,6 +8,7 @@ import Control.Concurrent.QSem (newQSem)
 import Data.Aeson (object, (.=))
 import Data.Text (Text)
 import Data.Text qualified as T
+import Log (makeLogger)
 import MockServer
 import Network.HTTP.Client (Manager, defaultManagerSettings, newManager)
 import Network.HTTP.Types (status500)
@@ -44,7 +45,7 @@ integrationSpec = withResource setupManager (\_ -> pure ()) $ \getMgr ->
             mgr <- getMgr
             mockJson "{}" $ \port -> do
               sem <- newQSem 4
-              let env = BenchmarkEnv testSettings sem mgr 1 Nothing
+              let env = BenchmarkEnv testSettings sem mgr 1 Nothing (makeLogger defaultLogLevel)
               results <- runBenchmark env 5 (endpoint port) Nothing
               length results `shouldBe` 5
               all ((== 200) . statusCode) results `shouldBe` True
@@ -137,21 +138,29 @@ setupManager = newManager defaultManagerSettings
 testSettings :: Settings
 testSettings =
   Settings
-    10
-    4
-    Nothing
-    (Just 10)
-    (Just 30)
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-    Nothing
-    Nothing
+    { iterations = 10
+    , concurrency = 4
+    , secrets = Nothing
+    , maxConnections = Just 10
+    , requestTimeout = Just 30
+    , retry = Nothing
+    , warmup = Nothing
+    , logLevel = Nothing
+    , tempo = Nothing
+    , healthCheckPath = Nothing
+    , healthCheckTimeout = Nothing
+    , loadMode = Nothing
+    }
 
 endpoint :: Int -> Endpoint
-endpoint port = Endpoint "GET" ("http://127.0.0.1:" <> T.pack (show port)) Nothing [] Nothing
+endpoint port =
+  Endpoint
+    { method = "GET"
+    , url = "http://127.0.0.1:" <> T.pack (show port)
+    , body = Nothing
+    , headers = []
+    , validate = Nothing
+    }
 
 testBenchmarkStats :: BenchmarkStats
 testBenchmarkStats =

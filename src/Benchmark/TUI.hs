@@ -33,6 +33,22 @@ data CustomEvent
 
 type Name = ()
 
+-- | Ratio of tail percentile to mean above which the stat is shown as "warn".
+tailWarnThreshold :: Double
+tailWarnThreshold = 1.5
+
+-- | Ratio of tail percentile to mean above which the stat is shown as "err".
+tailErrThreshold :: Double
+tailErrThreshold = 2.0
+
+-- | Error rate denominator for "err" level (1/errorRateCritical = 1%).
+errorRateCritical :: Int
+errorRateCritical = 100
+
+-- | Error rate denominator for "warn" level (1/errorRateWarning = 0.1%).
+errorRateWarning :: Int
+errorRateWarning = 1000
+
 -- ── Runner ────────────────────────────────────────────────────────────────────
 
 runTUI :: TChan BenchmarkEvent -> TUIState -> IO TUIState
@@ -191,7 +207,7 @@ progressSection state =
       ]
   where
     completed = tsCompleted state
-    total = tsIsTotal state
+    total = tsTotalIterations state
     pct = if total > 0 then fromIntegral completed / fromIntegral total else 0 :: Float
     elapsed = tsElapsedSecs state
     eta =
@@ -247,12 +263,12 @@ statsSection state =
           , withAttr (attrName valueAttr) $ txt value
           ]
     p99Attr stats
-      | rsMeanMs stats > 0 && rsP99Ms stats > 2 * rsMeanMs stats = "err"
-      | rsMeanMs stats > 0 && rsP99Ms stats > 1.5 * rsMeanMs stats = "warn"
+      | rsMeanMs stats > 0 && rsP99Ms stats > tailErrThreshold * rsMeanMs stats = "err"
+      | rsMeanMs stats > 0 && rsP99Ms stats > tailWarnThreshold * rsMeanMs stats = "warn"
       | otherwise = "stat"
     p95Attr stats
-      | rsMeanMs stats > 0 && rsP95Ms stats > 2 * rsMeanMs stats = "err"
-      | rsMeanMs stats > 0 && rsP95Ms stats > 1.5 * rsMeanMs stats = "warn"
+      | rsMeanMs stats > 0 && rsP95Ms stats > tailErrThreshold * rsMeanMs stats = "err"
+      | rsMeanMs stats > 0 && rsP95Ms stats > tailWarnThreshold * rsMeanMs stats = "warn"
       | otherwise = "stat"
 
 histogramSection :: TUIState -> Widget Name
@@ -315,8 +331,8 @@ errorsSection state =
     total = errorCount + tsSuccessCount state
     pct = if total > 0 then (errorCount * 100) `div` total else 0 :: Int
     errPctAttr
-      | total > 0 && errorCount * 100 > total = "err"
-      | total > 0 && errorCount * 1000 > total = "warn"
+      | total > 0 && errorCount * errorRateCritical > total = "err"
+      | total > 0 && errorCount * errorRateWarning > total = "warn"
       | otherwise = "dim"
     renderErr (_, msg) = withAttr (attrName "err") $ txt $ "  " <> msg
 

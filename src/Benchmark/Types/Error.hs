@@ -10,7 +10,7 @@ import Control.Exception (Exception)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
-import System.Exit (exitFailure)
+import System.Exit (ExitCode (..), exitWith)
 import System.IO (stderr)
 
 -- | Typed error variants for benchmark failures.
@@ -54,4 +54,4 @@ formatError (UnknownNetworkError msg) = "Network error: " <> msg
 
 -- | Print the error to stderr and exit with code 2.
 exitWithError :: PerfTestError -> IO a
-exitWithError err = TIO.hPutStrLn stderr ("Error: " <> formatError err) >> exitFailure
+exitWithError err = TIO.hPutStrLn stderr ("Error: " <> formatError err) >> exitWith (ExitFailure 2)

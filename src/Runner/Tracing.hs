@@ -8,28 +8,29 @@ import Control.Exception (SomeException, try)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Log (Logger, logInfo, logWarning)
+import Log (logInfo, logWarning)
 import Network.HTTP.Client (Manager)
+import Runner.Context (RunContext (..))
 import Tracing.Client (fetchTracesForTimeRange)
 import Tracing.Report (printTraceAnalysis, writeRawTraces)
 import Tracing.Types (Trace, TraceQuery (..))
 import Tracing.Types qualified as TT
 
 -- | Fetch and print Tempo traces for the benchmark time window, if configured.
-runTraceAnalysis :: Logger -> Manager -> Settings -> String -> TT.Nanoseconds -> TT.Nanoseconds -> IO ()
-runTraceAnalysis logger mgr setts timestamp startNs endNs = case tempo setts of
+runTraceAnalysis :: RunContext -> String -> TT.Nanoseconds -> TT.Nanoseconds -> IO ()
+runTraceAnalysis RunContext {..} timestamp startNs endNs = case tempo rcSettings of
   Nothing -> return ()
   Just tempoSetts
     | not (fromMaybe True (PT.tempoEnabled tempoSetts)) -> return ()
     | otherwise -> do
-        logInfo logger "\n#----- Fetching Traces from Tempo -----#"
-        fetchResult <- doFetchTraces mgr tempoSetts startNs endNs
+        logInfo rcLogger "\n#----- Fetching Traces from Tempo -----#"
+        fetchResult <- doFetchTraces rcManager tempoSetts startNs endNs
         case fetchResult of
-          Left err -> logWarning logger err
+          Left err -> logWarning rcLogger err
           Right traces -> do
             let tracesFile = resultsDir ++ "/traces-" ++ timestamp ++ ".json"
             writeRawTraces tracesFile traces
-            logInfo logger $ T.pack $ "Raw traces written to: " ++ tracesFile
+            logInfo rcLogger $ T.pack $ "Raw traces written to: " ++ tracesFile
             printTraceAnalysis traces
 
 -- | Fetch traces from Tempo, returning 'Right' traces or 'Left' an error message.

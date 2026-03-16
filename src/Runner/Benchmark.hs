@@ -1,5 +1,5 @@
 -- | Benchmark comparison orchestration.
-module Runner.Benchmark (runBenchmark, allPairComparisons) where
+module Runner.Benchmark (runBenchmark, allPairComparisons, withTUI) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Config.Loader (buildEndpoints)
@@ -8,7 +8,7 @@ import Benchmark.Report.Output (initOutputFiles)
 import Benchmark.Reporter (Reporter (..), combineReporters)
 import Benchmark.Reporter.Plot (plotReporter)
 import Benchmark.TUI (runTUI)
-import Benchmark.TUI.State (BenchmarkEvent (..), initialState, tsError, tsFinished)
+import Benchmark.TUI.State (BenchmarkEvent (..), TUIState, initialState, tsError, tsFinished)
 import Benchmark.Types
   ( BayesianComparison
   , BenchmarkConfig (..)
@@ -31,8 +31,7 @@ import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Log (Logger, logInfo)
-import Network.HTTP.Client (Manager)
-import Runner.Context (RunContext (..), emitEvent, getNowNs, initContext, setupOrFail)
+import Runner.Context (Branch (..), RunContext (..), ServiceUrl (..), emitEvent, getNowNs, initContext, setupOrFail)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
 import Stats.Benchmark (calculateStats, compareBayesian)
@@ -47,6 +46,31 @@ data BenchmarkResult = BenchmarkResult
   , nrEndNs :: TT.Nanoseconds
   }
 
+{-| Run a benchmark action under the TUI, handling async errors and cancellation.
+Emits 'BenchmarkFinished' or 'BenchmarkFailed' into the event channel, then
+waits for the TUI to exit before returning the action's result.
+-}
+withTUI :: TChan BenchmarkEvent -> TUIState -> IO a -> IO a
+withTUI eventChan tuiState work = do
+  benchmarkWork <- async $ do
+    result <- try work
+    case result of
+      Right val -> emitEvent (Just eventChan) BenchmarkFinished >> return val
+      Left ex
+        | Just (_ :: SomeAsyncException) <- fromException ex -> throwIO ex
+        | otherwise -> do
+            emitEvent (Just eventChan) (BenchmarkFailed (T.pack (show ex)))
+            throwIO ex
+  finalState <- runTUI eventChan tuiState
+  case (tsFinished finalState, tsError finalState) of
+    (False, _) -> do
+      cancel benchmarkWork
+      exitWithError BenchmarkCancelled
+    (True, Just errMsg) -> do
+      void (wait benchmarkWork) `catch` \(_ :: SomeException) -> return ()
+      exitWithError (UnknownNetworkError errMsg)
+    (True, Nothing) -> wait benchmarkWork
+
 -- | Run benchmarks against named targets and compare all pairs.
 runBenchmark :: Reporter -> BaselineMode -> Maybe ChartsSettings -> BenchmarkConfig -> IO RunResult
 runBenchmark reporter baselineMode mCharts cfg = do
@@ -55,15 +79,11 @@ runBenchmark reporter baselineMode mCharts cfg = do
   let fullReporter = case mCharts of
         Nothing -> reporter
         Just cs -> combineReporters [reporter, plotReporter cs csvFile]
-      setts = benchSettings cfg
-      eps = buildEndpoints "" (benchPayloads cfg)
-      numEndpoints = length eps
-      perTargetRequests = iterations setts * numEndpoints
 
   isTerm <- hIsTerminalDevice stdin
   if isTerm
-    then runBenchmarkWithTUI fullReporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints
-    else runBenchmarkNoTUI fullReporter baselineMode cfg csvFile timestamp setts
+    then runBenchmarkWithTUI fullReporter baselineMode cfg csvFile timestamp
+    else runBenchmarkNoTUI fullReporter baselineMode cfg csvFile timestamp
 
 -- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
 allPairComparisons :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)]
@@ -81,39 +101,17 @@ runBenchmarkWithTUI ::
   BenchmarkConfig ->
   FilePath ->
   String ->
-  Settings ->
-  Int ->
-  Int ->
   IO RunResult
-runBenchmarkWithTUI reporter baselineMode cfg csvFile timestamp setts perTargetRequests numEndpoints = do
+runBenchmarkWithTUI reporter baselineMode cfg csvFile timestamp = do
+  let setts = benchSettings cfg
+      eps = buildEndpoints "" (benchPayloads cfg)
+      numEndpoints = length eps
+      perTargetRequests = iterations setts * numEndpoints
   eventChan <- newTChanIO
   let tuiState = initialState "Starting..." perTargetRequests numEndpoints
   ctx <- initContext setts csvFile timestamp (Just eventChan)
-
-  benchmarkWork <- async $ do
-    result <- (try (runAllTargets ctx cfg (Just eventChan)) :: IO (Either SomeException [BenchmarkResult]))
-    case result of
-      Right val -> do
-        emitEvent (Just eventChan) BenchmarkFinished
-        return val
-      Left ex
-        | Just (_ :: SomeAsyncException) <- fromException ex -> throwIO ex
-        | otherwise -> do
-            emitEvent (Just eventChan) (BenchmarkFailed (T.pack (show ex)))
-            throwIO ex
-
-  finalState <- runTUI eventChan tuiState
-
-  case (tsFinished finalState, tsError finalState) of
-    (False, _) -> do
-      cancel benchmarkWork
-      exitWithError BenchmarkCancelled
-    (True, Just errMsg) -> do
-      void (wait benchmarkWork) `catch` \(_ :: SomeException) -> return ()
-      exitWithError (UnknownNetworkError errMsg)
-    (True, Nothing) -> do
-      results <- wait benchmarkWork
-      postAnalysis reporter (rcLogger ctx) (rcManager ctx) baselineMode setts timestamp results
+  results <- withTUI eventChan tuiState (runAllTargets ctx cfg (Just eventChan))
+  postAnalysis reporter ctx baselineMode timestamp results
 
 -- | Run benchmarks without TUI (headless/CI mode).
 runBenchmarkNoTUI ::
@@ -122,12 +120,12 @@ runBenchmarkNoTUI ::
   BenchmarkConfig ->
   FilePath ->
   String ->
-  Settings ->
   IO RunResult
-runBenchmarkNoTUI reporter baselineMode cfg csvFile timestamp setts = do
+runBenchmarkNoTUI reporter baselineMode cfg csvFile timestamp = do
+  let setts = benchSettings cfg
   ctx <- initContext setts csvFile timestamp Nothing
   results <- runAllTargets ctx cfg Nothing
-  postAnalysis reporter (rcLogger ctx) (rcManager ctx) baselineMode setts timestamp results
+  postAnalysis reporter ctx baselineMode timestamp results
 
 -- | Execute benchmarks for all targets.
 runAllTargets :: RunContext -> BenchmarkConfig -> Maybe (TChan BenchmarkEvent) -> IO [BenchmarkResult]
@@ -142,7 +140,7 @@ runAllTargets ctx cfg eventChan = do
     case targetBranch t of
       Just branch | not (T.null branch) -> do
         emitEvent eventChan (StatusMessage $ "Setting up " <> branch <> "...")
-        setupOrFail (rcManager ctx) setts branch (targetUrl t) (Just ["--profile", "testing", "up", "-d", "--build"])
+        setupOrFail (rcManager ctx) setts (Branch branch) (ServiceUrl (targetUrl t)) (Just ["--profile", "testing", "up", "-d", "--build"])
       _ -> return ()
 
     emitEvent eventChan (StatusMessage $ "Benchmarking " <> targetName t)
@@ -164,14 +162,12 @@ runAllTargets ctx cfg eventChan = do
 -- | Post-benchmark analysis: reporting, tracing, baselines.
 postAnalysis ::
   Reporter ->
-  Logger ->
-  Manager ->
+  RunContext ->
   BaselineMode ->
-  Settings ->
   String ->
   [BenchmarkResult] ->
   IO RunResult
-postAnalysis reporter logger mgr baselineMode setts timestamp results = do
+postAnalysis reporter ctx baselineMode timestamp results = do
   let namedStats = Map.fromList [(nrName r, nrStats r) | r <- results]
       pairs = allPairComparisons [(nrName r, nrStats r) | r <- results]
       validAll = concatMap nrValidations results
@@ -179,10 +175,10 @@ postAnalysis reporter logger mgr baselineMode setts timestamp results = do
   reportBenchmark reporter namedStats pairs validAll
 
   forM_ results $ \r -> do
-    logInfo logger $ "\n#----- Traces: " <> nrName r <> " -----#"
-    runTraceAnalysis logger mgr setts timestamp (nrStartNs r) (nrEndNs r)
+    logInfo (rcLogger ctx) $ "\n#----- Traces: " <> nrName r <> " -----#"
+    runTraceAnalysis ctx timestamp (nrStartNs r) (nrEndNs r)
 
-  handleBenchmarkBaseline reporter logger baselineMode (T.pack timestamp) namedStats
+  handleBenchmarkBaseline reporter (rcLogger ctx) baselineMode (T.pack timestamp) namedStats
 
 -- | Run baseline operations for each target, aggregate results.
 handleBenchmarkBaseline ::

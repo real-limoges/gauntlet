@@ -12,6 +12,7 @@ import Benchmark.Report.Formatting (formatValidationError)
 import Benchmark.Types
   ( BayesianComparison (..)
   , BenchmarkStats (..)
+  , ComparisonReport (..)
   , MetricRegression (..)
   , PercentileComparison (..)
   , RegressionResult (..)
@@ -36,29 +37,21 @@ markdownSingleReport label stats =
       ++ statsTable stats
 
 -- | Markdown report for an A/B benchmark with Bayesian comparison.
-markdownMultipleReport ::
-  -- | Primary label
-  Text ->
-  -- | Candidate label
-  Text ->
-  BenchmarkStats ->
-  BenchmarkStats ->
-  BayesianComparison ->
-  Text
-markdownMultipleReport primaryLabel candidateLabel primary candidate bayes =
+markdownMultipleReport :: ComparisonReport -> Text
+markdownMultipleReport ComparisonReport {..} =
   T.unlines $
-    [ "## Benchmark Report: " <> candidateLabel <> " vs " <> primaryLabel
+    [ "## Benchmark Report: " <> crNameB <> " vs " <> crNameA
     , ""
     , "### Statistics"
     , ""
-    , "#### " <> primaryLabel
+    , "#### " <> crNameA
     , ""
     ]
-      ++ statsTable primary
-      ++ ["", "#### " <> candidateLabel, ""]
-      ++ statsTable candidate
+      ++ statsTable crStatsA
+      ++ ["", "#### " <> crNameB, ""]
+      ++ statsTable crStatsB
       ++ ["", "### Bayesian Analysis", ""]
-      ++ bayesTable bayes
+      ++ bayesTable crBayes
 
 -- | Markdown report for a multi-target comparison with ranking and per-pair detail.
 markdownBenchmarkReport :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> Text
@@ -91,7 +84,7 @@ markdownBenchmarkReport namedStats pairs =
       let statsA = lookupStats nameA namedStats
           statsB = lookupStats nameB namedStats
        in ["", "---", ""]
-            ++ T.lines (markdownMultipleReport nameA nameB statsA statsB bayes)
+            ++ T.lines (markdownMultipleReport ComparisonReport {crNameA = nameA, crNameB = nameB, crStatsA = statsA, crStatsB = statsB, crBayes = bayes})
 
 -- | Markdown report for a regression comparison against a saved baseline.
 markdownRegressionReport :: RegressionResult -> Text

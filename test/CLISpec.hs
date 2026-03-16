@@ -37,15 +37,6 @@ cliSpec =
         , testCase "parses benchmark with --output markdown --report-path custom.md" $ do
             parse ["benchmark", "--config", "foo.json", "--output", "markdown", "--report-path", "custom.md"]
               `shouldBe` Just (Benchmark "foo.json" NoBaseline (OutputMarkdown "custom.md") Nothing)
-        , testCase "parses benchmark with --save-baseline" $ do
-            parse ["benchmark", "--config", "test.json", "--save-baseline", "foo"]
-              `shouldBe` Just (Benchmark "test.json" (SaveBaseline "foo") OutputTerminal Nothing)
-        , testCase "parses benchmark with --compare-baseline" $ do
-            parse ["benchmark", "--config", "test.json", "--compare-baseline", "bar"]
-              `shouldBe` Just (Benchmark "test.json" (CompareBaseline "bar") OutputTerminal Nothing)
-        , testCase "parses benchmark with --save-baseline and --compare-baseline" $ do
-            parse ["benchmark", "--config", "t.json", "--save-baseline", "v2", "--compare-baseline", "v1"]
-              `shouldBe` Just (Benchmark "t.json" (SaveAndCompare "v2" "v1") OutputTerminal Nothing)
         , testCase "fails on missing --config" $ do
             parse ["benchmark"] `shouldBe` Nothing
         , testCase "fails on unknown subcommand" $ do

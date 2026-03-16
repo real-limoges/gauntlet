@@ -38,7 +38,7 @@ markdownSpec =
         [ let primary = mockStats 100.0 10.0
               candidate = mockStats 80.0 8.0
               bayes = mockBayesianComparison
-              report = markdownMultipleReport "primary-branch" "candidate-branch" primary candidate bayes
+              report = markdownMultipleReport ComparisonReport {crNameA = "primary-branch", crNameB = "candidate-branch", crStatsA = primary, crStatsB = candidate, crBayes = bayes}
            in testGroup
                 "basic"
                 [ testCase "includes both endpoint labels" $ do

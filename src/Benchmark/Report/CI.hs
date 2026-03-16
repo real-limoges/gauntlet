@@ -42,32 +42,20 @@ formatForCI GitLab result = do
   putStrLn $ "\x1b[0Ksection_start:" ++ show epoch ++ ":benchmark_results[collapsed=false]"
   putStrLn "\x1b[0K\x1b[1;34m========== Benchmark Regression Check ==========\x1b[0m"
   putStrLn ""
-
-  forM_ (regressionMetrics result) $ \m -> do
-    let status :: String
-        status = if metricRegressed m then "\x1b[1;31mREGRESSED\x1b[0m" else "\x1b[1;32mok\x1b[0m"
-    printf
-      "  %s: %.2fms -> %.2fms (%+.1f%%) [%s]\n"
-      (T.unpack $ metricName m)
-      (metricBaseline m)
-      (metricCurrent m)
-      (metricChange m * 100)
-      status
-
-  putStrLn ""
-  if regressionPassed result
-    then putStrLn "\x1b[1;32m[PASS] Benchmark passed - no regressions detected\x1b[0m"
-    else putStrLn "\x1b[1;31m[FAIL] Benchmark FAILED - regression detected\x1b[0m"
-
-  putStrLn ""
+  printRegressionMetrics ansiRed ansiGreen result
   putStrLn $ "\x1b[0Ksection_end:" ++ show epoch ++ ":benchmark_results"
 formatForCI GitHub result = do
   putStrLn ""
   putStrLn "========== Benchmark Regression Check =========="
   putStrLn ""
+  printRegressionMetrics id id result
 
+-- | Print per-metric lines and pass/fail summary.
+-- Takes colorizers for "bad" (red) and "good" (green) text respectively.
+printRegressionMetrics :: (String -> String) -> (String -> String) -> RegressionResult -> IO ()
+printRegressionMetrics colorBad colorGood result = do
   forM_ (regressionMetrics result) $ \m -> do
-    let status = if metricRegressed m then "REGRESSED" else "ok" :: String
+    let status = if metricRegressed m then colorBad "REGRESSED" else colorGood "ok"
     printf
       "  %s: %.2fms -> %.2fms (%+.1f%%) [%s]\n"
       (T.unpack $ metricName m)
@@ -75,12 +63,17 @@ formatForCI GitHub result = do
       (metricCurrent m)
       (metricChange m * 100)
       status
-
   putStrLn ""
   if regressionPassed result
-    then putStrLn "[PASS] Benchmark passed - no regressions detected"
-    else putStrLn "[FAIL] Benchmark FAILED - regression detected"
+    then putStrLn $ colorGood "[PASS] Benchmark passed - no regressions detected"
+    else putStrLn $ colorBad "[FAIL] Benchmark FAILED - regression detected"
   putStrLn ""
+
+ansiRed :: String -> String
+ansiRed s = "\x1b[1;31m" ++ s ++ "\x1b[0m"
+
+ansiGreen :: String -> String
+ansiGreen s = "\x1b[1;32m" ++ s ++ "\x1b[0m"
 
 -- | Write a markdown report for CI artifacts / GitHub Step Summary.
 writeArtifactReport :: FilePath -> RegressionResult -> IO ()

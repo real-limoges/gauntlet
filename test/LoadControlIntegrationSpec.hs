@@ -6,12 +6,15 @@ import Benchmark.Network (BenchmarkEnv (..), runBenchmark, runBenchmarkDuration)
 import Benchmark.Types
   ( Endpoint (..)
   , LoadMode (..)
+  , RampUpConfig (..)
   , RetrySettings (..)
   , Settings (..)
   , TestConfig (..)
   , TestingResponse (..)
+  , defaultLogLevel
   )
 import Control.Concurrent (newQSem)
+import Log (makeLogger)
 import Data.Text qualified as T
 import Data.Time (diffUTCTime, getCurrentTime)
 import MockServer (mockJson)
@@ -33,7 +36,7 @@ loadControlIntegrationSpec =
           Just limiter <- makeLimiter (LoadConstantRps 20)
           sem <- newQSem 4
           start <- getCurrentTime
-          let env = BenchmarkEnv testSettings sem mgr 1 Nothing
+          let env = BenchmarkEnv testSettings sem mgr 1 Nothing (makeLogger defaultLogLevel)
           results <- runBenchmark env 10 (endpoint port) (Just limiter)
           end <- getCurrentTime
           let elapsed = realToFrac (diffUTCTime end start) :: Double
@@ -49,7 +52,7 @@ loadControlIntegrationSpec =
           Just limiter <- makeLimiter (LoadConstantRps 10)
           sem <- newQSem 4
           start <- getCurrentTime
-          let env = BenchmarkEnv durationSettings sem mgr 1 Nothing
+          let env = BenchmarkEnv durationSettings sem mgr 1 Nothing (makeLogger defaultLogLevel)
           results <- runBenchmarkDuration env 1.0 (endpoint port) limiter
           end <- getCurrentTime
           let elapsed = realToFrac (diffUTCTime end start) :: Double
@@ -63,7 +66,7 @@ loadControlIntegrationSpec =
         mgr <- newManager tlsManagerSettings
         mockJson "{}" $ \port -> do
           sem <- newQSem 4
-          let env = BenchmarkEnv testSettings sem mgr 1 Nothing
+          let env = BenchmarkEnv testSettings sem mgr 1 Nothing (makeLogger defaultLogLevel)
           results <- runBenchmark env 5 (endpoint port) Nothing
           length results `shouldBe` 5
           all ((== 200) . statusCode) results `shouldBe` True

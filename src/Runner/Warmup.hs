@@ -27,5 +27,5 @@ runWarmup RunContext {..} ep = do
         <> ")..."
     sem <- newQSem 1
     let authorizedEp = addAuth rcToken ep
-        env = BenchmarkEnv rcSettings sem rcManager 1 Nothing
+        env = BenchmarkEnv rcSettings sem rcManager 1 Nothing rcLogger
     void $ runBenchmark env warmupIters authorizedEp Nothing

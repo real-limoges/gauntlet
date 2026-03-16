@@ -34,18 +34,18 @@ reportSpec =
        in testGroup
             "printMultipleBenchmarkReport"
             [ testCase "contains both endpoint names" $ do
-                output <- captureStdout $ printMultipleBenchmarkReport "primary" "candidate" statsA statsB bayes
+                output <- captureStdout $ printMultipleBenchmarkReport ComparisonReport {crNameA = "primary", crNameB = "candidate", crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
                 output `shouldSatisfy` ("primary" `isInfixOf`)
                 output `shouldSatisfy` ("candidate" `isInfixOf`)
             , testCase "contains Bayesian Analysis header" $ do
-                output <- captureStdout $ printMultipleBenchmarkReport "a" "b" statsA statsB bayes
+                output <- captureStdout $ printMultipleBenchmarkReport ComparisonReport {crNameA = "a", crNameB = "b", crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
                 output `shouldSatisfy` ("Bayesian Analysis" `isInfixOf`)
             , testCase "contains probability lines" $ do
-                output <- captureStdout $ printMultipleBenchmarkReport "a" "b" statsA statsB bayes
+                output <- captureStdout $ printMultipleBenchmarkReport ComparisonReport {crNameA = "a", crNameB = "b", crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
                 output `shouldSatisfy` ("Probability Candidate is Faster" `isInfixOf`)
                 output `shouldSatisfy` ("Probability Single Request Faster" `isInfixOf`)
             , testCase "contains Tail Analysis header" $ do
-                output <- captureStdout $ printMultipleBenchmarkReport "a" "b" statsA statsB bayes
+                output <- captureStdout $ printMultipleBenchmarkReport ComparisonReport {crNameA = "a", crNameB = "b", crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
                 output `shouldSatisfy` ("Tail Analysis" `isInfixOf`)
             ]
     , testGroup

@@ -13,9 +13,7 @@ import Benchmark.Types
   ( Endpoint (..)
   , Settings (..)
   , TestingResponse (..)
-  , defaultLogLevel
   )
-import Benchmark.Types qualified as Types
 import Control.Concurrent (QSem)
 import Control.Concurrent.Async (replicateConcurrently)
 import Control.Concurrent.QSem (signalQSem, waitQSem)
@@ -23,10 +21,9 @@ import Control.Concurrent.STM (TChan, atomically, writeTChan)
 import Control.Exception (bracket_)
 import Control.Monad (when)
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
-import Data.Maybe (fromMaybe)
 import Data.Text qualified as T
 import Data.Time (NominalDiffTime, UTCTime, addUTCTime, getCurrentTime)
-import Log (Logger, logInfo, makeLogger)
+import Log (Logger, logInfo)
 import Network.HTTP.Client (Manager, Request)
 
 {-| Shared context for benchmark execution, bundling the common parameters
@@ -43,6 +40,8 @@ data BenchmarkEnv = BenchmarkEnv
   -- ^ Index of the current payload\/endpoint (for progress logging)
   , beEventChan :: Maybe (TChan BenchmarkEvent)
   -- ^ Optional TUI event channel for real-time feedback
+  , beLogger :: Logger
+  -- ^ Logger for progress output
   }
 
 -- | Frequency (in completed requests) at which duration-mode workers log progress.
@@ -60,7 +59,6 @@ runBenchmark ::
   Maybe RateLimiter ->
   IO [TestingResponse]
 runBenchmark BenchmarkEnv {..} iters endpoint mLimiter = do
-  let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel beSettings))
   countRef <- newIORef 0
   preparedReq <- prepareRequest beSettings endpoint
   replicateConcurrently iters $ do
@@ -69,7 +67,7 @@ runBenchmark BenchmarkEnv {..} iters endpoint mLimiter = do
       res <- timedRequestPrepared beSettings beManager preparedReq
       emitEvent beEventChan res
       current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
-      printProgressBar logger bePayloadIndex current iters
+      printProgressBar beLogger bePayloadIndex current iters
       return res
 
 {-| Run benchmark for a fixed wall-clock duration (for ramp-up and step-load modes).
@@ -83,7 +81,6 @@ runBenchmarkDuration ::
   RateLimiter ->
   IO [TestingResponse]
 runBenchmarkDuration BenchmarkEnv {..} duration endpoint limiter = do
-  let logger = makeLogger (fromMaybe defaultLogLevel (Types.logLevel beSettings))
   now <- getCurrentTime
   let deadline = addUTCTime duration now
       conc = concurrency beSettings
@@ -91,23 +88,18 @@ runBenchmarkDuration BenchmarkEnv {..} duration endpoint limiter = do
   preparedReq <- prepareRequest beSettings endpoint
   resultRefs <-
     replicateConcurrently conc $
-      workerLoop beSettings beSem beManager bePayloadIndex beEventChan preparedReq deadline countRef logger limiter
+      workerLoop BenchmarkEnv {..} preparedReq deadline countRef limiter
   pure (concat resultRefs)
 
 -- | Worker loop that runs requests until the deadline.
 workerLoop ::
-  Settings ->
-  QSem ->
-  Manager ->
-  Int ->
-  Maybe (TChan BenchmarkEvent) ->
+  BenchmarkEnv ->
   Request ->
   UTCTime ->
   IORef Int ->
-  Logger ->
   RateLimiter ->
   IO [TestingResponse]
-workerLoop settings sem mgr pIdx mEventChan preparedReq deadline countRef logger limiter = go []
+workerLoop BenchmarkEnv {..} preparedReq deadline countRef limiter = go []
   where
     go acc = do
       now <- getCurrentTime
@@ -120,14 +112,14 @@ workerLoop settings sem mgr pIdx mEventChan preparedReq deadline countRef logger
             then pure (reverse acc)
             else do
               res <-
-                bracket_ (waitQSem sem) (signalQSem sem) $
-                  timedRequestPrepared settings mgr preparedReq
-              emitEvent mEventChan res
+                bracket_ (waitQSem beSem) (signalQSem beSem) $
+                  timedRequestPrepared beSettings beManager preparedReq
+              emitEvent beEventChan res
               current <- atomicModifyIORef' countRef (\n -> (n + 1, n + 1))
               when (current `mod` logFrequency == 0) $
-                logInfo logger $
+                logInfo beLogger $
                   T.pack $
-                    "[Ep " ++ show pIdx ++ "] Completed " ++ show current ++ " requests"
+                    "[Ep " ++ show bePayloadIndex ++ "] Completed " ++ show current ++ " requests"
               go (res : acc)
 
 -- | Emit a TUI event for a completed request when a channel is present.

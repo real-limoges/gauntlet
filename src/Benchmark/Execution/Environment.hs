@@ -1,6 +1,8 @@
 -- | Git branch switching, docker-compose orchestration, and health-check polling.
 module Benchmark.Execution.Environment
-  ( setupEnvironment
+  ( Branch (..)
+  , ServiceUrl (..)
+  , setupEnvironment
   , waitForHealth
   ) where
 
@@ -9,12 +11,21 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (IOException, SomeException, try)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Maybe (fromMaybe)
+import Data.String (IsString)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Network.HTTP.Client (Manager, Response, httpLbs, parseRequest, responseStatus)
 import Network.HTTP.Types.Status qualified as Status
 import System.Exit (ExitCode (..))
 import System.Process (proc, readCreateProcessWithExitCode)
+
+-- | A git branch name.
+newtype Branch = Branch Text
+  deriving newtype (Show, Eq, IsString)
+
+-- | A service base URL for health checking.
+newtype ServiceUrl = ServiceUrl Text
+  deriving newtype (Show, Eq, IsString)
 
 {-| Switch git branch and optionally start Docker containers for the target service.
 
@@ -26,44 +37,42 @@ For example, pass @Just ["--profile", "testing", "up", "-d"]@ for the candidate 
 Uses 'proc' instead of shell strings to prevent shell injection attacks
 from malicious branch names containing metacharacters.
 -}
-setupEnvironment :: Manager -> Settings -> Text -> Text -> Maybe [String] -> IO (Either PerfTestError ())
-setupEnvironment mgr setts branch serviceName composeArgs = do
+setupEnvironment :: Manager -> Settings -> Branch -> ServiceUrl -> Maybe [String] -> IO (Either PerfTestError ())
+setupEnvironment mgr setts (Branch branch) (ServiceUrl serviceName) composeArgs = do
   let hcPath = fromMaybe "/health" (healthCheckPath setts)
       hcTimeout = fromMaybe 60 (healthCheckTimeout setts)
+  switchResult <- switchBranch branch
+  case switchResult of
+    Left e -> return (Left e)
+    Right () -> case composeArgs of
+      Nothing -> return (Right ())
+      Just args -> do
+        dockerResult <- startDocker args
+        case dockerResult of
+          Left e -> return (Left e)
+          Right () -> waitForHealth mgr (serviceName <> hcPath) hcTimeout
+  where
+    switchBranch b = do
+      r <-
+        try (readCreateProcessWithExitCode (proc "git" ["switch", T.unpack b]) "") ::
+          IO (Either IOException (ExitCode, String, String))
+      case r of
+        Left ex -> return $ Left $ EnvironmentSetupError $ "Could not run git: " <> T.pack (show ex)
+        Right (ExitFailure _, _, stderr) ->
+          return $ Left $ EnvironmentSetupError $ "git switch " <> b <> " failed: " <> T.strip (T.pack stderr)
+        Right (ExitSuccess, _, _) -> return (Right ())
 
-  gitResult <-
-    try (readCreateProcessWithExitCode (proc "git" ["switch", T.unpack branch]) "") ::
-      IO (Either IOException (ExitCode, String, String))
-
-  case gitResult of
-    Left ex ->
-      return $ Left $ EnvironmentSetupError $ "Could not run git: " <> T.pack (show ex)
-    Right (ExitFailure _, _, gitStderr) ->
-      return $
-        Left $
-          EnvironmentSetupError $
-            "git switch " <> branch <> " failed: " <> T.strip (T.pack gitStderr)
-    Right (ExitSuccess, _, _) ->
-      case composeArgs of
-        Nothing -> return $ Right ()
-        Just args -> do
-          dockerResult <-
-            try (readCreateProcessWithExitCode (proc "docker-compose" args) "") ::
-              IO (Either IOException (ExitCode, String, String))
-
-          case dockerResult of
-            Left ex ->
-              return $
-                Left $
-                  EnvironmentSetupError $
-                    "Could not run docker-compose: " <> T.pack (show ex) <> "\nIs docker-compose installed and in your PATH?"
-            Right (ExitFailure _, _, dockerStderr) ->
-              return $
-                Left $
-                  EnvironmentSetupError $
-                    "docker-compose up failed: " <> T.strip (T.pack dockerStderr)
-            Right (ExitSuccess, _, _) ->
-              waitForHealth mgr (serviceName <> hcPath) hcTimeout
+    startDocker args = do
+      r <-
+        try (readCreateProcessWithExitCode (proc "docker-compose" args) "") ::
+          IO (Either IOException (ExitCode, String, String))
+      case r of
+        Left ex ->
+          return $ Left $ EnvironmentSetupError $
+            "Could not run docker-compose: " <> T.pack (show ex) <> "\nIs docker-compose installed and in your PATH?"
+        Right (ExitFailure _, _, stderr) ->
+          return $ Left $ EnvironmentSetupError $ "docker-compose up failed: " <> T.strip (T.pack stderr)
+        Right (ExitSuccess, _, _) -> return (Right ())
 
 -- | Poll health endpoint until successful or max retries reached.
 waitForHealth :: Manager -> Text -> Int -> IO (Either PerfTestError ())

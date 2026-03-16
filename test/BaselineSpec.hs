@@ -9,7 +9,7 @@ import Data.IORef
 import Data.List (find)
 import Data.Text qualified as T
 import Log (Logger)
-import System.Directory (createDirectoryIfMissing, getCurrentDirectory, setCurrentDirectory)
+import System.Directory (createDirectoryIfMissing, withCurrentDirectory)
 import System.IO.Temp (withSystemTempDirectory)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)
@@ -146,14 +146,14 @@ handleBaselineSpec =
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]
               logText `shouldSatisfy` T.isInfixOf "Baseline saved"
-        , cleanTest "logs 'Error:' when save path is invalid" $
+        , cleanTest "logs warning when save path is invalid" $
             inTempDir $ do
               (logger, logRef) <- makeTestLogger
               result <- handleBaseline noOpReporter logger (SaveBaseline "foo\0bar") hbTimestamp hbStats
               result `shouldBe` RunSuccess
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]
-              logText `shouldSatisfy` T.isInfixOf "Error:"
+              logText `shouldSatisfy` T.isInfixOf "save"
         ]
     , testGroup
         "CompareBaseline"
@@ -164,7 +164,7 @@ handleBaselineSpec =
               result `shouldBe` RunSuccess
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]
-              logText `shouldSatisfy` T.isInfixOf "Error:"
+              logText `shouldSatisfy` T.isInfixOf "not found"
         , cleanTest "returns RunSuccess when baseline matches (no regression)" $
             inTempDir $ do
               (logger, _) <- makeTestLogger
@@ -209,11 +209,6 @@ makeTestLogger = do
   pure (logger, logRef)
 
 inTempDir :: IO a -> IO a
-inTempDir action = do
-  origDir <- getCurrentDirectory
-  withSystemTempDirectory "baseline-test" $ \dir -> do
-    createDirectoryIfMissing True dir
-    setCurrentDirectory dir
-    result <- action
-    setCurrentDirectory origDir
-    return result
+inTempDir action =
+  withSystemTempDirectory "baseline-test" $ \dir ->
+    withCurrentDirectory dir action

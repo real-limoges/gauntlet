@@ -56,7 +56,7 @@ data TUIState = TUIState
   , tsEndpointIndex :: Int
   , tsTotalEndpoints :: Int
   , tsCompleted :: Int
-  , tsIsTotal :: Int
+  , tsTotalIterations :: Int
   , tsSuccessCount :: Int
   , tsErrorCount :: Int
   , tsStartTime :: Maybe UTCTime
@@ -83,7 +83,7 @@ initialState target total endpoints =
     , tsEndpointIndex = 0
     , tsTotalEndpoints = endpoints
     , tsCompleted = 0
-    , tsIsTotal = total
+    , tsTotalIterations = total
     , tsSuccessCount = 0
     , tsErrorCount = 0
     , tsStartTime = Nothing
@@ -136,7 +136,7 @@ updateState now event state = case event of
   PhaseStarted total ->
     state
       { tsCompleted = 0
-      , tsIsTotal = total
+      , tsTotalIterations = total
       , tsSuccessCount = 0
       , tsErrorCount = 0
       , tsStartTime = Nothing
@@ -149,7 +149,7 @@ updateState now event state = case event of
     state
       { tsTarget = name
       , tsCompleted = 0
-      , tsIsTotal = total
+      , tsTotalIterations = total
       , tsSuccessCount = 0
       , tsErrorCount = 0
       , tsStartTime = Nothing

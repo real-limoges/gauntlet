@@ -131,10 +131,10 @@ validateLoadMode (Just LoadUnthrottled) = Right ()
 validateLoadMode (Just (LoadConstantRps rps))
   | rps <= 0 = Left $ ConfigValidationError "loadMode constantRps: targetRps must be greater than 0"
   | otherwise = Right ()
-validateLoadMode (Just (LoadRampUp startRps endRps dur))
-  | startRps <= 0 = Left $ ConfigValidationError "loadMode rampUp: startRps must be greater than 0"
-  | endRps <= 0 = Left $ ConfigValidationError "loadMode rampUp: endRps must be greater than 0"
-  | dur <= 0 = Left $ ConfigValidationError "loadMode rampUp: durationSecs must be greater than 0"
+validateLoadMode (Just (LoadRampUp (RampUpConfig {..})))
+  | rampStartRps <= 0 = Left $ ConfigValidationError "loadMode rampUp: startRps must be greater than 0"
+  | rampEndRps <= 0 = Left $ ConfigValidationError "loadMode rampUp: endRps must be greater than 0"
+  | rampDurationSecs <= 0 = Left $ ConfigValidationError "loadMode rampUp: durationSecs must be greater than 0"
   | otherwise = Right ()
 validateLoadMode (Just (LoadStepLoad [])) =
   Left $ ConfigValidationError "loadMode stepLoad: steps must not be empty"
