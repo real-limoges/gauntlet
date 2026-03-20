@@ -1,16 +1,10 @@
 {
-  "targets": {
-    "primary": "http://localhost:8080",
-    "candidate": "http://localhost:8080"
-  },
-  "git": {
-    "primary": "main",
-    "candidate": "main"
-  },
+  "targets": [
+    { "name": "local", "url": "http://localhost:8080" }
+  ],
   "settings": {
     "iterations": 1000,
     "concurrency": 20,
-    "secrets": ".secrets/token.txt",
     "requestTimeout": 30,
     "logLevel": "info"
   },

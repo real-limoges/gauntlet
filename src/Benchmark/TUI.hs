@@ -202,7 +202,7 @@ progressSection state =
           , case eta of
               Just e -> withAttr (attrName "dim") $ txt $ "  ETA " <> formatElapsed e
               Nothing -> emptyWidget
-          , rpsWidget state
+          , rpmWidget state
           ]
       ]
   where
@@ -215,25 +215,25 @@ progressSection state =
         then Just $ elapsed * fromIntegral (total - completed) / fromIntegral completed
         else Nothing
 
-rpsWidget :: TUIState -> Widget Name
-rpsWidget state = case (tsCurrentRps state, tsTargetRps state, tsCurrentStep state) of
-  (Just rps, Just target, Just step) ->
+rpmWidget :: TUIState -> Widget Name
+rpmWidget state = case (tsCurrentRpm state, tsTargetRpm state, tsCurrentStep state) of
+  (Just rpm, Just target, Just step) ->
     hBox
       [ withAttr (attrName "dim") $ txt "   "
-      , withAttr (attrName "hi") $ txt $ formatRPS rps
-      , withAttr (attrName "dim") $ txt $ " / " <> formatRPS target
+      , withAttr (attrName "hi") $ txt $ formatRPM rpm
+      , withAttr (attrName "dim") $ txt $ " / " <> formatRPM target
       , withAttr (attrName "dim") $ txt $ "  [step " <> T.pack (show step) <> "]"
       ]
-  (Just rps, Just target, Nothing) ->
+  (Just rpm, Just target, Nothing) ->
     hBox
       [ withAttr (attrName "dim") $ txt "   "
-      , withAttr (attrName "hi") $ txt $ formatRPS rps
-      , withAttr (attrName "dim") $ txt $ " / " <> formatRPS target
+      , withAttr (attrName "hi") $ txt $ formatRPM rpm
+      , withAttr (attrName "dim") $ txt $ " / " <> formatRPM target
       ]
-  (Just rps, Nothing, _) ->
+  (Just rpm, Nothing, _) ->
     hBox
       [ withAttr (attrName "dim") $ txt "   "
-      , withAttr (attrName "hi") $ txt $ formatRPS rps
+      , withAttr (attrName "hi") $ txt $ formatRPM rpm
       ]
   _ -> emptyWidget
 

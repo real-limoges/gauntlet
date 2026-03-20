@@ -26,9 +26,18 @@ typesSpec =
                   `shouldBe` "Health check timeout: http://svc:8080/health failed after 60 retries"
             , testCase "formats NoEndpointsError" $ do
                 formatError (NoEndpointsError "primary") `shouldBe` "No primary endpoints defined"
-            , testCase "formats EnvironmentSetupError" $ do
-                formatError (EnvironmentSetupError "git checkout failed")
-                  `shouldBe` "Environment setup error: git checkout failed"
+            , testCase "formats GitSwitchError" $ do
+                formatError (GitSwitchError "branch not found")
+                  `shouldBe` "Git switch error: branch not found"
+            , testCase "formats HookSetupError" $ do
+                formatError (HookSetupError "docker-compose failed")
+                  `shouldBe` "Setup hook failed: docker-compose failed"
+            , testCase "formats HookTeardownError" $ do
+                formatError (HookTeardownError "docker-compose down failed")
+                  `shouldBe` "Teardown hook failed: docker-compose down failed"
+            , testCase "formats HookTimeoutError" $ do
+                formatError (HookTimeoutError "docker-compose up" 120)
+                  `shouldBe` "Hook timed out after 120s: docker-compose up"
             , testCase "formats BenchmarkCancelled" $ do
                 formatError BenchmarkCancelled `shouldBe` "Benchmark cancelled by user"
             , testCase "formats NetworkTimeout" $ do

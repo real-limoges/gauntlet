@@ -2,8 +2,8 @@
 module EnvSpec (envSpec) where
 
 import Benchmark.Config.Env (interpolateEnv, loadEnvVars, parseEnvFile)
-import Benchmark.Config.Loader (loadConfig)
-import Benchmark.Types
+import Benchmark.Config.Loader (loadBenchmarkConfig)
+import Benchmark.Types (BenchmarkConfig (..), NamedTarget (..))
 import Data.Map.Strict qualified as Map
 import System.Directory (withCurrentDirectory)
 import System.FilePath ((</>))
@@ -103,37 +103,32 @@ loadEnvVarsTests =
 
 pipelineTests :: [TestTree]
 pipelineTests =
-  [ testCase "loadConfig interpolates ${VAR} from .env" $ do
+  [ testCase "loadBenchmarkConfig interpolates ${VAR} from .env" $ do
       withSystemTempDirectory "gauntlet-pipeline-test" $ \tmpDir -> do
-        writeFile (tmpDir </> ".env") "PRIMARY_URL=http://localhost:8080\nCANDIDATE_URL=http://localhost:9090\n"
-        writeFile (tmpDir </> "config.json") (minimalConfig "${PRIMARY_URL}" "${CANDIDATE_URL}")
-        result <- withCurrentDirectory tmpDir $ loadConfig (tmpDir </> "config.json")
+        writeFile (tmpDir </> ".env") "TARGET_URL=http://localhost:8080\n"
+        writeFile (tmpDir </> "config.json") (minimalConfig "${TARGET_URL}")
+        result <- withCurrentDirectory tmpDir $ loadBenchmarkConfig (tmpDir </> "config.json")
         case result of
-          Right tc -> do
-            primary (targets tc) `shouldBe` "http://localhost:8080"
-            candidate (targets tc) `shouldBe` "http://localhost:9090"
+          Right cfg -> case benchTargets cfg of
+            (t : _) -> targetUrl t `shouldBe` "http://localhost:8080"
+            [] -> assertFailure "Expected at least one target"
           Left err -> assertFailure $ "Expected successful parse: " ++ err
-  , testCase "loadConfig returns error for undefined variable" $ do
+  , testCase "loadBenchmarkConfig returns error for undefined variable" $ do
       withSystemTempDirectory "gauntlet-pipeline-test" $ \tmpDir -> do
-        writeFile (tmpDir </> "config.json") (minimalConfig "${UNDEFINED_PRIMARY}" "http://localhost:9090")
-        result <- withCurrentDirectory tmpDir $ loadConfig (tmpDir </> "config.json")
+        writeFile (tmpDir </> "config.json") (minimalConfig "${UNDEFINED_TARGET}")
+        result <- withCurrentDirectory tmpDir $ loadBenchmarkConfig (tmpDir </> "config.json")
         case result of
-          Left err -> err `shouldContain` "UNDEFINED_PRIMARY"
+          Left err -> err `shouldContain` "UNDEFINED_TARGET"
           Right _ -> assertFailure "Expected Left for undefined variable"
   ]
 
-minimalConfig :: String -> String -> String
-minimalConfig primaryUrl candidateUrl =
+minimalConfig :: String -> String
+minimalConfig targetUrl =
   unlines
     [ "{"
-    , "  \"targets\": {"
-    , "    \"primary\": \"" ++ primaryUrl ++ "\","
-    , "    \"candidate\": \"" ++ candidateUrl ++ "\""
-    , "  },"
-    , "  \"git\": {"
-    , "    \"primary\": \"main\","
-    , "    \"candidate\": \"feature\""
-    , "  },"
+    , "  \"targets\": ["
+    , "    { \"name\": \"test\", \"url\": \"" ++ targetUrl ++ "\" }"
+    , "  ],"
     , "  \"settings\": {"
     , "    \"iterations\": 10,"
     , "    \"concurrency\": 2,"

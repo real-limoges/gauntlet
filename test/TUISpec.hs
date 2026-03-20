@@ -135,19 +135,19 @@ tuiStateSpec =
             tsRollingStats newState `shouldBe` Nothing
         ]
     , testGroup
-        "updateState with CurrentRpsUpdated"
-        [ testCase "sets tsCurrentRps" $ do
+        "updateState with CurrentRpmUpdated"
+        [ testCase "sets tsCurrentRpm" $ do
             now <- getCurrentTime
             let state = initialState "http://test.example.com" 100 5
-                event = CurrentRpsUpdated 42.0
+                event = CurrentRpmUpdated 42.0
                 newState = updateState now event state
-            tsCurrentRps newState `shouldBe` Just 42.0
+            tsCurrentRpm newState `shouldBe` Just 42.0
         , testCase "overwrites previous RPS" $ do
             now <- getCurrentTime
             let state = initialState "http://test.example.com" 100 5
-                state1 = updateState now (CurrentRpsUpdated 10.0) state
-                state2 = updateState now (CurrentRpsUpdated 20.0) state1
-            tsCurrentRps state2 `shouldBe` Just 20.0
+                state1 = updateState now (CurrentRpmUpdated 10.0) state
+                state2 = updateState now (CurrentRpmUpdated 20.0) state1
+            tsCurrentRpm state2 `shouldBe` Just 20.0
         ]
     , testGroup
         "updateState with LoadStepChanged"
@@ -157,7 +157,7 @@ tuiStateSpec =
                 event = LoadStepChanged 2 50.0
                 newState = updateState now event state
             tsCurrentStep newState `shouldBe` Just 2
-            tsTargetRps newState `shouldBe` Just 50.0
+            tsTargetRpm newState `shouldBe` Just 50.0
         ]
     , testGroup
         "updateState with BenchmarkFinished"
@@ -197,14 +197,14 @@ tuiWidgetsSpec =
             formatDuration 0 `shouldBe` "0µs"
         ]
     , testGroup
-        "formatRPS"
-        [ testCase "formats low RPS with decimal" $
-            formatRPS 0.5 `shouldBe` "0.5 rps"
-        , testCase "formats very low RPS" $
-            formatRPS 0.05 `shouldBe` "<0.1 rps"
-        , testCase "formats integer RPS" $ do
-            formatRPS 42.3 `shouldBe` "42 rps"
-            formatRPS 100 `shouldBe` "100 rps"
+        "formatRPM"
+        [ testCase "formats low RPM with decimal" $
+            formatRPM 5.5 `shouldBe` "5.5 rpm"
+        , testCase "formats very low RPM" $
+            formatRPM 0.5 `shouldBe` "<1 rpm"
+        , testCase "formats integer RPM" $ do
+            formatRPM 42.3 `shouldBe` "42 rpm"
+            formatRPM 100 `shouldBe` "100 rpm"
         ]
     , testGroup
         "formatElapsed"

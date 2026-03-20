@@ -39,8 +39,9 @@ library
                           Benchmark.Execution.Environment
                           Benchmark.Execution.RateLimiter
                           Benchmark.Execution.Validation
-                          Benchmark.Network
                           Benchmark.Network.Auth
+                          Benchmark.Network.Exec
+                          Benchmark.Network.Request
                           Benchmark.Report
                           Benchmark.Report.Baseline
                           Benchmark.Report.CI
@@ -49,7 +50,6 @@ library
                           Benchmark.Compare
                           Benchmark.Report.Formatting
                           Benchmark.Reporter
-                          Benchmark.Reporter.Markdown
                           Benchmark.Types
                           Benchmark.TUI.State
                           Benchmark.TUI.Widgets
@@ -57,13 +57,7 @@ library
                           Tracing.Report
                           Tracing.Types
 
-  other-modules:          Runner
-                          Runner.Tracing
-                          Benchmark.Network.Exec
-                          Benchmark.Network.Request
-                          Benchmark.Reporter.CI
-                          Benchmark.Reporter.Plot
-                          Benchmark.Reporter.Terminal
+  other-modules:          Runner.Tracing
                           Benchmark.TUI
                           Benchmark.Types.Baseline
                           Benchmark.Types.Config

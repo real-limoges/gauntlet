@@ -5,6 +5,7 @@ module Benchmark.Report
   , printValidationSummary
   , printBenchmarkReport
   , lookupStats
+  , printRegressionResult
   )
 where
 
@@ -12,6 +13,8 @@ import Benchmark.Report.Formatting (formatValidationError)
 import Benchmark.Types
   ( BayesianComparison (..)
   , BenchmarkStats (..)
+  , MetricRegression (..)
+  , RegressionResult (..)
   , ComparisonReport (..)
   , PercentileComparison (..)
   , ValidationSummary (..)
@@ -195,3 +198,35 @@ emptyStats =
     , p99Ms = 0
     , esMs = 0
     }
+
+-- | Print a regression result summary to stdout.
+printRegressionResult :: RegressionResult -> IO ()
+printRegressionResult regression = do
+  putStrLn ""
+  putStrLn $ "#----- Regression Check vs '" ++ T.unpack (regressionBaseline regression) ++ "' -----#"
+  putStrLn ""
+  printf
+    "%-8s %12s %12s %10s %10s %s\n"
+    ("Metric" :: String)
+    ("Baseline" :: String)
+    ("Current" :: String)
+    ("Change" :: String)
+    ("Threshold" :: String)
+    ("Status" :: String)
+  putStrLn $ replicate 70 '-'
+  mapM_ printMetric (regressionMetrics regression)
+  putStrLn ""
+  if regressionPassed regression
+    then putStrLn "Result: PASSED (no regressions detected)"
+    else putStrLn "Result: FAILED (regression detected)"
+
+printMetric :: MetricRegression -> IO ()
+printMetric m =
+  printf
+    "%-8s %10.2f ms %10.2f ms %+9.1f%% %9.0f%% %s\n"
+    (T.unpack $ metricName m)
+    (metricBaseline m)
+    (metricCurrent m)
+    (metricChange m * 100)
+    (metricThreshold m * 100)
+    (if metricRegressed m then "REGRESSED" else "ok" :: String)

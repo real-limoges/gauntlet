@@ -1,29 +1,25 @@
 -- | Configuration loading and validation from JSON/YAML files.
 module Benchmark.Config.Loader
-  ( loadConfig
-  , loadBenchmarkConfig
+  ( loadBenchmarkConfig
   , buildEndpoints
-  , validateConfig
   , validateBenchmarkConfig
   )
 where
 
 import Benchmark.Config.Env (interpolateEnv, loadEnvVars)
 import Benchmark.Types
+import Benchmark.Types.Config (HealthCheckConfig (..), HookCommand (..), LifecycleHooks (..), NamedTarget (..))
 import Control.Exception (IOException, try)
 import Control.Monad (unless, when)
 import Data.Aeson (FromJSON, eitherDecode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Text.IO qualified as TIO
 
--- | Load and validate an A\/B benchmark config from a JSON\/YAML file.
-loadConfig :: FilePath -> IO (Either String TestConfig)
-loadConfig = loadConfigAs
-
--- | Load and validate a benchmark config from a JSON\/YAML file.
+-- | Load a benchmark config from a JSON\/YAML file.
 loadBenchmarkConfig :: FilePath -> IO (Either String BenchmarkConfig)
 loadBenchmarkConfig = loadConfigAs
 
@@ -58,31 +54,23 @@ toEndpoint baseUrl spec =
         , validate = specValidate spec
         }
 
--- | Validate an A\/B 'TestConfig' (positive iterations, non-empty payloads, etc.).
-validateConfig :: TestConfig -> Either PerfTestError TestConfig
-validateConfig cfg = do
-  when (null (payloads cfg)) $
-    Left $
-      ConfigValidationError "No payloads defined in config"
-  when (iterations (settings cfg) <= 0) $
-    Left $
-      ConfigValidationError "iterations must be greater than 0"
-  validateCommon (payloads cfg) (settings cfg)
-  Right cfg
-
--- | Validate a 'BenchmarkConfig' (at least one target, non-empty payloads).
+-- | Validate a 'BenchmarkConfig' (at least one target, non-empty payloads, positive iterations).
 validateBenchmarkConfig :: BenchmarkConfig -> Either PerfTestError BenchmarkConfig
 validateBenchmarkConfig cfg = do
   when (null (benchPayloads cfg)) $
     Left $
       ConfigValidationError "No payloads defined in config"
+  when (iterations (benchSettings cfg) <= 0) $
+    Left $
+      ConfigValidationError "iterations must be greater than 0"
   validateCommon (benchPayloads cfg) (benchSettings cfg)
   when (null (benchTargets cfg)) $
     Left $
       ConfigValidationError "Must have at least 1 target"
+  mapM_ validateTargetLifecycle (benchTargets cfg)
   Right cfg
 
--- | Shared validation logic for both single and multi-target configs.
+-- | Shared validation logic for settings and payloads.
 validateCommon :: [PayloadSpec] -> Settings -> Either PerfTestError ()
 validateCommon ps setts = do
   when (concurrency setts <= 0) $
@@ -100,7 +88,6 @@ isValidMethod p = specMethod p `elem` ["GET", "POST", "PUT", "DELETE", "PATCH"]
 validateSettings :: Settings -> Either PerfTestError ()
 validateSettings setts = do
   check (requestTimeout setts) (<= 0) "requestTimeout must be greater than 0"
-  check (healthCheckTimeout setts) (<= 0) "healthCheckTimeout must be greater than 0"
   case retry setts of
     Nothing -> Right ()
     Just r -> do
@@ -124,16 +111,16 @@ validateSettings setts = do
 -- | Validate load mode settings when present.
 validateLoadMode :: Maybe LoadMode -> Either PerfTestError ()
 validateLoadMode Nothing = Right ()
-validateLoadMode (Just (LoadPoissonRps rps))
-  | rps <= 0 = Left $ ConfigValidationError "loadMode poisson: target mean must be greater than 0"
+validateLoadMode (Just (LoadPoissonRpm rpm))
+  | rpm <= 0 = Left $ ConfigValidationError "loadMode poisson: target mean must be greater than 0"
   | otherwise = Right ()
 validateLoadMode (Just LoadUnthrottled) = Right ()
-validateLoadMode (Just (LoadConstantRps rps))
-  | rps <= 0 = Left $ ConfigValidationError "loadMode constantRps: targetRps must be greater than 0"
+validateLoadMode (Just (LoadConstantRpm rpm))
+  | rpm <= 0 = Left $ ConfigValidationError "loadMode constantRpm: targetRpm must be greater than 0"
   | otherwise = Right ()
 validateLoadMode (Just (LoadRampUp (RampUpConfig {..})))
-  | rampStartRps <= 0 = Left $ ConfigValidationError "loadMode rampUp: startRps must be greater than 0"
-  | rampEndRps <= 0 = Left $ ConfigValidationError "loadMode rampUp: endRps must be greater than 0"
+  | rampStartRpm <= 0 = Left $ ConfigValidationError "loadMode rampUp: startRpm must be greater than 0"
+  | rampEndRpm <= 0 = Left $ ConfigValidationError "loadMode rampUp: endRpm must be greater than 0"
   | rampDurationSecs <= 0 = Left $ ConfigValidationError "loadMode rampUp: durationSecs must be greater than 0"
   | otherwise = Right ()
 validateLoadMode (Just (LoadStepLoad [])) =
@@ -141,8 +128,36 @@ validateLoadMode (Just (LoadStepLoad [])) =
 validateLoadMode (Just (LoadStepLoad steps)) = mapM_ validateStep steps
   where
     validateStep s
-      | loadStepRps s <= 0 =
-          Left $ ConfigValidationError "loadMode stepLoad: each step rps must be greater than 0"
+      | loadStepRpm s <= 0 =
+          Left $ ConfigValidationError "loadMode stepLoad: each step rpm must be greater than 0"
       | loadStepDurationSecs s <= 0 =
           Left $ ConfigValidationError "loadMode stepLoad: each step durationSecs must be greater than 0"
       | otherwise = Right ()
+
+-- | Validate lifecycle hooks for a named target.
+validateTargetLifecycle :: NamedTarget -> Either PerfTestError ()
+validateTargetLifecycle t = case targetLifecycle t of
+  Nothing -> Right ()
+  Just hooks -> do
+    mapM_ (validateHookCommand "setup") (hookSetup hooks)
+    mapM_ (validateHookCommand "teardown") (hookTeardown hooks)
+    mapM_ validateHealthCheck (hookHealthCheck hooks)
+
+validateHookCommand :: Text -> HookCommand -> Either PerfTestError ()
+validateHookCommand label HookCommand{..} = do
+  when (T.null (T.strip hookCmd)) $
+    Left $ ConfigValidationError $ label <> " hook: cmd must not be empty"
+  case hookTimeoutSecs of
+    Just t | t <= 0 -> Left $ ConfigValidationError $ label <> " hook: timeoutSecs must be greater than 0"
+    _ -> Right ()
+
+validateHealthCheck :: HealthCheckConfig -> Either PerfTestError ()
+validateHealthCheck HealthCheckConfig{..} = do
+  when (T.null (T.strip hcUrl)) $
+    Left $ ConfigValidationError "lifecycle healthCheck: url must not be empty"
+  case hcTimeoutSecs of
+    Just t | t <= 0 -> Left $ ConfigValidationError "lifecycle healthCheck: timeoutSecs must be greater than 0"
+    _ -> Right ()
+  case hcIntervalMs of
+    Just i | i <= 0 -> Left $ ConfigValidationError "lifecycle healthCheck: intervalMs must be greater than 0"
+    _ -> Right ()

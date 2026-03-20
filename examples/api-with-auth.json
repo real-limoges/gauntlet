@@ -1,12 +1,8 @@
 {
-  "targets": {
-    "primary": "https://api.production.com",
-    "candidate": "https://api.staging.com"
-  },
-  "git": {
-    "primary": "main",
-    "candidate": "main"
-  },
+  "targets": [
+    { "name": "production", "url": "https://api.production.com" },
+    { "name": "staging", "url": "https://api.staging.com" }
+  ],
   "settings": {
     "iterations": 2000,
     "concurrency": 25,

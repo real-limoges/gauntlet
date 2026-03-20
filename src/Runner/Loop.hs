@@ -3,12 +3,8 @@ module Runner.Loop (benchmarkEndpoints) where
 
 import Benchmark.Execution.RateLimiter (makeLimiter)
 import Benchmark.Execution.Validation (validateResponses)
-import Benchmark.Network
-  ( BenchmarkEnv (..)
-  , addAuth
-  , runBenchmark
-  , runBenchmarkDuration
-  )
+import Benchmark.Network.Auth (addAuth)
+import Benchmark.Network.Exec (runBenchmark, runBenchmarkDuration)
 import Benchmark.Report.Output (writeLatenciesWithTarget)
 import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types
@@ -30,7 +26,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Log (logInfo)
-import Runner.Context (RunContext (..), emitEvent)
+import Runner.Context (RunContext (..), emitEvent, makeBenchmarkEnv)
 import Runner.Warmup (runWarmup)
 
 -- | Warm up then run the benchmark loop for a labelled set of endpoints.
@@ -43,7 +39,7 @@ benchmarkEndpoints ctx label eps = case eps of
 
 -- | Concurrently benchmark all endpoints and collect responses and validation summaries.
 runEndpointLoop :: RunContext -> [Endpoint] -> IO ([TestingResponse], [ValidationSummary])
-runEndpointLoop RunContext {..} endpoints = do
+runEndpointLoop ctx@RunContext {..} endpoints = do
   let mode = fromMaybe LoadUnthrottled (loadMode rcSettings)
       iters = totalRequestsForMode mode (iterations rcSettings)
       conc = concurrency rcSettings
@@ -68,7 +64,7 @@ runEndpointLoop RunContext {..} endpoints = do
       ( \(idx, ep) -> do
           emitEvent rcEventChan (EndpointStarted (url ep) idx numEndpoints)
           let authorizedEp = addAuth rcToken ep
-              env = BenchmarkEnv rcSettings sem rcManager idx rcEventChan rcLogger
+              env = makeBenchmarkEnv ctx sem idx
           responses <-
             if isDurationBased mode
               then case mLimiter of
@@ -98,14 +94,14 @@ runEndpointLoop RunContext {..} endpoints = do
 -- | Human-readable label for log message.
 loadModeLabel :: LoadMode -> String
 loadModeLabel LoadUnthrottled = ""
-loadModeLabel (LoadPoissonRps rps) = " at " ++ show (round rps :: Int) ++ " RPS on average"
-loadModeLabel (LoadConstantRps rps) = " at " ++ show (round rps :: Int) ++ " RPS"
+loadModeLabel (LoadPoissonRpm rpm) = " at " ++ show (round rpm :: Int) ++ " RPM on average"
+loadModeLabel (LoadConstantRpm rpm) = " at " ++ show (round rpm :: Int) ++ " RPM"
 loadModeLabel (LoadRampUp RampUpConfig {..}) =
   " ramping "
-    ++ show (round rampStartRps :: Int)
+    ++ show (round rampStartRpm :: Int)
     ++ arrowRight
-    ++ show (round rampEndRps :: Int)
-    ++ " RPS over "
+    ++ show (round rampEndRpm :: Int)
+    ++ " RPM over "
     ++ show (round rampDurationSecs :: Int)
     ++ "s"
 loadModeLabel (LoadStepLoad steps) =

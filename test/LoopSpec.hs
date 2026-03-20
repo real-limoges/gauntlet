@@ -53,8 +53,6 @@ testSettings =
     , warmup = Just WarmupSettings {warmupIterations = 0}
     , logLevel = Nothing
     , tempo = Nothing
-    , healthCheckPath = Nothing
-    , healthCheckTimeout = Nothing
     , loadMode = Nothing
     }
 

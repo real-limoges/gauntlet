@@ -1,16 +1,10 @@
 {
-  "targets": {
-    "primary": "http://api.example.com",
-    "candidate": "http://api.example.com"
-  },
-  "git": {
-    "primary": "main",
-    "candidate": "main"
-  },
+  "targets": [
+    { "name": "api", "url": "http://api.example.com" }
+  ],
   "settings": {
     "iterations": 500,
     "concurrency": 10,
-    "secrets": ".secrets/token.txt",
     "logLevel": "info"
   },
   "payloads": [

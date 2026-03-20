@@ -22,10 +22,11 @@ module Benchmark.Types
   , ValidationSummary (..)
 
     -- * Configuration
-  , TestConfig (..)
   , BenchmarkConfig (..)
-  , Targets (..)
   , NamedTarget (..)
+  , LifecycleHooks (..)
+  , HookCommand (..)
+  , HealthCheckConfig (..)
   , Settings (..)
   , RetrySettings (..)
   , defaultRetrySettings

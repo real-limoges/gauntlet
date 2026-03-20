@@ -71,7 +71,7 @@ makeCtxWithWarmupAndLog _port iters = do
   mgr <- newManager tlsManagerSettings
   logRef <- newIORef ([] :: [(LogLevel, Text)])
   let setts =
-        (settings (makeValidConfig :: TestConfig))
+        (benchSettings makeValidConfig)
           { warmup = Just WarmupSettings {warmupIterations = iters}
           , secrets = Nothing
           }

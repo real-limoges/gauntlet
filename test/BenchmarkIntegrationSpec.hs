@@ -2,8 +2,7 @@
 module BenchmarkIntegrationSpec (benchmarkIntegrationSpec) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
-import Benchmark.Reporter (noOpReporter)
-import Benchmark.Reporter.Markdown (markdownReporter)
+import Benchmark.Reporter (markdownReporter, noOpReporter)
 import Benchmark.Types
 import Data.Text qualified as T
 import MockServer (mockJson)
@@ -137,8 +136,6 @@ makeTestSettings tokenPath =
     , warmup = Nothing
     , logLevel = Nothing
     , tempo = Nothing
-    , healthCheckPath = Nothing
-    , healthCheckTimeout = Nothing
     , loadMode = Nothing
     }
 
@@ -150,6 +147,7 @@ makeTestBenchmarkConfig tokenPath ports =
             { targetName = T.pack ("target-" ++ show i)
             , targetUrl = T.pack ("http://127.0.0.1:" ++ show port)
             , targetBranch = Nothing
+            , targetLifecycle = Nothing
             }
         | (i, port) <- zip [(1 :: Int) ..] ports
         ]

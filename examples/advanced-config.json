@@ -1,12 +1,44 @@
 {
-  "targets": {
-    "primary": "http://primary-service.internal:8080",
-    "candidate": "http://candidate-service.internal:8080"
-  },
-  "git": {
-    "primary": "main",
-    "candidate": "feat/candidate"
-  },
+  "targets": [
+    {
+      "name": "primary",
+      "url": "http://primary-service.internal:8080",
+      "branch": "main",
+      "lifecycle": {
+        "setup": {
+          "cmd": "docker-compose --profile testing up -d --build",
+          "timeoutSecs": 120
+        },
+        "teardown": {
+          "cmd": "docker-compose down"
+        },
+        "healthCheck": {
+          "url": "http://primary-service.internal:8080/health",
+          "timeoutSecs": 60,
+          "intervalMs": 1000
+        }
+      }
+    },
+    {
+      "name": "candidate",
+      "url": "http://candidate-service.internal:8080",
+      "branch": "feat/candidate",
+      "lifecycle": {
+        "setup": {
+          "cmd": "docker-compose --profile testing up -d --build",
+          "timeoutSecs": 120
+        },
+        "teardown": {
+          "cmd": "docker-compose down"
+        },
+        "healthCheck": {
+          "url": "http://candidate-service.internal:8080/health",
+          "timeoutSecs": 60,
+          "intervalMs": 1000
+        }
+      }
+    }
+  ],
   "settings": {
     "iterations": 10000,
     "concurrency": 100,
@@ -29,8 +61,8 @@
       "tempoAuthToken": "optional-tempo-bearer-token"
     },
     "loadMode": {
-      "mode": "constantRps",
-      "targetRps": 100
+      "mode": "constantRpm",
+      "targetRpm": 6000
     }
   },
   "payloads": [

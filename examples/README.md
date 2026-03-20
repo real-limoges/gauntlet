@@ -5,12 +5,8 @@ This directory contains sample configuration files demonstrating various feature
 ## Quick Start
 
 ```bash
-# Create a secrets file
-mkdir -p .secrets
-echo "your-bearer-token-here" > .secrets/token.txt
-
 # Run a simple benchmark
-cabal run gauntlet-exe -- benchmark-single --config examples/simple-benchmark.json
+cabal run gauntlet-exe -- benchmark --config examples/simple-benchmark.json
 ```
 
 ## Example Files
@@ -19,7 +15,6 @@ cabal run gauntlet-exe -- benchmark-single --config examples/simple-benchmark.js
 **Minimal configuration** - The absolute minimum required fields.
 - 100 iterations, 10 concurrent requests
 - Single health check endpoint
-- No optional features
 
 **Use case:** Quick smoke test or learning the basic structure.
 
@@ -36,7 +31,7 @@ cabal run gauntlet-exe -- benchmark-single --config examples/simple-benchmark.js
 - 5,000 iterations, 50 concurrent requests
 - Warmup iterations to prime caches
 - Retry settings for flaky networks
-- Search and recommendation endpoints
+- Lifecycle health checks per target
 
 **Use case:** Production vs. staging comparison, or v1 vs. v2 API testing.
 
@@ -53,9 +48,10 @@ cabal run gauntlet-exe -- benchmark-single --config examples/simple-benchmark.js
 - 10,000 iterations, 100 concurrent requests
 - DEBUG logging for detailed output
 - Grafana Tempo tracing integration
+- Lifecycle hooks (docker-compose setup/teardown, health checks)
 - Complex POST bodies with nested JSON
 - Connection pooling tuning
-- Load control (constant RPS example)
+- Load control (constant RPM)
 
 **Use case:** Production-grade benchmarking with distributed tracing and rate limiting.
 
@@ -72,15 +68,13 @@ Change `logLevel` to control output verbosity:
 **Multi-target comparison** - Compare multiple API targets simultaneously.
 - 3 named targets: prod, staging, dev
 - All pairwise Bayesian comparisons computed automatically
-- Targets specified as an array of `{name, url}` objects
 
 **Use case:** Comparing performance across multiple environments or API versions.
 
 ### `load-modes.json`
 **Step load profile** - Ramp requests up and back down in discrete steps.
-- 4 steps: 10 → 50 → 100 → 50 RPS
+- 4 steps: 600 -> 3000 -> 6000 -> 3000 RPM
 - Duration-based (`iterations` ignored; total requests derived from schedule)
-- Uses `benchmark` with two named targets
 
 **Use case:** Stress testing, finding saturation points, validating autoscaling.
 
@@ -90,14 +84,12 @@ Change `logLevel` to control output verbosity:
 
 ```json
 {
-  "targets": {
-    "primary": "http://api-v1.example.com",
-    "candidate": "http://api-v2.example.com"
-  },
+  "targets": [
+    { "name": "my-service", "url": "http://api.example.com" }
+  ],
   "settings": {
     "iterations": 1000,
-    "concurrency": 10,
-    "secrets": ".secrets/token.txt"
+    "concurrency": 10
   },
   "payloads": [
     {
@@ -109,13 +101,23 @@ Change `logLevel` to control output verbosity:
 }
 ```
 
+### Target Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Human-readable label for this target |
+| `url` | string | yes | Base URL (payloads paths are appended) |
+| `branch` | string | no | Git branch to switch to before benchmarking |
+| `lifecycle` | object | no | Setup/teardown hooks and health check config |
+
 ### Optional Settings
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `secrets` | string | - | Path to file containing Bearer token |
 | `maxConnections` | int | 10 | HTTP connection pool size |
 | `requestTimeout` | int | 30 | Request timeout (seconds) |
-| `loadMode` | object | `unthrottled` | Load control: `unthrottled`, `constantRps`, `rampUp`, `stepLoad` |
+| `loadMode` | object | `unthrottled` | Load control: `unthrottled`, `constantRpm`, `rampUp`, `stepLoad`, `poissonRpm` |
 | `logLevel` | string | `"info"` | Log verbosity: `"debug"`, `"info"`, `"warning"`, `"error"` |
 | `warmup` | object | `{"warmupIterations": 1}` | Warmup configuration |
 | `retry` | object | See below | Retry configuration |
@@ -171,6 +173,26 @@ Warmup requests prime caches and JIT compilers before the actual benchmark.
 
 Headers are per-payload. If `Content-Type` is not specified for POST/PUT requests, it defaults to `application/json`.
 
+### Lifecycle Hooks
+
+```json
+{
+  "targets": [
+    {
+      "name": "my-service",
+      "url": "http://localhost:8080",
+      "lifecycle": {
+        "setup": { "cmd": "docker-compose up -d", "timeoutSecs": 120 },
+        "teardown": { "cmd": "docker-compose down" },
+        "healthCheck": { "url": "http://localhost:8080/health", "timeoutSecs": 60 }
+      }
+    }
+  ]
+}
+```
+
+Setup runs before benchmarking each target; teardown runs after. Health check polls until the service is ready.
+
 ### Tempo Tracing
 
 ```json
@@ -188,45 +210,27 @@ Integrates with Grafana Tempo for distributed trace analysis.
 
 ## Running Examples
 
-### Single or A/B Benchmark
-Configs with `targets: {primary, candidate}` use `benchmark-single`:
-
 ```bash
-cabal run gauntlet-exe -- benchmark-single --config examples/minimal.json
-cabal run gauntlet-exe -- benchmark-single --config examples/ab-comparison.json
-```
+# Basic benchmark
+cabal run gauntlet-exe -- benchmark --config examples/minimal.json
 
-### Multi-Target Comparison
-Configs with `targets: [...]` use `benchmark`:
-
-```bash
-cabal run gauntlet-exe -- benchmark --config examples/comparison.json
-cabal run gauntlet-exe -- benchmark --config examples/load-modes.json
-```
-
-### With Baseline Comparison
-Save a baseline for regression detection:
-
-```bash
-# Save baseline
-cabal run gauntlet-exe -- benchmark-single \
+# With baseline comparison
+cabal run gauntlet-exe -- benchmark \
   --config examples/simple-benchmark.json \
   --save-baseline my-baseline
 
-# Compare against baseline
-cabal run gauntlet-exe -- benchmark-single \
+cabal run gauntlet-exe -- benchmark \
   --config examples/simple-benchmark.json \
   --compare-baseline my-baseline
-```
 
-### Markdown Report
-Write a full markdown report in addition to terminal output:
-
-```bash
-cabal run gauntlet-exe -- benchmark-single \
+# Markdown report
+cabal run gauntlet-exe -- benchmark \
   --config examples/simple-benchmark.json \
   --output markdown \
   --report-path results/report.md
+
+# Validate config without running
+cabal run gauntlet-exe -- validate --config examples/advanced-config.json
 ```
 
 ## Tips

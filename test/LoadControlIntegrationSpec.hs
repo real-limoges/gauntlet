@@ -2,14 +2,14 @@
 module LoadControlIntegrationSpec (loadControlIntegrationSpec) where
 
 import Benchmark.Execution.RateLimiter (makeLimiter)
-import Benchmark.Network (BenchmarkEnv (..), runBenchmark, runBenchmarkDuration)
+import Benchmark.Network.Exec (BenchmarkEnv (..), runBenchmark, runBenchmarkDuration)
 import Benchmark.Types
-  ( Endpoint (..)
+  ( BenchmarkConfig (..)
+  , Endpoint (..)
   , LoadMode (..)
   , RampUpConfig (..)
   , RetrySettings (..)
   , Settings (..)
-  , TestConfig (..)
   , TestingResponse (..)
   , defaultLogLevel
   )
@@ -29,11 +29,11 @@ loadControlIntegrationSpec :: TestTree
 loadControlIntegrationSpec =
   testGroup
     "LoadControl Integration"
-    [ testCase "constant RPS: completes expected iterations in expected time" $ do
+    [ testCase "constant RPM: completes expected iterations in expected time" $ do
         mgr <- newManager tlsManagerSettings
         mockJson "{}" $ \port -> do
-          -- 10 requests at 20 RPS => ~0.45s (first fires immediately, then 9 intervals of 50ms)
-          Just limiter <- makeLimiter (LoadConstantRps 20)
+          -- 10 requests at 1200 RPM => ~0.45s (first fires immediately, then 9 intervals of 50ms)
+          Just limiter <- makeLimiter (LoadConstantRpm 1200)
           sem <- newQSem 4
           start <- getCurrentTime
           let env = BenchmarkEnv testSettings sem mgr 1 Nothing (makeLogger defaultLogLevel)
@@ -48,8 +48,8 @@ loadControlIntegrationSpec =
     , testCase "duration-based: runs for specified duration" $ do
         mgr <- newManager tlsManagerSettings
         mockJson "{}" $ \port -> do
-          -- Run at 10 RPS for 1 second => ~10 requests
-          Just limiter <- makeLimiter (LoadConstantRps 10)
+          -- Run at 600 RPM for 1 second => ~10 requests
+          Just limiter <- makeLimiter (LoadConstantRpm 600)
           sem <- newQSem 4
           start <- getCurrentTime
           let env = BenchmarkEnv durationSettings sem mgr 1 Nothing (makeLogger defaultLogLevel)
@@ -74,7 +74,7 @@ loadControlIntegrationSpec =
 
 testSettings :: Settings
 testSettings =
-  (settings (makeValidConfig :: TestConfig))
+  (benchSettings makeValidConfig)
     { iterations = 10
     , concurrency = 4
     , secrets = Nothing

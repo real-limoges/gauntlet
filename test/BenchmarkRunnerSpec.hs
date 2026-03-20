@@ -24,7 +24,7 @@ benchmarkRunnerSpec =
                 msg `shouldBe` "Must have at least 1 target"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts config with 1 target" $ do
-            let cfg = makeBenchmarkConfig [NamedTarget "a" "http://a" Nothing]
+            let cfg = makeBenchmarkConfig [NamedTarget "a" "http://a" Nothing Nothing]
             case validateBenchmarkConfig cfg of
               Right _ -> pure ()
               Left err -> assertFailure $ "Expected success but got: " ++ show err
@@ -32,8 +32,8 @@ benchmarkRunnerSpec =
             let cfg =
                   BenchmarkConfig
                     { benchTargets =
-                        [ NamedTarget "a" "http://a" Nothing
-                        , NamedTarget "b" "http://b" Nothing
+                        [ NamedTarget "a" "http://a" Nothing Nothing
+                        , NamedTarget "b" "http://b" Nothing Nothing
                         ]
                     , benchSettings = defaultSettings
                     , benchPayloads = []
@@ -46,8 +46,8 @@ benchmarkRunnerSpec =
             let cfg =
                   BenchmarkConfig
                     { benchTargets =
-                        [ NamedTarget "a" "http://a" Nothing
-                        , NamedTarget "b" "http://b" Nothing
+                        [ NamedTarget "a" "http://a" Nothing Nothing
+                        , NamedTarget "b" "http://b" Nothing Nothing
                         ]
                     , benchSettings = defaultSettings
                     , benchPayloads = [PayloadSpec "test" "INVALID" "/path" Nothing Nothing Nothing]
@@ -57,7 +57,7 @@ benchmarkRunnerSpec =
                 msg `textShouldContain` "Invalid HTTP method"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts valid 2-target config" $ do
-            let cfg = makeBenchmarkConfig [NamedTarget "a" "http://a" Nothing, NamedTarget "b" "http://b" Nothing]
+            let cfg = makeBenchmarkConfig [NamedTarget "a" "http://a" Nothing Nothing, NamedTarget "b" "http://b" Nothing Nothing]
             validateBenchmarkConfig cfg `shouldBe` Right cfg
         ]
     , testGroup
@@ -98,8 +98,6 @@ defaultSettings =
     , warmup = Nothing
     , logLevel = Nothing
     , tempo = Nothing
-    , healthCheckPath = Nothing
-    , healthCheckTimeout = Nothing
     , loadMode = Nothing
     }
 

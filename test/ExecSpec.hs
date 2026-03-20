@@ -1,11 +1,8 @@
 -- | Tests for Benchmark.Network.Exec.
 module ExecSpec (execSpec) where
 
-import Benchmark.Network
-  ( BenchmarkEnv (..)
-  , initNetwork
-  , runBenchmark
-  )
+import Benchmark.Network.Exec (BenchmarkEnv (..), runBenchmark)
+import Benchmark.Network.Request (initNetwork)
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types
 import Control.Concurrent (newQSem)
@@ -64,8 +61,6 @@ testSettings =
     , warmup = Nothing
     , logLevel = Nothing
     , tempo = Nothing
-    , healthCheckPath = Nothing
-    , healthCheckTimeout = Nothing
     , loadMode = Nothing
     }
 

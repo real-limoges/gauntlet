@@ -3,7 +3,7 @@ module Benchmark.TUI.Widgets
   ( progressBar
   , histogram
   , formatDuration
-  , formatRPS
+  , formatRPM
   , formatElapsed
   ) where
 
@@ -58,12 +58,12 @@ formatDuration ms
   | ms < 1000 = T.pack $ show (round ms :: Int) <> "ms"
   | otherwise = T.pack $ show (fromIntegral (round (ms / 100) :: Int) / 10 :: Double) <> "s"
 
--- | Format requests per second
-formatRPS :: Double -> Text
-formatRPS rps
-  | rps < 0.1 = "<0.1 rps"
-  | rps < 1 = T.pack $ show (fromIntegral (round (rps * 10) :: Int) / 10 :: Double) <> " rps"
-  | otherwise = T.pack $ show (round rps :: Int) <> " rps"
+-- | Format requests per minute
+formatRPM :: Double -> Text
+formatRPM rpm
+  | rpm < 1 = "<1 rpm"
+  | rpm < 10 = T.pack $ show (fromIntegral (round (rpm * 10) :: Int) / 10 :: Double) <> " rpm"
+  | otherwise = T.pack $ show (round rpm :: Int) <> " rpm"
 
 -- | Format elapsed time as HH:MM:SS or MM:SS
 formatElapsed :: Double -> Text
