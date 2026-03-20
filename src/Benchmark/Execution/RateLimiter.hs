@@ -1,9 +1,9 @@
--- | Rate limiting strategies: constant RPS, ramp-up, step-load, and Poisson modes.
+-- | Rate limiting strategies: constant RPM, ramp-up, step-load, and Poisson modes.
 module Benchmark.Execution.RateLimiter
   ( RateLimiter
   , waitForSlot
   , makeLimiter
-  , currentTargetRps
+  , currentTargetRpm
   )
 where
 
@@ -21,8 +21,8 @@ data RateLimiter = RateLimiter
   -- ^ Compute interval based on current time (for ramp/step schedules)
   , rlStartTime :: UTCTime
   -- ^ When the limiter was created (for elapsed-time calculations)
-  , rlNominalRps :: Maybe Double
-  -- ^ Fixed nominal RPS for display (set for modes where interval is stochastic)
+  , rlNominalRpm :: Maybe Double
+  -- ^ Fixed nominal RPM for display (set for modes where interval is stochastic)
   }
 
 {-| Atomically claim the next dispatch slot and sleep until it arrives.
@@ -46,22 +46,22 @@ makeLimiter LoadUnthrottled = pure Nothing
 makeLimiter mode = do
   now <- getCurrentTime
   nextSlot <- newMVar now
-  let poissonInterval rps _ = do
+  let poissonInterval rpm _ = do
         u <- randomRIO (1e-9, 1.0)
-        pure (realToFrac (-(log u / rps)) :: NominalDiffTime)
-      constantInterval rps _ = pure (realToFrac (1.0 / rps) :: NominalDiffTime)
+        pure (realToFrac (-(log u * 60.0 / rpm)) :: NominalDiffTime)
+      constantInterval rpm _ = pure (realToFrac (60.0 / rpm) :: NominalDiffTime)
       rampInterval RampUpConfig {..} t =
         let elapsed = realToFrac (diffUTCTime t now) :: Double
             progress = min 1.0 (max 0.0 (elapsed / rampDurationSecs))
-            rps = max 0.1 (rampStartRps + (rampEndRps - rampStartRps) * progress)
-         in pure (realToFrac (1.0 / rps) :: NominalDiffTime)
+            rpm = max 6.0 (rampStartRpm + (rampEndRpm - rampStartRpm) * progress)
+         in pure (realToFrac (60.0 / rpm) :: NominalDiffTime)
       stepInterval steps t =
         let elapsed = realToFrac (diffUTCTime t now) :: Double
-            rps = findStepRps steps elapsed
-         in pure (realToFrac (1.0 / rps) :: NominalDiffTime)
-      (intervalFn, nominalRps) = case mode of
-        LoadPoissonRps rps -> (poissonInterval rps, Just rps)
-        LoadConstantRps rps -> (constantInterval rps, Nothing)
+            rpm = findStepRpm steps elapsed
+         in pure (realToFrac (60.0 / rpm) :: NominalDiffTime)
+      (intervalFn, nominalRpm) = case mode of
+        LoadPoissonRpm rpm -> (poissonInterval rpm, Just rpm)
+        LoadConstantRpm rpm -> (constantInterval rpm, Nothing)
         LoadRampUp cfg -> (rampInterval cfg, Nothing)
         LoadStepLoad steps -> (stepInterval steps, Nothing)
   pure $
@@ -70,24 +70,24 @@ makeLimiter mode = do
         { rlNextSlot = nextSlot
         , rlInterval = intervalFn
         , rlStartTime = now
-        , rlNominalRps = nominalRps
+        , rlNominalRpm = nominalRpm
         }
 
--- | Find the RPS for the current elapsed time in a step schedule.
-findStepRps :: [LoadStep] -> Double -> Double
-findStepRps [] _ = 1.0
-findStepRps [s] _ = max 0.1 (loadStepRps s)
-findStepRps (s : rest) elapsed
-  | elapsed < loadStepDurationSecs s = max 0.1 (loadStepRps s)
-  | otherwise = findStepRps rest (elapsed - loadStepDurationSecs s)
+-- | Find the RPM for the current elapsed time in a step schedule.
+findStepRpm :: [LoadStep] -> Double -> Double
+findStepRpm [] _ = 60.0
+findStepRpm [s] _ = max 6.0 (loadStepRpm s)
+findStepRpm (s : rest) elapsed
+  | elapsed < loadStepDurationSecs s = max 6.0 (loadStepRpm s)
+  | otherwise = findStepRpm rest (elapsed - loadStepDurationSecs s)
 
--- | Get the current target RPS based on elapsed time.
-currentTargetRps :: RateLimiter -> IO Double
-currentTargetRps RateLimiter {..} =
-  case rlNominalRps of
-    Just rps -> pure rps
+-- | Get the current target RPM based on elapsed time.
+currentTargetRpm :: RateLimiter -> IO Double
+currentTargetRpm RateLimiter {..} =
+  case rlNominalRpm of
+    Just rpm -> pure rpm
     Nothing -> do
       now <- getCurrentTime
       interval <- rlInterval now
       let secs = realToFrac interval :: Double
-      pure (if secs > 0 then 1.0 / secs else 0)
+      pure (if secs > 0 then 60.0 / secs else 0)

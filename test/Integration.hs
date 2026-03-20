@@ -1,7 +1,8 @@
 -- | End-to-end integration tests for HTTP operations.
 module Integration (integrationSpec) where
 
-import Benchmark.Network hiding (prepareRequest)
+import Benchmark.Network.Exec (BenchmarkEnv (..), runBenchmark)
+import Benchmark.Network.Request (timedRequest)
 import Benchmark.Report.Baseline
 import Benchmark.Types
 import Control.Concurrent.QSem (newQSem)
@@ -147,8 +148,6 @@ testSettings =
     , warmup = Nothing
     , logLevel = Nothing
     , tempo = Nothing
-    , healthCheckPath = Nothing
-    , healthCheckTimeout = Nothing
     , loadMode = Nothing
     }
 

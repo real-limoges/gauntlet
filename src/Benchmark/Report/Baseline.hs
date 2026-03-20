@@ -6,7 +6,6 @@ module Benchmark.Report.Baseline
   , baselineDir
   , listBaselines
   , handleBaseline
-  , printRegressionResult
   ) where
 
 import Control.Exception (SomeException, try)
@@ -15,10 +14,9 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import System.Directory (createDirectoryIfMissing, doesFileExist, listDirectory)
 import System.FilePath (takeBaseName, (</>))
-import Text.Printf (printf)
 
 import Benchmark.Config.CLI (BaselineMode (..))
-import Benchmark.Reporter (Reporter (..))
+import Benchmark.Reporter (Reporter (..), ReportingContext (..))
 import Benchmark.Types
   ( Baseline (..)
   , BenchmarkStats (..)
@@ -28,7 +26,7 @@ import Benchmark.Types
   , RunResult (..)
   , defaultThresholds
   )
-import Log (Logger, logError, logInfo, logWarning)
+import Log (logError, logInfo, logWarning)
 
 -- | Directory where baselines are stored.
 baselineDir :: FilePath
@@ -109,36 +107,36 @@ checkMetric name threshold baselineVal currentVal =
 -- ---------------------------------------------------------------------------
 
 -- | Handle baseline save/compare operations per 'BaselineMode'.
-handleBaseline :: Reporter -> Logger -> BaselineMode -> Text -> BenchmarkStats -> IO RunResult
-handleBaseline reporter logger mode timestamp stats = case mode of
+handleBaseline :: ReportingContext -> Text -> BenchmarkStats -> IO RunResult
+handleBaseline ReportingContext {..} timestamp stats = case rctxBaselineMode of
   NoBaseline -> return RunSuccess
   SaveBaseline name -> do
     result <- saveBaseline name timestamp stats
     case result of
       Left err -> do
-        logWarning logger (T.pack err)
+        logWarning rctxLogger (T.pack err)
         return RunSuccess
       Right path -> do
-        logInfo logger $ "Baseline saved: " <> T.pack path
+        logInfo rctxLogger $ "Baseline saved: " <> T.pack path
         return RunSuccess
   CompareBaseline name -> do
     result <- loadBaseline name
     case result of
       Left err -> do
-        logError logger (T.pack err)
+        logError rctxLogger (T.pack err)
         return RunSuccess
-      Right baseline -> doBaselineComparison reporter stats baseline
+      Right baseline -> doBaselineComparison rctxReporter stats baseline
   SaveAndCompare saveName compareName -> do
     saveResult <- saveBaseline saveName timestamp stats
     case saveResult of
-      Left err -> logWarning logger ("Failed to save baseline: " <> T.pack err)
-      Right path -> logInfo logger $ "Baseline saved: " <> T.pack path
+      Left err -> logWarning rctxLogger ("Failed to save baseline: " <> T.pack err)
+      Right path -> logInfo rctxLogger $ "Baseline saved: " <> T.pack path
     loadResult <- loadBaseline compareName
     case loadResult of
       Left err -> do
-        logError logger (T.pack err)
+        logError rctxLogger (T.pack err)
         return RunSuccess
-      Right baseline -> doBaselineComparison reporter stats baseline
+      Right baseline -> doBaselineComparison rctxReporter stats baseline
 
 doBaselineComparison :: Reporter -> BenchmarkStats -> Baseline -> IO RunResult
 doBaselineComparison reporter stats baseline = do
@@ -148,34 +146,3 @@ doBaselineComparison reporter stats baseline = do
     then return RunSuccess
     else return $ RunRegression regression
 
--- | Print a regression result summary to stdout.
-printRegressionResult :: RegressionResult -> IO ()
-printRegressionResult regression = do
-  putStrLn ""
-  putStrLn $ "#----- Regression Check vs '" ++ T.unpack (regressionBaseline regression) ++ "' -----#"
-  putStrLn ""
-  printf
-    "%-8s %12s %12s %10s %10s %s\n"
-    ("Metric" :: String)
-    ("Baseline" :: String)
-    ("Current" :: String)
-    ("Change" :: String)
-    ("Threshold" :: String)
-    ("Status" :: String)
-  putStrLn $ replicate 70 '-'
-  mapM_ printMetric (regressionMetrics regression)
-  putStrLn ""
-  if regressionPassed regression
-    then putStrLn "Result: PASSED (no regressions detected)"
-    else putStrLn "Result: FAILED (regression detected)"
-
-printMetric :: MetricRegression -> IO ()
-printMetric m =
-  printf
-    "%-8s %10.2f ms %10.2f ms %+9.1f%% %9.0f%% %s\n"
-    (T.unpack $ metricName m)
-    (metricBaseline m)
-    (metricCurrent m)
-    (metricChange m * 100)
-    (metricThreshold m * 100)
-    (if metricRegressed m then "REGRESSED" else "ok" :: String)

@@ -32,7 +32,7 @@ data BenchmarkEvent
   | StatusMessage Text
   | PhaseStarted Int
   | TargetStarted Text Int Int
-  | CurrentRpsUpdated Double
+  | CurrentRpmUpdated Double
   | LoadStepChanged Int Double
   | BenchmarkFinished
   | BenchmarkFailed Text
@@ -68,8 +68,8 @@ data TUIState = TUIState
   , tsError :: Maybe Text
   , tsStatus :: Text
   , tsElapsedSecs :: Double
-  , tsCurrentRps :: Maybe Double
-  , tsTargetRps :: Maybe Double
+  , tsCurrentRpm :: Maybe Double
+  , tsTargetRpm :: Maybe Double
   , tsCurrentStep :: Maybe Int
   }
   deriving (Show, Eq)
@@ -95,8 +95,8 @@ initialState target total endpoints =
     , tsError = Nothing
     , tsStatus = ""
     , tsElapsedSecs = 0
-    , tsCurrentRps = Nothing
-    , tsTargetRps = Nothing
+    , tsCurrentRpm = Nothing
+    , tsTargetRpm = Nothing
     , tsCurrentStep = Nothing
     }
 
@@ -157,14 +157,14 @@ updateState now event state = case event of
       , tsRollingStats = Nothing
       , tsRecentDurations = Seq.empty
       , tsRecentRequests = Seq.empty
-      , tsCurrentRps = Nothing
-      , tsTargetRps = Nothing
+      , tsCurrentRpm = Nothing
+      , tsTargetRpm = Nothing
       , tsCurrentStep = Nothing
       }
-  CurrentRpsUpdated rps ->
-    state {tsCurrentRps = Just rps}
-  LoadStepChanged step rps ->
-    state {tsCurrentStep = Just step, tsTargetRps = Just rps}
+  CurrentRpmUpdated rpm ->
+    state {tsCurrentRpm = Just rpm}
+  LoadStepChanged step rpm ->
+    state {tsCurrentStep = Just step, tsTargetRpm = Just rpm}
   BenchmarkFinished ->
     state {tsFinished = True}
   BenchmarkFailed msg ->

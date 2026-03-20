@@ -1,10 +1,11 @@
 -- | Configuration data types: test settings, targets, payloads, and load modes.
 module Benchmark.Types.Config
   ( -- * Configuration
-    TestConfig (..)
-  , BenchmarkConfig (..)
-  , Targets (..)
+    BenchmarkConfig (..)
   , NamedTarget (..)
+  , LifecycleHooks (..)
+  , HookCommand (..)
+  , HealthCheckConfig (..)
   , Settings (..)
   , RetrySettings (..)
   , defaultRetrySettings
@@ -51,16 +52,6 @@ import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
--- | Top-level A\/B benchmark configuration (two targets, git branches, settings, payloads).
-data TestConfig = TestConfig
-  { targets :: Targets
-  , git :: Targets
-  , settings :: Settings
-  , payloads :: [PayloadSpec]
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (FromJSON)
-
 -- | Benchmark configuration (one or more named targets).
 data BenchmarkConfig = BenchmarkConfig
   { benchTargets :: [NamedTarget]
@@ -76,19 +67,12 @@ instance FromJSON BenchmarkConfig where
         { fieldLabelModifier = dropFieldPrefix "bench"
         }
 
--- | Primary and candidate target URLs or git branches.
-data Targets = Targets
-  { primary :: Text
-  , candidate :: Text
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (FromJSON)
-
--- | Single named target in a benchmark run
+-- | Single named target in a benchmark run.
 data NamedTarget = NamedTarget
   { targetName :: Text
   , targetUrl :: Text
   , targetBranch :: Maybe Text
+  , targetLifecycle :: Maybe LifecycleHooks
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)
@@ -98,6 +82,81 @@ instance FromJSON NamedTarget where
     genericParseJSON
       defaultOptions
         { fieldLabelModifier = dropFieldPrefix "target"
+        }
+
+-- | Per-target setup, teardown, and health-check hooks.
+data LifecycleHooks = LifecycleHooks
+  { hookSetup :: Maybe HookCommand
+  -- ^ Command to run before benchmarking this target
+  , hookTeardown :: Maybe HookCommand
+  -- ^ Command to run after benchmarking this target
+  , hookHealthCheck :: Maybe HealthCheckConfig
+  -- ^ Health check to poll before benchmarking starts
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON LifecycleHooks where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "hook"
+        }
+
+instance ToJSON LifecycleHooks where
+  toJSON =
+    genericToJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "hook"
+        }
+
+-- | A shell command to execute as a lifecycle hook.
+data HookCommand = HookCommand
+  { hookCmd :: Text
+  -- ^ Shell command (run via @\/bin\/sh -c@)
+  , hookTimeoutSecs :: Maybe Int
+  -- ^ Timeout in seconds (default: 300)
+  , hookWorkingDir :: Maybe FilePath
+  -- ^ Working directory (default: current directory)
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON HookCommand where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "hook"
+        }
+
+instance ToJSON HookCommand where
+  toJSON =
+    genericToJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "hook"
+        }
+
+-- | Health check configuration for polling a URL until it responds 200.
+data HealthCheckConfig = HealthCheckConfig
+  { hcUrl :: Text
+  -- ^ URL to poll
+  , hcTimeoutSecs :: Maybe Int
+  -- ^ Total polling budget in seconds (default: 60)
+  , hcIntervalMs :: Maybe Int
+  -- ^ Delay between polls in milliseconds (default: 1000)
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON HealthCheckConfig where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "hc"
+        }
+
+instance ToJSON HealthCheckConfig where
+  toJSON =
+    genericToJSON
+      defaultOptions
+        { fieldLabelModifier = dropFieldPrefix "hc"
         }
 
 -- | Retry configuration for failed requests.
@@ -165,8 +224,8 @@ defaultLogLevel = Info
 
 -- | A single step in a step-load profile.
 data LoadStep = LoadStep
-  { loadStepRps :: Double
-  -- ^ Target RPS for this step
+  { loadStepRpm :: Double
+  -- ^ Target RPM for this step
   , loadStepDurationSecs :: Double
   -- ^ Duration of this step in seconds
   }
@@ -188,10 +247,10 @@ instance ToJSON LoadStep where
 
 -- | Ramp-up load configuration.
 data RampUpConfig = RampUpConfig
-  { rampStartRps :: Double
-  -- ^ Starting RPS at the beginning of the ramp
-  , rampEndRps :: Double
-  -- ^ Target RPS at the end of the ramp
+  { rampStartRpm :: Double
+  -- ^ Starting RPM at the beginning of the ramp
+  , rampEndRpm :: Double
+  -- ^ Target RPM at the end of the ramp
   , rampDurationSecs :: Double
   -- ^ Duration of the ramp in seconds
   }
@@ -202,14 +261,14 @@ data RampUpConfig = RampUpConfig
 data LoadMode
   = -- | No throttling — fire as fast as concurrency allows (default)
     LoadUnthrottled
-  | -- | Constant RPS — pace iterations at a fixed rate
-    LoadConstantRps Double
-  | -- | Ramp-up — linearly increase RPS from start to end over a duration
+  | -- | Constant RPM — pace iterations at a fixed rate
+    LoadConstantRpm Double
+  | -- | Ramp-up — linearly increase RPM from start to end over a duration
     LoadRampUp RampUpConfig
-  | -- | Step load — sequential steps, each with its own RPS and duration
+  | -- | Step load — sequential steps, each with its own RPM and duration
     LoadStepLoad [LoadStep]
   | -- | Poisson-distributed load
-    LoadPoissonRps Double
+    LoadPoissonRpm Double
   deriving stock (Show, Eq)
 
 instance FromJSON LoadMode where
@@ -217,38 +276,38 @@ instance FromJSON LoadMode where
     mode <- o .: "mode" :: Parser Text
     case mode of
       "unthrottled" -> pure LoadUnthrottled
-      "constantRps" -> LoadConstantRps <$> o .: "targetRps"
-      "rampUp" -> LoadRampUp <$> (RampUpConfig <$> o .: "startRps" <*> o .: "endRps" <*> o .: "durationSecs")
+      "constantRpm" -> LoadConstantRpm <$> o .: "targetRpm"
+      "rampUp" -> LoadRampUp <$> (RampUpConfig <$> o .: "startRpm" <*> o .: "endRpm" <*> o .: "durationSecs")
       "stepLoad" -> LoadStepLoad <$> o .: "steps"
-      "poissonRps" -> LoadPoissonRps <$> o .: "targetRps"
+      "poissonRpm" -> LoadPoissonRpm <$> o .: "targetRpm"
       _ -> fail $ "Unknown load mode: " ++ show mode
 
 instance ToJSON LoadMode where
   toJSON LoadUnthrottled = object ["mode" .= ("unthrottled" :: Text)]
-  toJSON (LoadConstantRps rps) = object ["mode" .= ("constantRps" :: Text), "targetRps" .= rps]
+  toJSON (LoadConstantRpm rpm) = object ["mode" .= ("constantRpm" :: Text), "targetRpm" .= rpm]
   toJSON (LoadRampUp RampUpConfig {..}) =
     object
       [ "mode" .= ("rampUp" :: Text)
-      , "startRps" .= rampStartRps
-      , "endRps" .= rampEndRps
+      , "startRpm" .= rampStartRpm
+      , "endRpm" .= rampEndRpm
       , "durationSecs" .= rampDurationSecs
       ]
   toJSON (LoadStepLoad steps) = object ["mode" .= ("stepLoad" :: Text), "steps" .= steps]
-  toJSON (LoadPoissonRps rps) = object ["mode" .= ("poissonRps" :: Text), "targetRps" .= rps]
+  toJSON (LoadPoissonRpm rpm) = object ["mode" .= ("poissonRpm" :: Text), "targetRpm" .= rpm]
 
 -- | Compute total requests for a load mode given a fallback iteration count.
 totalRequestsForMode :: LoadMode -> Int -> Int
 totalRequestsForMode LoadUnthrottled fallback = fallback
-totalRequestsForMode (LoadConstantRps _) fallback = fallback
-totalRequestsForMode (LoadPoissonRps _) fallback = fallback
+totalRequestsForMode (LoadConstantRpm _) fallback = fallback
+totalRequestsForMode (LoadPoissonRpm _) fallback = fallback
 totalRequestsForMode (LoadRampUp RampUpConfig {..}) _ =
-  round ((rampStartRps + rampEndRps) / 2 * rampDurationSecs)
+  round ((rampStartRpm + rampEndRpm) / 2 / 60 * rampDurationSecs)
 totalRequestsForMode (LoadStepLoad steps) _ =
-  sum [round (loadStepRps s * loadStepDurationSecs s) | s <- steps]
+  sum [round (loadStepRpm s / 60 * loadStepDurationSecs s) | s <- steps]
 
 -- | Whether the load mode is duration-based (ignores iterations).
 isDurationBased :: LoadMode -> Bool
-isDurationBased (LoadRampUp {}) = True
+isDurationBased LoadRampUp {} = True
 isDurationBased (LoadStepLoad _) = True
 isDurationBased _ = False
 
@@ -273,10 +332,6 @@ data Settings = Settings
   , logLevel :: Maybe LogLevel
   -- ^ Logging verbosity (default: Info)
   , tempo :: Maybe TempoSettings
-  , healthCheckPath :: Maybe Text
-  -- ^ Health check path appended to service URL (default: "/health")
-  , healthCheckTimeout :: Maybe Int
-  -- ^ Health check poll timeout in seconds (default: 60)
   , loadMode :: Maybe LoadMode
   -- ^ Load control mode (default: unthrottled)
   }

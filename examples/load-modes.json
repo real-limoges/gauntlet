@@ -11,10 +11,10 @@
     "loadMode": {
       "mode": "stepLoad",
       "steps": [
-        { "rps": 10,  "durationSecs": 30 },
-        { "rps": 50,  "durationSecs": 60 },
-        { "rps": 100, "durationSecs": 60 },
-        { "rps": 50,  "durationSecs": 30 }
+        { "rpm": 600,  "durationSecs": 30 },
+        { "rpm": 3000, "durationSecs": 60 },
+        { "rpm": 6000, "durationSecs": 60 },
+        { "rpm": 3000, "durationSecs": 30 }
       ]
     }
   },

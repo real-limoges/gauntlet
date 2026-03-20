@@ -1,16 +1,11 @@
 {
-  "targets": {
-    "primary": "http://api.example.com",
-    "candidate": "http://api-new.example.com"
-  },
-  "git": {
-    "primary": "main",
-    "candidate": "main"
-  },
+  "targets": [
+    { "name": "primary", "url": "http://api.example.com" },
+    { "name": "candidate", "url": "http://api-new.example.com" }
+  ],
   "settings": {
     "iterations": 100,
-    "concurrency": 10,
-    "secrets": ".secrets/token.txt"
+    "concurrency": 10
   },
   "payloads": [
     {

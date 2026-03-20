@@ -5,7 +5,7 @@ module Lib (run) where
 
 import Control.Exception (SomeException, catch)
 import Control.Monad (forM_)
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes)
 import Data.Text qualified as T
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import Network.HTTP.Client (Manager, httpNoBody, newManager, parseRequest, responseStatus)
@@ -17,22 +17,19 @@ import System.IO (hPutStrLn, stderr)
 import Benchmark.Compare (runCompare)
 import Benchmark.Config.CLI (Command (..), parseArgs)
 import Benchmark.Config.Loader (loadBenchmarkConfig, validateBenchmarkConfig)
-import Benchmark.Reporter (combineReporters)
-import Benchmark.Reporter.CI (ciReporter)
-import Benchmark.Reporter.Markdown (markdownReporter)
-import Benchmark.Reporter.Terminal (terminalReporter)
+import Benchmark.Reporter (ciReporter, combineReporters, markdownReporter, terminalReporter)
 import Benchmark.Types
   ( BenchmarkConfig (..)
   , ChartsSettings
+  , HealthCheckConfig (..)
+  , LifecycleHooks (..)
+  , NamedTarget (..)
   , OutputFormat (..)
   , PerfTestError (..)
   , RunResult (..)
-  , Targets (..)
-  , TestConfig (..)
+  , Settings (..)
   , exitWithError
   )
-import Benchmark.Types.Config (NamedTarget (..), Settings (..))
-import Runner (runSingle)
 import Runner.Benchmark (runBenchmark)
 
 -- | Parse CLI arguments and dispatch to the appropriate benchmark command.
@@ -50,11 +47,8 @@ run = do
   let charts = getChartsConfig cmd
   result <- case cmd of
     Benchmark path baseline _ _ -> do
-      cfg <- loadAndValidateBenchmarkConfig path
-      case benchTargets cfg of
-        [] -> exitWithError (ConfigParseError "no targets defined in config")
-        [t] -> runSingle reporter baseline charts (toTestConfig t cfg)
-        _ -> runBenchmark reporter baseline charts cfg
+      cfg <- loadConfig path
+      runBenchmark reporter baseline charts cfg
     Compare fileA fileB ->
       runCompare reporter fileA fileB
     Validate cfgPath doCheck ->
@@ -69,8 +63,12 @@ exitWithResult RunSuccess = exitWith ExitSuccess
 exitWithResult (RunRegression _) = exitWith (ExitFailure 1)
 exitWithResult (RunError _) = exitWith (ExitFailure 2)
 
-loadAndValidateBenchmarkConfig :: FilePath -> IO BenchmarkConfig
-loadAndValidateBenchmarkConfig = loadAndValidate loadBenchmarkConfig validateBenchmarkConfig
+loadConfig :: FilePath -> IO BenchmarkConfig
+loadConfig path = do
+  res <- loadBenchmarkConfig path
+  case res of
+    Left err -> exitWithError $ ConfigParseError (T.pack err)
+    Right cfg -> either exitWithError return (validateBenchmarkConfig cfg)
 
 getMarkdownPath :: Command -> Maybe FilePath
 getMarkdownPath (Benchmark _ _ fmt _) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
@@ -79,24 +77,6 @@ getMarkdownPath _ = Nothing
 getChartsConfig :: Command -> Maybe ChartsSettings
 getChartsConfig (Benchmark _ _ _ c) = c
 getChartsConfig _ = Nothing
-
-toTestConfig :: NamedTarget -> BenchmarkConfig -> TestConfig
-toTestConfig t cfg =
-  TestConfig
-    { targets = Targets {primary = targetUrl t, candidate = targetUrl t}
-    , git = Targets {primary = branch, candidate = branch}
-    , settings = benchSettings cfg
-    , payloads = benchPayloads cfg
-    }
-  where
-    branch = fromMaybe "" (targetBranch t)
-
-loadAndValidate :: (FilePath -> IO (Either String a)) -> (a -> Either PerfTestError a) -> FilePath -> IO a
-loadAndValidate load validate path = do
-  res <- load path
-  case res of
-    Left err -> exitWithError $ ConfigParseError (T.pack err)
-    Right cfg -> either exitWithError return (validate cfg)
 
 -- | Validate a config file without running any benchmarks.
 runValidate :: FilePath -> Bool -> IO RunResult
@@ -114,7 +94,6 @@ runValidate cfgPath doCheck = do
         let setts = benchSettings validCfg
             targets = benchTargets validCfg
             payloads = benchPayloads validCfg
-            hcPath = fromMaybe "/health" (healthCheckPath setts)
         putStrLn "Config OK"
         putStrLn $ "Targets (" <> show (length targets) <> "):"
         forM_ targets $ \t ->
@@ -126,17 +105,19 @@ runValidate cfgPath doCheck = do
         if doCheck
           then do
             mgr <- newManager tlsManagerSettings
-            results <- mapM (checkEndpoint mgr hcPath) targets
+            results <- mapM (checkEndpoint mgr) targets
             if and results
               then pure RunSuccess
               else pure (RunError (UnknownNetworkError "one or more endpoints unreachable"))
           else pure RunSuccess
 
-checkEndpoint :: Manager -> T.Text -> NamedTarget -> IO Bool
-checkEndpoint mgr hcPath target =
+checkEndpoint :: Manager -> NamedTarget -> IO Bool
+checkEndpoint mgr target =
   catch go (\(_ :: SomeException) -> putStrLn unreachableMsg >> pure False)
   where
-    url = T.unpack (targetUrl target) <> T.unpack hcPath
+    url = T.unpack $ case targetLifecycle target >>= hookHealthCheck of
+      Just hc -> hcUrl hc
+      Nothing -> targetUrl target <> "/health"
     unreachableMsg = "  " <> T.unpack (targetName target) <> " " <> url <> " => unreachable"
     go = do
       req <- parseRequest url

@@ -2,28 +2,24 @@
 module Runner.Context
   ( RunContext (..)
   , initContext
-  , getNowNs
   , emitEvent
-  , setupOrFail
-  , Branch (..)
-  , ServiceUrl (..)
+  , makeBenchmarkEnv
   )
 where
 
-import Benchmark.Execution.Environment (Branch (..), ServiceUrl (..), setupEnvironment)
-import Benchmark.Network (initNetwork, readToken)
+import Benchmark.Network.Exec (BenchmarkEnv (..))
+import Benchmark.Network.Auth (readToken)
+import Benchmark.Network.Request (initNetwork)
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types (Settings (..), exitWithError)
 import Benchmark.Types qualified as PT
+import Control.Concurrent (QSem)
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
-import Control.Exception (throwIO)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Log (Logger, makeLogger)
 import Network.HTTP.Client (Manager)
-import System.Clock (Clock (Realtime), getTime, toNanoSecs)
-import Tracing.Types qualified as TT
 
 -- | Shared state threaded through every benchmark phase.
 data RunContext = RunContext
@@ -65,14 +61,17 @@ initContext setts csvFile timestamp eventChan = do
       , rcTargetName = ""
       }
 
--- | Set up the git environment or exit with an error.
-setupOrFail :: Manager -> Settings -> Branch -> ServiceUrl -> Maybe [String] -> IO ()
-setupOrFail mgr setts branch target composeArgs =
-  setupEnvironment mgr setts branch target composeArgs >>= either throwIO return
-
--- | Current time as nanoseconds (wall clock).
-getNowNs :: IO TT.Nanoseconds
-getNowNs = fromIntegral . toNanoSecs <$> getTime Realtime
+-- | Build a 'BenchmarkEnv' from shared 'RunContext' fields plus loop-local state.
+makeBenchmarkEnv :: RunContext -> QSem -> Int -> BenchmarkEnv
+makeBenchmarkEnv RunContext {..} sem idx =
+  BenchmarkEnv
+    { beSettings = rcSettings
+    , beSem = sem
+    , beManager = rcManager
+    , bePayloadIndex = idx
+    , beEventChan = rcEventChan
+    , beLogger = rcLogger
+    }
 
 -- | Emit an event to the TUI channel when one is present.
 emitEvent :: Maybe (TChan BenchmarkEvent) -> BenchmarkEvent -> IO ()

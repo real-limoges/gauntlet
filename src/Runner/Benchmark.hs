@@ -5,8 +5,7 @@ import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Config.Loader (buildEndpoints)
 import Benchmark.Report.Baseline (handleBaseline)
 import Benchmark.Report.Output (initOutputFiles)
-import Benchmark.Reporter (Reporter (..), combineReporters)
-import Benchmark.Reporter.Plot (plotReporter)
+import Benchmark.Reporter (Reporter (..), ReportingContext (..), combineReporters, plotReporter)
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), TUIState, initialState, tsError, tsFinished)
 import Benchmark.Types
@@ -14,6 +13,7 @@ import Benchmark.Types
   , BenchmarkConfig (..)
   , BenchmarkStats
   , ChartsSettings
+  , LifecycleHooks (..)
   , NamedTarget (..)
   , PerfTestError (..)
   , RegressionResult (..)
@@ -25,24 +25,20 @@ import Benchmark.Types
 import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (TChan, newTChanIO)
 import Control.Exception (SomeAsyncException, SomeException, catch, fromException, throwIO, try)
-import Control.Monad (forM, forM_, void)
+import Control.Monad (forM, forM_, void, when)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Log (Logger, logInfo)
-import Runner.Context
-  ( Branch (..)
-  , RunContext (..)
-  , ServiceUrl (..)
-  , emitEvent
-  , getNowNs
-  , initContext
-  , setupOrFail
-  )
+import Benchmark.Execution.Environment (runLifecycleSetup, runLifecycleTeardown)
+import Benchmark.Types.Error (formatError)
+import Log (logInfo, logWarning)
+import Runner.Context (RunContext (..), emitEvent, initContext)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
 import Stats.Benchmark (calculateStats, compareBayesian)
+import System.Clock (Clock (Realtime), getTime, toNanoSecs)
 import System.IO (hIsTerminalDevice, stdin)
 import Tracing.Types qualified as TT
 
@@ -93,6 +89,15 @@ runBenchmark reporter baselineMode mCharts cfg = do
     then runBenchmarkWithTUI fullReporter baselineMode cfg csvFile timestamp
     else runBenchmarkNoTUI fullReporter baselineMode cfg csvFile timestamp
 
+-- | Build a 'ReportingContext' from a reporter, baseline mode, and run context.
+mkReportingContext :: Reporter -> BaselineMode -> RunContext -> ReportingContext
+mkReportingContext reporter baselineMode ctx =
+  ReportingContext
+    { rctxReporter = reporter
+    , rctxBaselineMode = baselineMode
+    , rctxLogger = rcLogger ctx
+    }
+
 -- | Generate all N*(N-1)/2 pairwise Bayesian comparisons.
 allPairComparisons :: [(Text, BenchmarkStats)] -> [(Text, Text, BayesianComparison)]
 allPairComparisons [] = []
@@ -103,13 +108,7 @@ allPairComparisons ((nameA, statsA) : rest) =
     ++ allPairComparisons rest
 
 -- | Run benchmarks with TUI display.
-runBenchmarkWithTUI ::
-  Reporter ->
-  BaselineMode ->
-  BenchmarkConfig ->
-  FilePath ->
-  String ->
-  IO RunResult
+runBenchmarkWithTUI :: Reporter -> BaselineMode -> BenchmarkConfig -> FilePath -> String -> IO RunResult
 runBenchmarkWithTUI reporter baselineMode cfg csvFile timestamp = do
   let setts = benchSettings cfg
       eps = buildEndpoints "" (benchPayloads cfg)
@@ -118,24 +117,20 @@ runBenchmarkWithTUI reporter baselineMode cfg csvFile timestamp = do
   eventChan <- newTChanIO
   let tuiState = initialState "Starting..." perTargetRequests numEndpoints
   ctx <- initContext setts csvFile timestamp (Just eventChan)
+  let rctx = mkReportingContext reporter baselineMode ctx
   results <- withTUI eventChan tuiState (runAllTargets ctx cfg (Just eventChan))
-  postAnalysis reporter ctx baselineMode timestamp results
+  postAnalysis rctx ctx timestamp results
 
 -- | Run benchmarks without TUI (headless/CI mode).
-runBenchmarkNoTUI ::
-  Reporter ->
-  BaselineMode ->
-  BenchmarkConfig ->
-  FilePath ->
-  String ->
-  IO RunResult
+runBenchmarkNoTUI :: Reporter -> BaselineMode -> BenchmarkConfig -> FilePath -> String -> IO RunResult
 runBenchmarkNoTUI reporter baselineMode cfg csvFile timestamp = do
   let setts = benchSettings cfg
   ctx <- initContext setts csvFile timestamp Nothing
+  let rctx = mkReportingContext reporter baselineMode ctx
   results <- runAllTargets ctx cfg Nothing
-  postAnalysis reporter ctx baselineMode timestamp results
+  postAnalysis rctx ctx timestamp results
 
--- | Execute benchmarks for all targets.
+-- | Execute benchmarks for all targets sequentially.
 runAllTargets :: RunContext -> BenchmarkConfig -> Maybe (TChan BenchmarkEvent) -> IO [BenchmarkResult]
 runAllTargets ctx cfg eventChan = do
   let setts = benchSettings cfg
@@ -145,23 +140,24 @@ runAllTargets ctx cfg eventChan = do
 
     emitEvent eventChan (TargetStarted (targetName t) idx totalReqs)
 
-    case targetBranch t of
-      Just branch | not (T.null branch) -> do
-        emitEvent eventChan (StatusMessage $ "Setting up " <> branch <> "...")
-        setupOrFail
-          (rcManager ctx)
-          setts
-          (Branch branch)
-          (ServiceUrl (targetUrl t))
-          (Just ["--profile", "testing", "up", "-d", "--build"])
-      _ -> return ()
+    when (targetNeedsSetup t) $
+      emitEvent eventChan (StatusMessage $ "Setting up " <> targetName t <> "...")
+    runLifecycleSetup (rcManager ctx) t >>= either throwIO return
 
     emitEvent eventChan (StatusMessage $ "Benchmarking " <> targetName t)
 
-    startNs <- getNowNs
+    startNs <- fromIntegral . toNanoSecs <$> getTime Realtime
     let ctxWithTarget = ctx {rcTargetName = targetName t}
     (timings, validSummaries) <- benchmarkEndpoints ctxWithTarget (targetName t) targetEps
-    endNs <- getNowNs
+    endNs <- fromIntegral . toNanoSecs <$> getTime Realtime
+
+    do
+      teardownResult <- runLifecycleTeardown t
+      case teardownResult of
+        Right () -> return ()
+        Left err ->
+          logWarning (rcLogger ctx) $
+            "Teardown failed for " <> targetName t <> ": " <> formatError err
 
     pure
       BenchmarkResult
@@ -172,35 +168,35 @@ runAllTargets ctx cfg eventChan = do
         , nrEndNs = endNs
         }
 
+-- | True when a target has a branch or a setup hook that requires pre-benchmark work.
+targetNeedsSetup :: NamedTarget -> Bool
+targetNeedsSetup t =
+  maybe False (not . T.null) (targetBranch t)
+    || maybe False (isJust . hookSetup) (targetLifecycle t)
+
 -- | Post-benchmark analysis: reporting, tracing, baselines.
-postAnalysis ::
-  Reporter ->
-  RunContext ->
-  BaselineMode ->
-  String ->
-  [BenchmarkResult] ->
-  IO RunResult
-postAnalysis reporter ctx baselineMode timestamp results = do
+postAnalysis :: ReportingContext -> RunContext -> String -> [BenchmarkResult] -> IO RunResult
+postAnalysis rctx ctx timestamp results = do
   let namedStats = Map.fromList [(nrName r, nrStats r) | r <- results]
       pairs = allPairComparisons [(nrName r, nrStats r) | r <- results]
       validAll = concatMap nrValidations results
 
-  reportBenchmark reporter namedStats pairs validAll
+  reportBenchmark (rctxReporter rctx) namedStats pairs validAll
 
   forM_ results $ \r -> do
-    logInfo (rcLogger ctx) $ "\n#----- Traces: " <> nrName r <> " -----#"
+    logInfo (rctxLogger rctx) $ "\n#----- Traces: " <> nrName r <> " -----#"
     runTraceAnalysis ctx timestamp (nrStartNs r) (nrEndNs r)
 
-  handleBenchmarkBaseline reporter (rcLogger ctx) baselineMode (T.pack timestamp) namedStats
+  handleBenchmarkBaseline rctx (T.pack timestamp) namedStats
 
 -- | Run baseline operations for each target, aggregate results.
-handleBenchmarkBaseline ::
-  Reporter -> Logger -> BaselineMode -> Text -> Map Text BenchmarkStats -> IO RunResult
-handleBenchmarkBaseline _reporter _logger NoBaseline _timestamp _namedStats = return RunSuccess
-handleBenchmarkBaseline reporter logger mode timestamp namedStats = do
+handleBenchmarkBaseline :: ReportingContext -> Text -> Map Text BenchmarkStats -> IO RunResult
+handleBenchmarkBaseline ReportingContext {rctxBaselineMode = NoBaseline} _ _ = return RunSuccess
+handleBenchmarkBaseline rctx timestamp namedStats = do
   results <- forM (Map.toList namedStats) $ \(name, stats) -> do
-    let qualifiedMode = qualifyBaselineMode name mode
-    handleBaseline reporter logger qualifiedMode timestamp stats
+    let qualifiedMode = qualifyBaselineMode name (rctxBaselineMode rctx)
+        qualifiedRctx = rctx {rctxBaselineMode = qualifiedMode}
+    handleBaseline qualifiedRctx timestamp stats
   if any isRegression results
     then return $ RunRegression $ aggregateRegressions [r | RunRegression r <- results]
     else return RunSuccess

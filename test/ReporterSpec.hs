@@ -1,8 +1,7 @@
 -- | Tests for Benchmark.Reporter.
 module ReporterSpec (reporterSpec) where
 
-import Benchmark.Reporter (Reporter (..), combineReporters, noOpReporter)
-import Benchmark.Reporter.Markdown (markdownReporter)
+import Benchmark.Reporter (Reporter (..), combineReporters, markdownReporter, noOpReporter)
 import Benchmark.Types
 import Data.IORef
 import Data.Map.Strict qualified as Map

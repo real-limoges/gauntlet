@@ -1,12 +1,26 @@
 {
-  "targets": {
-    "primary": "http://api-v1.example.com",
-    "candidate": "http://api-v2.example.com"
-  },
-  "git": {
-    "primary": "main",
-    "candidate": "feat/v2"
-  },
+  "targets": [
+    {
+      "name": "api-v1",
+      "url": "http://api-v1.example.com",
+      "lifecycle": {
+        "healthCheck": {
+          "url": "http://api-v1.example.com/health",
+          "timeoutSecs": 30
+        }
+      }
+    },
+    {
+      "name": "api-v2",
+      "url": "http://api-v2.example.com",
+      "lifecycle": {
+        "healthCheck": {
+          "url": "http://api-v2.example.com/health",
+          "timeoutSecs": 30
+        }
+      }
+    }
+  ],
   "settings": {
     "iterations": 5000,
     "concurrency": 50,

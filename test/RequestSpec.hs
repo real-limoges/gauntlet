@@ -1,7 +1,7 @@
 -- | Tests for Benchmark.Network.Request.
 module RequestSpec (requestSpec) where
 
-import Benchmark.Network (initNetwork, prepareRequest, timedRequest)
+import Benchmark.Network.Request (initNetwork, prepareRequest, timedRequest)
 import Benchmark.Types
 import Data.Aeson (object, (.=))
 import Data.Text (Text)
@@ -41,8 +41,6 @@ testSettings =
     , warmup = Nothing
     , logLevel = Nothing
     , tempo = Nothing
-    , healthCheckPath = Nothing
-    , healthCheckTimeout = Nothing
     , loadMode = Nothing
     }
 

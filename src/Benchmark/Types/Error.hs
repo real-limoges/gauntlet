@@ -20,7 +20,10 @@ data PerfTestError
   | TokenReadError Text Text
   | HealthCheckTimeout Text Int
   | NoEndpointsError Text
-  | EnvironmentSetupError Text
+  | GitSwitchError Text
+  | HookSetupError Text
+  | HookTeardownError Text
+  | HookTimeoutError Text Int
   | BenchmarkCancelled
   | -- | Request timed out; contains endpoint URL
     NetworkTimeout Text
@@ -44,7 +47,11 @@ formatError (TokenReadError path msg) = "Token read error (" <> path <> "): " <>
 formatError (HealthCheckTimeout url retries) =
   "Health check timeout: " <> url <> " failed after " <> T.pack (show retries) <> " retries"
 formatError (NoEndpointsError which) = "No " <> which <> " endpoints defined"
-formatError (EnvironmentSetupError msg) = "Environment setup error: " <> msg
+formatError (GitSwitchError msg) = "Git switch error: " <> msg
+formatError (HookSetupError msg) = "Setup hook failed: " <> msg
+formatError (HookTeardownError msg) = "Teardown hook failed: " <> msg
+formatError (HookTimeoutError cmd secs) =
+  "Hook timed out after " <> T.pack (show secs) <> "s: " <> cmd
 formatError BenchmarkCancelled = "Benchmark cancelled by user"
 formatError (NetworkTimeout url) = "Network timeout: " <> url
 formatError (ConnectionRefused url) = "Connection refused: " <> url

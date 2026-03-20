@@ -5,6 +5,8 @@ module TestHelpers
   , makeResponseWithBody
   , mockStats
   , makeValidConfig
+  , makeLifecycleHooks
+  , makeHookCommand
   , makeSpan
   , makeBaseline
   , mockBayesianComparison
@@ -86,21 +88,25 @@ mockStats mean dev =
     , esMs = mean + 3 * dev
     }
 
--- | A valid TestConfig with primary\/candidate targets, git branches, and one payload.
-makeValidConfig :: TestConfig
+-- | A valid 'BenchmarkConfig' with two named targets and one payload.
+makeValidConfig :: BenchmarkConfig
 makeValidConfig =
-  TestConfig
-    { targets =
-        Targets
-          { primary = "http://primary.test"
-          , candidate = "http://candidate.test"
-          }
-    , git =
-        Targets
-          { primary = "main"
-          , candidate = "feature"
-          }
-    , settings =
+  BenchmarkConfig
+    { benchTargets =
+        [ NamedTarget
+            { targetName = "primary"
+            , targetUrl = "http://primary.test"
+            , targetBranch = Nothing
+            , targetLifecycle = Nothing
+            }
+        , NamedTarget
+            { targetName = "candidate"
+            , targetUrl = "http://candidate.test"
+            , targetBranch = Just "feature"
+            , targetLifecycle = Nothing
+            }
+        ]
+    , benchSettings =
         Settings
           { iterations = 10
           , concurrency = 2
@@ -111,11 +117,9 @@ makeValidConfig =
           , warmup = Nothing
           , logLevel = Nothing
           , tempo = Nothing
-          , healthCheckPath = Nothing
-          , healthCheckTimeout = Nothing
           , loadMode = Nothing
           }
-    , payloads =
+    , benchPayloads =
         [ PayloadSpec
             { specName = "test-payload"
             , specMethod = "POST"
@@ -125,6 +129,24 @@ makeValidConfig =
             , specValidate = Nothing
             }
         ]
+    }
+
+-- | A minimal 'LifecycleHooks' with all fields set to Nothing.
+makeLifecycleHooks :: LifecycleHooks
+makeLifecycleHooks =
+  LifecycleHooks
+    { hookSetup = Nothing
+    , hookTeardown = Nothing
+    , hookHealthCheck = Nothing
+    }
+
+-- | A 'HookCommand' with the given shell command and no timeout or working dir.
+makeHookCommand :: Text -> HookCommand
+makeHookCommand cmd =
+  HookCommand
+    { hookCmd = cmd
+    , hookTimeoutSecs = Nothing
+    , hookWorkingDir = Nothing
     }
 
 -- | Build a Span with the given operation name and duration in nanoseconds.
