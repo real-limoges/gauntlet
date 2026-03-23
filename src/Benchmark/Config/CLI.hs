@@ -41,6 +41,7 @@ data Command
       { validateConfigPath :: FilePath
       , checkEndpoints :: Bool
       }
+  | Schema
   deriving (Show, Eq)
 
 -- | Parse command-line arguments into a 'Command'.
@@ -64,6 +65,7 @@ commandParser =
         (info benchmarkOptions (progDesc "Run benchmark (single or multi-target based on config)"))
         <> command "compare" (info compareOptions (progDesc "Compare two saved benchmark results"))
         <> command "validate" (info validateOptions (progDesc "Validate config without running benchmarks"))
+        <> command "schema" (info (pure Schema) (progDesc "Print the config JSON schema to stdout"))
     )
 
 configOption :: Parser FilePath

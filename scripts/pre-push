@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "==> hlint"
+hlint src app test
+
+echo "==> fourmolu"
+fourmolu -i src app test
+if ! git diff --quiet; then
+    echo "fourmolu modified files — re-stage and retry"
+    git diff --name-only
+    exit 1
+fi
+
+echo "==> cabal clean"
+cabal clean
+
+echo "==> cabal build"
+cabal build
+
+echo "==> cabal test"
+cabal test --test-show-details=direct

@@ -1,16 +1,20 @@
 {- HLINT ignore "Use exitSuccess" -}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | Main entry point: CLI dispatch and benchmark orchestration.
 module Lib (run) where
 
 import Control.Exception (SomeException, catch)
 import Control.Monad (forM_)
+import Data.ByteString.Char8 qualified as BC8
+import Data.FileEmbed (embedFile)
 import Data.Maybe (catMaybes)
 import Data.Text qualified as T
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import Network.HTTP.Client (Manager, httpNoBody, newManager, parseRequest, responseStatus)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types.Status (statusCode)
+import System.Directory (createDirectoryIfMissing)
 import System.Exit (ExitCode (..), exitWith)
 import System.IO (hPutStrLn, stderr)
 
@@ -62,6 +66,11 @@ run = do
       runCompare reporter fileA fileB
     Validate cfgPath doCheck ->
       runValidate cfgPath doCheck
+    Schema -> do
+      createDirectoryIfMissing True "schema"
+      BC8.writeFile "schema/config-schema.json" $(embedFile "schema/config-schema.json")
+      putStrLn "Wrote schema/config-schema.json"
+      pure RunSuccess
   exitWithResult result
 
 {-| Exit with appropriate code based on run result.

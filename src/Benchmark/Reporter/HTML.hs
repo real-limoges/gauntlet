@@ -235,7 +235,7 @@ showD = B.fromString . show
 
 -- | Round to 1 decimal place.
 showD1 :: Double -> B.Builder
-showD1 d = B.fromString $ showFFloat' 1 d
+showD1 d = B.fromString $ showFFloat' (1 :: Integer) d
   where
     showFFloat' n v =
       let factor = 10 ^ n :: Int

@@ -5,6 +5,7 @@ src/.DS_Store
 docker-compose-dev.yml
 *.json
 !examples/*.json
+!schema/*.json
 secrets.txt
 .secrets/
 .env.local
