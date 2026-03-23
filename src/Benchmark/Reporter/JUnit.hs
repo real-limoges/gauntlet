@@ -130,7 +130,7 @@ statsTestCases BenchmarkStats {..} =
   , metric "failure_count" (showI countFailure)
   ]
   where
-    metric name val =
+    metric name _val =
       TestCase
         { tcName = name
         , tcClassName = "gauntlet.stats"
@@ -146,7 +146,7 @@ comparisonTestCases _nameA _nameB BayesianComparison {..} =
   , tc "mean_diff_ms" (showD meanDifference)
   ]
   where
-    tc name val =
+    tc name _val =
       TestCase
         { tcName = name
         , tcClassName = "gauntlet.comparison"

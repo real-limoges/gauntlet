@@ -105,6 +105,7 @@ library
                           vty-crossplatform,
                           vector,
                           vector-algorithms,
+                          file-embed,
 
 executable            gauntlet-exe
   import:             warnings
