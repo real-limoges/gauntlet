@@ -1,0 +1,691 @@
+{
+  "version": 1,
+  "root": "NwayConfig",
+  "types": {
+    "NwayConfig": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "targets",
+          "type": "[NamedTarget]",
+          "required": true,
+          "label": "Targets",
+          "help": "Named HTTP targets to benchmark. Use one for single-target runs, two or more for N-way comparison.",
+          "constraints": { "minItems": 1 }
+        },
+        {
+          "key": "settings",
+          "type": "Settings",
+          "required": true,
+          "label": "Settings",
+          "help": "Runtime settings controlling iterations, concurrency, timeouts, and optional features."
+        },
+        {
+          "key": "payloads",
+          "type": "[PayloadSpec]",
+          "required": true,
+          "label": "Payloads",
+          "help": "HTTP request specifications to execute against each target.",
+          "constraints": { "minItems": 1 }
+        }
+      ]
+    },
+    "NamedTarget": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "name",
+          "type": "string",
+          "required": true,
+          "label": "Name",
+          "help": "Display name for this target (e.g. \"production\", \"candidate\").",
+          "placeholder": "my-target"
+        },
+        {
+          "key": "url",
+          "type": "string",
+          "required": true,
+          "label": "Base URL",
+          "help": "Base URL for the target service (e.g. \"http://localhost:8080\").",
+          "placeholder": "http://localhost:8080"
+        },
+        {
+          "key": "branch",
+          "type": "string",
+          "required": false,
+          "label": "Git Branch",
+          "help": "Git branch to switch to before benchmarking this target. Leave empty to skip git switching.",
+          "placeholder": "main"
+        },
+        {
+          "key": "lifecycle",
+          "type": "LifecycleHooks",
+          "required": false,
+          "label": "Lifecycle Hooks",
+          "help": "Optional setup/teardown commands and health check for this target."
+        }
+      ]
+    },
+    "LifecycleHooks": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "setup",
+          "type": "HookCommand",
+          "required": false,
+          "label": "Setup Command",
+          "help": "Shell command to run before benchmarking this target."
+        },
+        {
+          "key": "teardown",
+          "type": "HookCommand",
+          "required": false,
+          "label": "Teardown Command",
+          "help": "Shell command to run after benchmarking this target."
+        },
+        {
+          "key": "healthCheck",
+          "type": "HealthCheckConfig",
+          "required": false,
+          "label": "Health Check",
+          "help": "Health check to poll before benchmarking starts."
+        }
+      ]
+    },
+    "HookCommand": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "cmd",
+          "type": "string",
+          "required": true,
+          "label": "Command",
+          "help": "Shell command to execute (run via /bin/sh -c).",
+          "placeholder": "docker-compose up -d"
+        },
+        {
+          "key": "timeoutSecs",
+          "type": "int",
+          "required": false,
+          "label": "Timeout (seconds)",
+          "help": "Maximum time to wait for the command to finish.",
+          "default": 300,
+          "constraints": { "min": 1 }
+        },
+        {
+          "key": "workingDir",
+          "type": "string",
+          "required": false,
+          "label": "Working Directory",
+          "help": "Working directory for the command. Defaults to the current directory."
+        }
+      ]
+    },
+    "HealthCheckConfig": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "url",
+          "type": "string",
+          "required": true,
+          "label": "URL",
+          "help": "URL to poll for health check readiness.",
+          "placeholder": "http://localhost:8080/health"
+        },
+        {
+          "key": "timeoutSecs",
+          "type": "int",
+          "required": false,
+          "label": "Timeout (seconds)",
+          "help": "Total polling budget in seconds.",
+          "default": 60,
+          "constraints": { "min": 1 }
+        },
+        {
+          "key": "intervalMs",
+          "type": "int",
+          "required": false,
+          "label": "Poll Interval (ms)",
+          "help": "Delay between health check polls in milliseconds.",
+          "default": 1000,
+          "constraints": { "min": 1 }
+        }
+      ]
+    },
+    "Settings": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "iterations",
+          "type": "int",
+          "required": true,
+          "label": "Iterations",
+          "help": "Number of HTTP requests to execute per payload per target.",
+          "placeholder": "1000",
+          "constraints": { "min": 1 }
+        },
+        {
+          "key": "concurrency",
+          "type": "int",
+          "required": true,
+          "label": "Concurrency",
+          "help": "Maximum number of concurrent HTTP requests.",
+          "placeholder": "10",
+          "constraints": { "min": 1 }
+        },
+        {
+          "key": "secrets",
+          "type": "string",
+          "required": false,
+          "label": "Secrets File",
+          "help": "Path to a file containing the Bearer token for authenticated endpoints.",
+          "placeholder": ".secrets"
+        },
+        {
+          "key": "maxConnections",
+          "type": "int",
+          "required": false,
+          "label": "Max Connections",
+          "help": "HTTP connection pool size.",
+          "default": 10,
+          "constraints": { "min": 1 }
+        },
+        {
+          "key": "requestTimeout",
+          "type": "int",
+          "required": false,
+          "label": "Request Timeout",
+          "help": "Per-request timeout in seconds.",
+          "default": 30,
+          "constraints": { "min": 1 }
+        },
+        {
+          "key": "retry",
+          "type": "RetrySettings",
+          "required": false,
+          "label": "Retry Settings",
+          "help": "Retry configuration for failed HTTP requests."
+        },
+        {
+          "key": "warmup",
+          "type": "WarmupSettings",
+          "required": false,
+          "label": "Warmup Settings",
+          "help": "Warmup configuration before benchmark runs."
+        },
+        {
+          "key": "logLevel",
+          "type": "LogLevel",
+          "required": false,
+          "label": "Log Level",
+          "help": "Logging verbosity.",
+          "default": "info"
+        },
+        {
+          "key": "tempo",
+          "type": "TempoSettings",
+          "required": false,
+          "label": "Tempo Settings",
+          "help": "Optional Grafana Tempo integration for distributed trace analysis."
+        },
+        {
+          "key": "loadMode",
+          "type": "LoadMode",
+          "required": false,
+          "label": "Load Mode",
+          "help": "Load control mode for pacing request dispatch."
+        }
+      ]
+    },
+    "RetrySettings": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "retryMaxAttempts",
+          "type": "int",
+          "required": false,
+          "label": "Max Attempts",
+          "help": "Maximum number of retry attempts.",
+          "default": 3,
+          "constraints": { "min": 1 }
+        },
+        {
+          "key": "retryInitialDelayMs",
+          "type": "int",
+          "required": false,
+          "label": "Initial Delay (ms)",
+          "help": "Initial delay in milliseconds before the first retry.",
+          "default": 1000,
+          "constraints": { "min": 0 }
+        },
+        {
+          "key": "retryBackoffMultiplier",
+          "type": "float",
+          "required": false,
+          "label": "Backoff Multiplier",
+          "help": "Delay multiplier for exponential backoff.",
+          "default": 2.0,
+          "constraints": { "minExclusive": 0 }
+        }
+      ]
+    },
+    "WarmupSettings": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "warmupIterations",
+          "type": "int",
+          "required": false,
+          "label": "Warmup Iterations",
+          "help": "Number of warmup requests per endpoint before the benchmark starts.",
+          "default": 1,
+          "constraints": { "min": 0 }
+        }
+      ]
+    },
+    "TempoSettings": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "tempoUrl",
+          "type": "string",
+          "required": true,
+          "label": "Tempo URL",
+          "help": "Base URL for the Grafana Tempo instance.",
+          "placeholder": "http://tempo:3200"
+        },
+        {
+          "key": "tempoServiceName",
+          "type": "string",
+          "required": true,
+          "label": "Service Name",
+          "help": "Service name to filter traces by.",
+          "placeholder": "my-service"
+        },
+        {
+          "key": "tempoEnabled",
+          "type": "bool",
+          "required": false,
+          "label": "Enabled",
+          "help": "Whether Tempo integration is enabled. Defaults to true when the tempo section is present.",
+          "default": true
+        },
+        {
+          "key": "tempoAuthToken",
+          "type": "string",
+          "required": false,
+          "label": "Auth Token",
+          "help": "Optional Bearer token for authenticating with Tempo."
+        }
+      ]
+    },
+    "LogLevel": {
+      "kind": "enum",
+      "default": "info",
+      "values": [
+        { "value": "debug", "label": "Debug" },
+        { "value": "info", "label": "Info" },
+        { "value": "warning", "label": "Warning" },
+        { "value": "error", "label": "Error" }
+      ]
+    },
+    "HttpMethod": {
+      "kind": "enum",
+      "default": "GET",
+      "values": [
+        { "value": "GET", "label": "GET" },
+        { "value": "POST", "label": "POST" },
+        { "value": "PUT", "label": "PUT" },
+        { "value": "PATCH", "label": "PATCH" },
+        { "value": "DELETE", "label": "DELETE" },
+        { "value": "HEAD", "label": "HEAD" },
+        { "value": "OPTIONS", "label": "OPTIONS" }
+      ]
+    },
+    "LoadMode": {
+      "kind": "tagged_union",
+      "discriminator": "mode",
+      "default_variant": "unthrottled",
+      "variants": [
+        {
+          "value": "unthrottled",
+          "label": "Unthrottled",
+          "help": "No throttling — fire requests as fast as concurrency allows.",
+          "fields": []
+        },
+        {
+          "value": "constantRpm",
+          "label": "Constant RPM",
+          "help": "Pace iterations at a fixed requests-per-minute rate.",
+          "fields": [
+            {
+              "key": "targetRpm",
+              "type": "float",
+              "required": true,
+              "label": "Target RPM",
+              "help": "Requests per minute to maintain.",
+              "placeholder": "600",
+              "constraints": { "minExclusive": 0 }
+            }
+          ]
+        },
+        {
+          "value": "rampUp",
+          "label": "Ramp Up",
+          "help": "Linearly increase RPM from a starting rate to an ending rate over a duration.",
+          "fields": [
+            {
+              "key": "startRpm",
+              "type": "float",
+              "required": true,
+              "label": "Start RPM",
+              "help": "Initial requests per minute.",
+              "placeholder": "60",
+              "constraints": { "minExclusive": 0 }
+            },
+            {
+              "key": "endRpm",
+              "type": "float",
+              "required": true,
+              "label": "End RPM",
+              "help": "Final requests per minute.",
+              "placeholder": "1200",
+              "constraints": { "minExclusive": 0 }
+            },
+            {
+              "key": "durationSecs",
+              "type": "float",
+              "required": true,
+              "label": "Duration (seconds)",
+              "help": "Total ramp-up duration in seconds.",
+              "placeholder": "60",
+              "constraints": { "minExclusive": 0 }
+            }
+          ]
+        },
+        {
+          "value": "stepLoad",
+          "label": "Step Load",
+          "help": "Sequential steps, each with its own RPM and duration.",
+          "fields": [
+            {
+              "key": "steps",
+              "type": "[LoadStep]",
+              "required": true,
+              "label": "Steps",
+              "help": "Ordered list of load steps to execute.",
+              "constraints": { "minItems": 1 }
+            }
+          ]
+        },
+        {
+          "value": "poissonRpm",
+          "label": "Poisson RPM",
+          "help": "Poisson-distributed load at an average requests-per-minute rate.",
+          "fields": [
+            {
+              "key": "targetRpm",
+              "type": "float",
+              "required": true,
+              "label": "Target RPM",
+              "help": "Average requests per minute (Poisson-distributed inter-arrival times).",
+              "placeholder": "600",
+              "constraints": { "minExclusive": 0 }
+            }
+          ]
+        }
+      ]
+    },
+    "LoadStep": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "rpm",
+          "type": "float",
+          "required": true,
+          "label": "RPM",
+          "help": "Target requests per minute for this step.",
+          "constraints": { "minExclusive": 0 }
+        },
+        {
+          "key": "durationSecs",
+          "type": "float",
+          "required": true,
+          "label": "Duration (seconds)",
+          "help": "How long this step lasts in seconds.",
+          "constraints": { "minExclusive": 0 }
+        }
+      ]
+    },
+    "PayloadSpec": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "name",
+          "type": "string",
+          "required": true,
+          "label": "Name",
+          "help": "Display name for this payload (e.g. \"List Users\", \"Create Order\").",
+          "placeholder": "my-endpoint"
+        },
+        {
+          "key": "method",
+          "type": "HttpMethod",
+          "required": true,
+          "label": "HTTP Method",
+          "help": "HTTP method to use for this request."
+        },
+        {
+          "key": "path",
+          "type": "string",
+          "required": true,
+          "label": "Path",
+          "help": "URL path appended to the target base URL.",
+          "placeholder": "/api/v1/resource"
+        },
+        {
+          "key": "body",
+          "type": "any",
+          "required": false,
+          "label": "Request Body",
+          "help": "JSON request body. Only applicable for POST, PUT, PATCH methods."
+        },
+        {
+          "key": "headers",
+          "type": "map<string,string>",
+          "required": false,
+          "label": "Headers",
+          "help": "Custom HTTP headers as key-value pairs.",
+          "placeholder": "Content-Type: application/json"
+        },
+        {
+          "key": "validate",
+          "type": "ValidationSpec",
+          "required": false,
+          "label": "Validation",
+          "help": "Optional validation rules applied to every response from this endpoint."
+        }
+      ]
+    },
+    "ValidationSpec": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "status",
+          "type": "int",
+          "required": false,
+          "label": "Expected Status Code",
+          "help": "Expected HTTP status code (e.g. 200, 201).",
+          "placeholder": "200",
+          "constraints": { "min": 100, "max": 599 }
+        },
+        {
+          "key": "fields",
+          "type": "map<string,FieldAssertion>",
+          "required": false,
+          "label": "Field Assertions",
+          "help": "Map from JSON dot-path (e.g. \"$.user.id\") to an assertion on the field value."
+        }
+      ]
+    },
+    "FieldAssertion": {
+      "kind": "tagged_union",
+      "discriminator": null,
+      "default_variant": "present",
+      "variants": [
+        {
+          "value": "present",
+          "label": "Present",
+          "help": "Assert the field exists (any value, including null).",
+          "fields": [
+            {
+              "key": "present",
+              "type": "bool",
+              "required": true,
+              "label": "Present",
+              "default": true
+            }
+          ]
+        },
+        {
+          "value": "eq",
+          "label": "Equals",
+          "help": "Assert the field has an exact JSON value.",
+          "fields": [
+            {
+              "key": "eq",
+              "type": "any",
+              "required": true,
+              "label": "Expected Value"
+            }
+          ]
+        },
+        {
+          "value": "null",
+          "label": "Null",
+          "help": "Assert the field is explicitly null.",
+          "fields": [
+            {
+              "key": "null",
+              "type": "bool",
+              "required": true,
+              "label": "Null",
+              "default": true
+            }
+          ]
+        },
+        {
+          "value": "notNull",
+          "label": "Not Null",
+          "help": "Assert the field exists and is not null.",
+          "fields": [
+            {
+              "key": "notNull",
+              "type": "bool",
+              "required": true,
+              "label": "Not Null",
+              "default": true
+            }
+          ]
+        },
+        {
+          "value": "type",
+          "label": "Type Check",
+          "help": "Assert the JSON type of the field.",
+          "fields": [
+            {
+              "key": "type",
+              "type": "JsonType",
+              "required": true,
+              "label": "Expected Type"
+            }
+          ]
+        },
+        {
+          "value": "matches",
+          "label": "Regex Match",
+          "help": "Assert a string field matches a POSIX ERE regex pattern.",
+          "fields": [
+            {
+              "key": "matches",
+              "type": "string",
+              "required": true,
+              "label": "Pattern",
+              "placeholder": "^[a-z]+$"
+            }
+          ]
+        },
+        {
+          "value": "range",
+          "label": "Numeric Range",
+          "help": "Assert a numeric field is within [min, max]. Both bounds are optional.",
+          "fields": [
+            {
+              "key": "range",
+              "type": "NumericRange",
+              "required": true,
+              "label": "Range"
+            }
+          ]
+        },
+        {
+          "value": "arrayLength",
+          "label": "Array Length",
+          "help": "Assert an array has exactly N elements.",
+          "fields": [
+            {
+              "key": "arrayLength",
+              "type": "int",
+              "required": true,
+              "label": "Expected Length",
+              "constraints": { "min": 0 }
+            }
+          ]
+        },
+        {
+          "value": "arrayContains",
+          "label": "Array Contains",
+          "help": "Assert a value is present in an array.",
+          "fields": [
+            {
+              "key": "arrayContains",
+              "type": "any",
+              "required": true,
+              "label": "Expected Element"
+            }
+          ]
+        }
+      ]
+    },
+    "JsonType": {
+      "kind": "enum",
+      "values": [
+        { "value": "string", "label": "String" },
+        { "value": "number", "label": "Number" },
+        { "value": "boolean", "label": "Boolean" },
+        { "value": "array", "label": "Array" },
+        { "value": "object", "label": "Object" },
+        { "value": "null", "label": "Null" }
+      ]
+    },
+    "NumericRange": {
+      "kind": "object",
+      "fields": [
+        {
+          "key": "min",
+          "type": "float",
+          "required": false,
+          "label": "Minimum",
+          "help": "Lower bound (inclusive). Leave empty for no lower bound."
+        },
+        {
+          "key": "max",
+          "type": "float",
+          "required": false,
+          "label": "Maximum",
+          "help": "Upper bound (inclusive). Leave empty for no upper bound."
+        }
+      ]
+    }
+  }
+}
