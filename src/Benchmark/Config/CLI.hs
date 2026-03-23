@@ -28,6 +28,10 @@ data Command
       , baselineMode :: BaselineMode
       , outputFormat :: OutputFormat
       , chartsConfig :: Maybe ChartsSettings
+      , junitPath :: Maybe FilePath
+      , htmlPath :: Maybe FilePath
+      , prometheusConfig :: Maybe (String, String)
+      -- ^ (pushgatewayUrl, jobName)
       }
   | Compare
       { compareFileA :: FilePath
@@ -152,9 +156,51 @@ chartsParser = optional $ buildCharts <$> chartsOption <*> chartsDirOption
             [] -> []
             (_ : rs) -> splitOn sep rs
 
+junitOption :: Parser (Maybe FilePath)
+junitOption =
+  optional $
+    strOption
+      ( long "junit-report"
+          <> metavar "FILE"
+          <> help "Write JUnit XML report to FILE"
+      )
+
+htmlOption :: Parser (Maybe FilePath)
+htmlOption =
+  optional $
+    strOption
+      ( long "html-report"
+          <> metavar "FILE"
+          <> help "Write self-contained HTML report to FILE"
+      )
+
+prometheusOption :: Parser (Maybe (String, String))
+prometheusOption =
+  optional $
+    (,)
+      <$> strOption
+        ( long "prometheus-pushgateway"
+            <> metavar "URL"
+            <> help "Prometheus Pushgateway URL (e.g. http://localhost:9091)"
+        )
+      <*> strOption
+        ( long "prometheus-job"
+            <> metavar "NAME"
+            <> help "Prometheus job name"
+            <> value "gauntlet"
+            <> showDefault
+        )
+
 benchmarkOptions :: Parser Command
 benchmarkOptions =
-  Benchmark <$> configOption <*> baselineModeParser <*> outputFormatParser <*> chartsParser
+  Benchmark
+    <$> configOption
+    <*> baselineModeParser
+    <*> outputFormatParser
+    <*> chartsParser
+    <*> junitOption
+    <*> htmlOption
+    <*> prometheusOption
 
 compareOptions :: Parser Command
 compareOptions =

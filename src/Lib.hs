@@ -17,12 +17,16 @@ import System.IO (hPutStrLn, stderr)
 import Benchmark.Compare (runCompare)
 import Benchmark.Config.CLI (Command (..), parseArgs)
 import Benchmark.Config.Loader (loadBenchmarkConfig, validateBenchmarkConfig)
-import Benchmark.Reporter (ciReporter, combineReporters, markdownReporter, terminalReporter)
+import Benchmark.Reporter (Reporter, ciReporter, combineReporters, markdownReporter, terminalReporter)
+import Benchmark.Reporter.HTML (htmlReporter)
+import Benchmark.Reporter.JUnit (junitReporter)
+import Benchmark.Reporter.Prometheus (prometheusReporter)
 import Benchmark.Types
   ( BenchmarkConfig (..)
   , ChartsSettings
   , HealthCheckConfig (..)
   , LifecycleHooks (..)
+  , LogLevel (..)
   , NamedTarget (..)
   , OutputFormat (..)
   , PerfTestError (..)
@@ -30,6 +34,7 @@ import Benchmark.Types
   , Settings (..)
   , exitWithError
   )
+import Log (makeLogger)
 import Runner.Benchmark (runBenchmark)
 
 -- | Parse CLI arguments and dispatch to the appropriate benchmark command.
@@ -37,16 +42,20 @@ run :: IO ()
 run = do
   cmd <- parseArgs
   ci <- ciReporter
+  promReporter <- mkPrometheusReporter cmd
   let reporter =
         combineReporters $
           catMaybes
             [ Just terminalReporter
             , markdownReporter <$> getMarkdownPath cmd
+            , junitReporter <$> getJUnitPath cmd
+            , htmlReporter <$> getHTMLPath cmd
+            , promReporter
             , Just ci
             ]
   let charts = getChartsConfig cmd
   result <- case cmd of
-    Benchmark path baseline _ _ -> do
+    Benchmark {configPath = path, baselineMode = baseline} -> do
       cfg <- loadConfig path
       runBenchmark reporter baseline charts cfg
     Compare fileA fileB ->
@@ -71,12 +80,27 @@ loadConfig path = do
     Right cfg -> either exitWithError return (validateBenchmarkConfig cfg)
 
 getMarkdownPath :: Command -> Maybe FilePath
-getMarkdownPath (Benchmark _ _ fmt _) = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
+getMarkdownPath Benchmark {outputFormat = fmt} = case fmt of OutputMarkdown p -> Just p; _ -> Nothing
 getMarkdownPath _ = Nothing
 
 getChartsConfig :: Command -> Maybe ChartsSettings
-getChartsConfig (Benchmark _ _ _ c) = c
+getChartsConfig Benchmark {chartsConfig = c} = c
 getChartsConfig _ = Nothing
+
+getJUnitPath :: Command -> Maybe FilePath
+getJUnitPath Benchmark {junitPath = j} = j
+getJUnitPath _ = Nothing
+
+getHTMLPath :: Command -> Maybe FilePath
+getHTMLPath Benchmark {htmlPath = h} = h
+getHTMLPath _ = Nothing
+
+mkPrometheusReporter :: Command -> IO (Maybe Reporter)
+mkPrometheusReporter Benchmark {prometheusConfig = Just (url, job)} = do
+  let logger = makeLogger Info
+  mgr <- newManager tlsManagerSettings
+  pure $ Just $ prometheusReporter logger mgr (T.pack url) (T.pack job)
+mkPrometheusReporter _ = pure Nothing
 
 -- | Validate a config file without running any benchmarks.
 runValidate :: FilePath -> Bool -> IO RunResult

@@ -12,7 +12,12 @@ module Benchmark.Reporter
 where
 
 import Benchmark.Config.CLI (BaselineMode)
-import Benchmark.Report (printBenchmarkReport, printRegressionResult, printSingleBenchmarkReport, printValidationSummary)
+import Benchmark.Report
+  ( printBenchmarkReport
+  , printRegressionResult
+  , printSingleBenchmarkReport
+  , printValidationSummary
+  )
 import Benchmark.Report.CI
   ( CIMode (..)
   , detectCIMode
@@ -27,25 +32,26 @@ import Benchmark.Report.Markdown
   , markdownValidationReport
   )
 import Benchmark.Types
-import Benchmark.Types.Config (ChartsSettings (..))
-import Log (Logger)
 import Data.List (intercalate)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Time.Clock.POSIX (getPOSIXTime)
+import Log (Logger, logWarning)
 import System.Exit (ExitCode (..))
 import System.FilePath (takeDirectory)
-import System.IO (hPutStrLn, stderr)
 import System.Process (readProcessWithExitCode)
 
 -- | Record of callbacks for reporting benchmark results.
 data Reporter = Reporter
   { reportSingle :: Text -> BenchmarkStats -> [ValidationSummary] -> IO ()
+  -- ^ Called after a single-target benchmark completes.
   , reportBenchmark ::
       Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> [ValidationSummary] -> IO ()
+  -- ^ Called after all targets complete with per-target stats and pairwise comparisons.
   , reportRegression :: RegressionResult -> IO ()
+  -- ^ Called after baseline comparison when regressions are detected.
   }
 
 -- | Bundles reporting dependencies that always travel together.
@@ -120,16 +126,16 @@ ciReporter = do
         }
 
 -- | Reporter that generates charts by invoking the plot_latency.py script.
-plotReporter :: ChartsSettings -> FilePath -> Reporter
-plotReporter settings csvFile =
+plotReporter :: Logger -> ChartsSettings -> FilePath -> Reporter
+plotReporter logger settings csvFile =
   Reporter
-    { reportSingle = \_ _ _ -> generateCharts settings csvFile
-    , reportBenchmark = \_ _ _ -> generateCharts settings csvFile
+    { reportSingle = \_ _ _ -> generateCharts logger settings csvFile
+    , reportBenchmark = \_ _ _ -> generateCharts logger settings csvFile
     , reportRegression = \_ -> pure ()
     }
 
-generateCharts :: ChartsSettings -> FilePath -> IO ()
-generateCharts ChartsSettings {..} csvFile = do
+generateCharts :: Logger -> ChartsSettings -> FilePath -> IO ()
+generateCharts logger ChartsSettings {..} csvFile = do
   let chartArg = intercalate "," (map T.unpack chartsTypes)
       outDir = case chartsDir of
         Just d -> d
@@ -148,6 +154,7 @@ generateCharts ChartsSettings {..} csvFile = do
   (exitCode, _stdout, stderrOut) <- readProcessWithExitCode "uv" args ""
   case exitCode of
     ExitSuccess -> pure ()
-    ExitFailure code -> do
-      hPutStrLn stderr $
-        "Chart generation failed (exit " <> show code <> "): " <> stderrOut
+    ExitFailure code ->
+      logWarning logger $
+        T.pack $
+          "Chart generation failed (exit " <> show code <> "): " <> stderrOut

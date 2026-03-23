@@ -13,10 +13,10 @@ import Benchmark.Report.Formatting (formatValidationError)
 import Benchmark.Types
   ( BayesianComparison (..)
   , BenchmarkStats (..)
-  , MetricRegression (..)
-  , RegressionResult (..)
   , ComparisonReport (..)
+  , MetricRegression (..)
   , PercentileComparison (..)
+  , RegressionResult (..)
   , ValidationSummary (..)
   )
 import Control.Monad (forM_, unless, when)
@@ -183,6 +183,7 @@ printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
 lookupStats :: Text -> Map Text BenchmarkStats -> BenchmarkStats
 lookupStats = Map.findWithDefault emptyStats
 
+-- | Zero-valued stats used as fallback when a target name is not found in the results map.
 emptyStats :: BenchmarkStats
 emptyStats =
   BenchmarkStats

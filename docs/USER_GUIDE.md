@@ -156,14 +156,14 @@ Controls the rate at which requests are sent. Defaults to `unthrottled` (as fast
 "loadMode": {"mode": "unthrottled"}
 ```
 
-**Constant RPS** — steady request rate:
+**Constant RPM** — steady request rate:
 ```json
-"loadMode": {"mode": "constantRps", "targetRps": 100}
+"loadMode": {"mode": "constantRpm", "targetRpm": 100}
 ```
 
 **Ramp Up** — linearly increasing rate over a duration:
 ```json
-"loadMode": {"mode": "rampUp", "startRps": 10, "endRps": 200, "durationSecs": 60}
+"loadMode": {"mode": "rampUp", "startRpm": 10, "endRpm": 200, "durationSecs": 60}
 ```
 
 **Step Load** — discrete rate steps:
@@ -171,19 +171,19 @@ Controls the rate at which requests are sent. Defaults to `unthrottled` (as fast
 "loadMode": {
   "mode": "stepLoad",
   "steps": [
-    {"rps": 50, "durationSecs": 30},
-    {"rps": 100, "durationSecs": 30},
-    {"rps": 200, "durationSecs": 30}
+    {"rpm": 50, "durationSecs": 30},
+    {"rpm": 100, "durationSecs": 30},
+    {"rpm": 200, "durationSecs": 30}
   ]
 }
 ```
 
-**Poisson RPS** — random inter-arrival times following a Poisson process (more realistic traffic simulation):
+**Poisson RPM** — random inter-arrival times following a Poisson process (more realistic traffic simulation):
 ```json
-"loadMode": {"mode": "poissonRps", "targetRps": 100}
+"loadMode": {"mode": "poissonRpm", "targetRpm": 100}
 ```
 
-When using `constantRps`, `rampUp`, `stepLoad`, or `poissonRps`, the `iterations` setting controls how many total requests are sent — the benchmark ends when either the iteration count is reached or the load duration expires, whichever comes first.
+When using `constantRpm`, `rampUp`, `stepLoad`, or `poissonRpm`, the `iterations` setting controls how many total requests are sent — the benchmark ends when either the iteration count is reached or the load duration expires, whichever comes first.
 
 #### `healthCheckPath` / `healthCheckTimeout`
 
@@ -557,8 +557,8 @@ Everything enabled — high iteration count, connection pool tuning, debug loggi
       "tempoAuthToken": "optional-tempo-bearer-token"
     },
     "loadMode": {
-      "mode": "constantRps",
-      "targetRps": 100
+      "mode": "constantRpm",
+      "targetRpm": 100
     }
   },
   "payloads": [

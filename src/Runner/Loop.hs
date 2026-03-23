@@ -10,7 +10,6 @@ import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types
   ( Endpoint (..)
   , LoadMode (..)
-  , PerfTestError (..)
   , RampUpConfig (..)
   , Settings (..)
   , TestingResponse
@@ -21,7 +20,8 @@ import Benchmark.Types
   )
 import Control.Concurrent (newQSem)
 import Control.Concurrent.Async (mapConcurrently)
-import Control.Exception (throwIO)
+import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -30,12 +30,11 @@ import Runner.Context (RunContext (..), emitEvent, makeBenchmarkEnv)
 import Runner.Warmup (runWarmup)
 
 -- | Warm up then run the benchmark loop for a labelled set of endpoints.
-benchmarkEndpoints :: RunContext -> Text -> [Endpoint] -> IO ([TestingResponse], [ValidationSummary])
-benchmarkEndpoints ctx label eps = case eps of
-  [] -> throwIO $ NoEndpointsError label
-  (firstEp : _) -> do
-    runWarmup ctx firstEp
-    runEndpointLoop ctx eps
+benchmarkEndpoints :: RunContext -> Text -> NonEmpty Endpoint -> IO ([TestingResponse], [ValidationSummary])
+benchmarkEndpoints ctx label eps = do
+  runWarmup ctx (NE.head eps)
+  emitEvent (rcEventChan ctx) (StatusMessage $ "Benchmarking " <> label)
+  runEndpointLoop ctx (NE.toList eps)
 
 -- | Concurrently benchmark all endpoints and collect responses and validation summaries.
 runEndpointLoop :: RunContext -> [Endpoint] -> IO ([TestingResponse], [ValidationSummary])

@@ -21,6 +21,7 @@ import Benchmark.Types
   ( Baseline (..)
   , BenchmarkStats (..)
   , MetricRegression (..)
+  , PerfTestError (..)
   , RegressionResult (..)
   , RegressionThresholds (..)
   , RunResult (..)
@@ -124,7 +125,7 @@ handleBaseline ReportingContext {..} timestamp stats = case rctxBaselineMode of
     case result of
       Left err -> do
         logError rctxLogger (T.pack err)
-        return RunSuccess
+        return $ RunError (ConfigValidationError (T.pack err))
       Right baseline -> doBaselineComparison rctxReporter stats baseline
   SaveAndCompare saveName compareName -> do
     saveResult <- saveBaseline saveName timestamp stats
@@ -135,7 +136,7 @@ handleBaseline ReportingContext {..} timestamp stats = case rctxBaselineMode of
     case loadResult of
       Left err -> do
         logError rctxLogger (T.pack err)
-        return RunSuccess
+        return $ RunError (ConfigValidationError (T.pack err))
       Right baseline -> doBaselineComparison rctxReporter stats baseline
 
 doBaselineComparison :: Reporter -> BenchmarkStats -> Baseline -> IO RunResult
@@ -145,4 +146,3 @@ doBaselineComparison reporter stats baseline = do
   if regressionPassed regression
     then return RunSuccess
     else return $ RunRegression regression
-

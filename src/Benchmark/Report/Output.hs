@@ -9,7 +9,6 @@ module Benchmark.Report.Output
 
 import Benchmark.Types (Endpoint (..), Nanoseconds (..), TestingResponse (..))
 import Data.Text (Text)
-import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Data.Text.Lazy.Builder (Builder, toLazyText)
 import Data.Text.Lazy.Builder qualified as B
@@ -28,8 +27,6 @@ initOutputFiles = do
   createDirectoryIfMissing True resultsDir
   timestamp <- formatTime defaultTimeLocale "%Y-%m-%dT%H-%M-%S" <$> getZonedTime
   let csvFile = resultsDir ++ "/latencies-" ++ timestamp ++ ".csv"
-      logFile = resultsDir ++ "/failures-" ++ timestamp ++ ".log"
-  TIO.writeFile logFile T.empty
   TIO.writeFile csvFile "target_name,payload_id,url,method,status_code,latency_ms,timestamp_iso\n"
   return (csvFile, timestamp)
 
@@ -58,7 +55,7 @@ formatRow target idx ep r =
     , B.singleton ','
     , B.fromString (show $ statusCode r)
     , B.singleton ','
-    , B.fromString (show (fromIntegral (unNanoseconds (durationNs r)) / 1_000_000 :: Double))
+    , B.fromString (show (fromIntegral (unNanoseconds (durationNs r)) / 1_000_000 :: Double)) -- ns to ms
     , B.singleton ','
     , B.fromString (iso8601Show (requestedAt r))
     , B.singleton '\n'

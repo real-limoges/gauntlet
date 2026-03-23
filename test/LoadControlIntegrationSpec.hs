@@ -7,7 +7,6 @@ import Benchmark.Types
   ( BenchmarkConfig (..)
   , Endpoint (..)
   , LoadMode (..)
-  , RampUpConfig (..)
   , RetrySettings (..)
   , Settings (..)
   , TestingResponse (..)

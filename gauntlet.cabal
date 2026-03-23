@@ -50,6 +50,9 @@ library
                           Benchmark.Compare
                           Benchmark.Report.Formatting
                           Benchmark.Reporter
+                          Benchmark.Reporter.HTML
+                          Benchmark.Reporter.JUnit
+                          Benchmark.Reporter.Prometheus
                           Benchmark.Types
                           Benchmark.TUI.State
                           Benchmark.TUI.Widgets
@@ -123,6 +126,9 @@ test-suite            gauntlet-test
                     , BaselineSpec
                     , ExecSpec
                     , FormattingSpec
+                    , HTMLSpec
+                    , JUnitSpec
+                    , PrometheusSpec
                     , LoopSpec
                     , TypesConfigSpec
                     , CLISpec

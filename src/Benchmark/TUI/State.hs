@@ -20,9 +20,13 @@ import Data.Text (Text)
 import Data.Time (UTCTime)
 import Stats.Common (percentileList)
 
--- | Size of rolling window
+-- | Size of rolling window for recent-duration stats.
 rollingWindow :: Int
 rollingWindow = 100
+
+-- | Max entries in the request success/failure timeline grid.
+timelineCapacity :: Int
+timelineCapacity = 80
 
 -- | Events emitted by runner
 data BenchmarkEvent
@@ -51,24 +55,30 @@ data RollingStats = RollingStats
 
 -- | Mutable state for the Brick TUI, updated on each 'BenchmarkEvent'.
 data TUIState = TUIState
-  { tsTarget :: Text
+  { -- Target & phase
+    tsTarget :: Text
   , tsCurrentEndpoint :: Text
   , tsEndpointIndex :: Int
   , tsTotalEndpoints :: Int
-  , tsCompleted :: Int
+  , -- Progress
+    tsCompleted :: Int
   , tsTotalIterations :: Int
   , tsSuccessCount :: Int
   , tsErrorCount :: Int
-  , tsStartTime :: Maybe UTCTime
-  , tsRecentDurations :: Seq Double
+  , -- Timing
+    tsStartTime :: Maybe UTCTime
+  , tsElapsedSecs :: Double
+  , -- Rolling data windows
+    tsRecentDurations :: Seq Double
   , tsRecentErrors :: Seq (UTCTime, Text)
   , tsRecentRequests :: Seq Bool
   , tsRollingStats :: Maybe RollingStats
-  , tsFinished :: Bool
+  , -- Terminal state
+    tsFinished :: Bool
   , tsError :: Maybe Text
   , tsStatus :: Text
-  , tsElapsedSecs :: Double
-  , tsCurrentRpm :: Maybe Double
+  , -- Load control display
+    tsCurrentRpm :: Maybe Double
   , tsTargetRpm :: Maybe Double
   , tsCurrentStep :: Maybe Int
   }
@@ -87,6 +97,7 @@ initialState target total endpoints =
     , tsSuccessCount = 0
     , tsErrorCount = 0
     , tsStartTime = Nothing
+    , tsElapsedSecs = 0
     , tsRecentDurations = Seq.empty
     , tsRecentErrors = Seq.empty
     , tsRecentRequests = Seq.empty
@@ -94,7 +105,6 @@ initialState target total endpoints =
     , tsFinished = False
     , tsError = Nothing
     , tsStatus = ""
-    , tsElapsedSecs = 0
     , tsCurrentRpm = Nothing
     , tsTargetRpm = Nothing
     , tsCurrentStep = Nothing
@@ -124,6 +134,7 @@ updateState now event state = case event of
           , tsErrorCount = tsErrorCount state + 1
           , tsRecentErrors = Seq.take 5 newErrors
           , tsRecentRequests = addToTimeline False (tsRecentRequests state)
+          , tsStartTime = tsStartTime state <|> Just now
           }
   EndpointStarted endpoint index total ->
     state
@@ -144,6 +155,7 @@ updateState now event state = case event of
       , tsRollingStats = Nothing
       , tsRecentDurations = Seq.empty
       , tsRecentRequests = Seq.empty
+      , tsRecentErrors = Seq.empty
       }
   TargetStarted name _idx total ->
     state
@@ -172,6 +184,7 @@ updateState now event state = case event of
   where
     unMilliseconds (Milliseconds ms) = ms
 
+-- | Prepend to a bounded sequence, dropping the oldest when at capacity.
 addToRolling :: a -> Seq a -> Seq a
 addToRolling x xs
   | Seq.length xs >= rollingWindow = x Seq.<| Seq.deleteAt (Seq.length xs - 1) xs
@@ -182,8 +195,6 @@ addToTimeline :: a -> Seq a -> Seq a
 addToTimeline x xs
   | Seq.length xs >= timelineCapacity = Seq.deleteAt 0 xs Seq.|> x
   | otherwise = xs Seq.|> x
-  where
-    timelineCapacity = 80
 
 computeRollingStats :: Seq Double -> RollingStats
 computeRollingStats durations

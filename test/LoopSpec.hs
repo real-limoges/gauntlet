@@ -2,7 +2,7 @@
 module LoopSpec (loopSpec) where
 
 import Benchmark.Types
-import Control.Exception (try)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text qualified as T
 import MockServer (mockJson)
 import Runner.Context (RunContext, initContext)
@@ -17,17 +17,10 @@ loopSpec :: TestTree
 loopSpec =
   testGroup
     "Runner.Loop"
-    [ testCase "empty endpoints throws NoEndpointsError" $
-        withCtx $ \ctx -> do
-          result <-
-            ( try (benchmarkEndpoints ctx "test" []) ::
-                IO (Either PerfTestError ([TestingResponse], [ValidationSummary]))
-            )
-          result `shouldBe` Left (NoEndpointsError "test")
-    , testCase "single endpoint returns 10 responses, no validation summaries" $
+    [ testCase "single endpoint returns 10 responses, no validation summaries" $
         mockJson "{}" $ \port ->
           withCtx $ \ctx -> do
-            (responses, summaries) <- benchmarkEndpoints ctx "test" [testEndpoint port]
+            (responses, summaries) <- benchmarkEndpoints ctx "test" (testEndpoint port :| [])
             length responses `shouldBe` 10
             null summaries `shouldBe` True
     , testCase "endpoint with validate produces one validation summary" $
@@ -37,7 +30,7 @@ loopSpec =
                   (testEndpoint port)
                     { validate = Just ValidationSpec {validateStatus = Just 200, validateFields = Nothing}
                     }
-            (_, summaries) <- benchmarkEndpoints ctx "test" [ep]
+            (_, summaries) <- benchmarkEndpoints ctx "test" (ep :| [])
             length summaries `shouldBe` 1
     ]
 

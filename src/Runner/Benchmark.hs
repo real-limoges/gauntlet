@@ -3,6 +3,7 @@ module Runner.Benchmark (runBenchmark, allPairComparisons, withTUI) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
 import Benchmark.Config.Loader (buildEndpoints)
+import Benchmark.Execution.Environment (runLifecycleSetup, runLifecycleTeardown)
 import Benchmark.Report.Baseline (handleBaseline)
 import Benchmark.Report.Output (initOutputFiles)
 import Benchmark.Reporter (Reporter (..), ReportingContext (..), combineReporters, plotReporter)
@@ -22,18 +23,18 @@ import Benchmark.Types
   , ValidationSummary
   , exitWithError
   )
+import Benchmark.Types.Error (formatError)
 import Control.Concurrent.Async (async, cancel, wait)
 import Control.Concurrent.STM (TChan, newTChanIO)
 import Control.Exception (SomeAsyncException, SomeException, catch, fromException, throwIO, try)
 import Control.Monad (forM, forM_, void, when)
+import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Benchmark.Execution.Environment (runLifecycleSetup, runLifecycleTeardown)
-import Benchmark.Types.Error (formatError)
-import Log (logInfo, logWarning)
+import Log (Logger, logInfo, logWarning)
 import Runner.Context (RunContext (..), emitEvent, initContext)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
@@ -41,6 +42,16 @@ import Stats.Benchmark (calculateStats, compareBayesian)
 import System.Clock (Clock (Realtime), getTime, toNanoSecs)
 import System.IO (hIsTerminalDevice, stdin)
 import Tracing.Types qualified as TT
+
+-- | Internal config bundle for a single benchmark run (avoids passing 6 positional params).
+data BenchmarkRunConfig = BenchmarkRunConfig
+  { brcReporter :: Reporter
+  , brcBaseline :: BaselineMode
+  , brcCharts :: Maybe ChartsSettings
+  , brcConfig :: BenchmarkConfig
+  , brcCsvFile :: FilePath
+  , brcTimestamp :: String
+  }
 
 data BenchmarkResult = BenchmarkResult
   { nrName :: Text
@@ -79,15 +90,19 @@ withTUI eventChan tuiState work = do
 runBenchmark :: Reporter -> BaselineMode -> Maybe ChartsSettings -> BenchmarkConfig -> IO RunResult
 runBenchmark reporter baselineMode mCharts cfg = do
   (csvFile, timestamp) <- initOutputFiles
-
-  let fullReporter = case mCharts of
-        Nothing -> reporter
-        Just cs -> combineReporters [reporter, plotReporter cs csvFile]
-
+  let rc =
+        BenchmarkRunConfig
+          { brcReporter = reporter
+          , brcBaseline = baselineMode
+          , brcCharts = mCharts
+          , brcConfig = cfg
+          , brcCsvFile = csvFile
+          , brcTimestamp = timestamp
+          }
   isTerm <- hIsTerminalDevice stdin
   if isTerm
-    then runBenchmarkWithTUI fullReporter baselineMode cfg csvFile timestamp
-    else runBenchmarkNoTUI fullReporter baselineMode cfg csvFile timestamp
+    then runBenchmarkWithTUI rc
+    else runBenchmarkNoTUI rc
 
 -- | Build a 'ReportingContext' from a reporter, baseline mode, and run context.
 mkReportingContext :: Reporter -> BaselineMode -> RunContext -> ReportingContext
@@ -108,34 +123,41 @@ allPairComparisons ((nameA, statsA) : rest) =
     ++ allPairComparisons rest
 
 -- | Run benchmarks with TUI display.
-runBenchmarkWithTUI :: Reporter -> BaselineMode -> BenchmarkConfig -> FilePath -> String -> IO RunResult
-runBenchmarkWithTUI reporter baselineMode cfg csvFile timestamp = do
-  let setts = benchSettings cfg
-      eps = buildEndpoints "" (benchPayloads cfg)
+runBenchmarkWithTUI :: BenchmarkRunConfig -> IO RunResult
+runBenchmarkWithTUI BenchmarkRunConfig {..} = do
+  let setts = benchSettings brcConfig
+      eps = buildEndpoints "" (NE.fromList (benchPayloads brcConfig))
       numEndpoints = length eps
       perTargetRequests = iterations setts * numEndpoints
   eventChan <- newTChanIO
   let tuiState = initialState "Starting..." perTargetRequests numEndpoints
-  ctx <- initContext setts csvFile timestamp (Just eventChan)
-  let rctx = mkReportingContext reporter baselineMode ctx
-  results <- withTUI eventChan tuiState (runAllTargets ctx cfg (Just eventChan))
-  postAnalysis rctx ctx timestamp results
+  ctx <- initContext setts brcCsvFile brcTimestamp (Just eventChan)
+  let fullReporter = addPlotReporter (rcLogger ctx) brcCharts brcCsvFile brcReporter
+      rctx = mkReportingContext fullReporter brcBaseline ctx
+  results <- withTUI eventChan tuiState (runAllTargets ctx brcConfig (Just eventChan))
+  postAnalysis rctx ctx brcTimestamp results
 
 -- | Run benchmarks without TUI (headless/CI mode).
-runBenchmarkNoTUI :: Reporter -> BaselineMode -> BenchmarkConfig -> FilePath -> String -> IO RunResult
-runBenchmarkNoTUI reporter baselineMode cfg csvFile timestamp = do
-  let setts = benchSettings cfg
-  ctx <- initContext setts csvFile timestamp Nothing
-  let rctx = mkReportingContext reporter baselineMode ctx
-  results <- runAllTargets ctx cfg Nothing
-  postAnalysis rctx ctx timestamp results
+runBenchmarkNoTUI :: BenchmarkRunConfig -> IO RunResult
+runBenchmarkNoTUI BenchmarkRunConfig {..} = do
+  let setts = benchSettings brcConfig
+  ctx <- initContext setts brcCsvFile brcTimestamp Nothing
+  let fullReporter = addPlotReporter (rcLogger ctx) brcCharts brcCsvFile brcReporter
+      rctx = mkReportingContext fullReporter brcBaseline ctx
+  results <- runAllTargets ctx brcConfig Nothing
+  postAnalysis rctx ctx brcTimestamp results
+
+-- | Optionally combine a plot reporter with the base reporter.
+addPlotReporter :: Logger -> Maybe ChartsSettings -> FilePath -> Reporter -> Reporter
+addPlotReporter _ Nothing _ r = r
+addPlotReporter logger (Just cs) csvFile r = combineReporters [r, plotReporter logger cs csvFile]
 
 -- | Execute benchmarks for all targets sequentially.
 runAllTargets :: RunContext -> BenchmarkConfig -> Maybe (TChan BenchmarkEvent) -> IO [BenchmarkResult]
 runAllTargets ctx cfg eventChan = do
   let setts = benchSettings cfg
   forM (zip [1 ..] (benchTargets cfg)) $ \(idx, t) -> do
-    let targetEps = buildEndpoints (targetUrl t) (benchPayloads cfg)
+    let targetEps = buildEndpoints (targetUrl t) (NE.fromList (benchPayloads cfg))
         totalReqs = iterations setts * length targetEps
 
     emitEvent eventChan (TargetStarted (targetName t) idx totalReqs)

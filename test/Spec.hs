@@ -17,12 +17,15 @@ import EnvSpec (envSpec)
 import EnvironmentSpec (environmentSpec)
 import ExecSpec (execSpec)
 import FormattingSpec (formattingSpec)
+import HTMLSpec (htmlSpec)
 import Integration (integrationSpec)
+import JUnitSpec (junitSpec)
 import LoadControlIntegrationSpec (loadControlIntegrationSpec)
 import LogSpec (logSpec)
 import LoopSpec (loopSpec)
 import MarkdownSpec (markdownSpec)
 import OutputSpec (outputSpec)
+import PrometheusSpec (prometheusSpec)
 import PropertySpec (propertySpec)
 import RateLimiterSpec (rateLimiterSpec)
 import ReportSpec (reportSpec)
@@ -82,4 +85,7 @@ main =
         , formattingSpec
         , loopSpec
         , typesConfigSpec
+        , junitSpec
+        , htmlSpec
+        , prometheusSpec
         ]

@@ -346,7 +346,7 @@ Targets are an array of objects with `name`, `url`, and optional `branch` fields
 | `payloads[].headers` | object | - | Custom HTTP headers (key/value map) |
 | `payloads[].validate.status` | int | - | Expected HTTP status code |
 | `payloads[].validate.fields` | object | - | Dot-path field assertions (`present: true` or `eq: value`) |
-| `settings.loadMode` | object | `unthrottled` | Load control mode: `unthrottled`, `constantRps`, `rampUp`, `stepLoad`, `poissonRps` |
+| `settings.loadMode` | object | `unthrottled` | Load control mode: `unthrottled`, `constantRpm`, `rampUp`, `stepLoad`, `poissonRpm` |
 
 **Load Control Modes:**
 
@@ -354,21 +354,21 @@ Targets are an array of objects with `name`, `url`, and optional `branch` fields
 // Unthrottled (default) — no rate limiting
 {"mode": "unthrottled"}
 
-// Constant RPS — steady request rate
-{"mode": "constantRps", "targetRps": 100}
+// Constant RPM — steady request rate
+{"mode": "constantRpm", "targetRpm": 100}
 
 // Ramp Up — linearly increasing rate
-{"mode": "rampUp", "startRps": 10, "endRps": 200, "durationSecs": 60}
+{"mode": "rampUp", "startRpm": 10, "endRpm": 200, "durationSecs": 60}
 
 // Step Load — discrete rate steps
 {"mode": "stepLoad", "steps": [
-  {"rps": 50, "durationSecs": 30},
-  {"rps": 100, "durationSecs": 30},
-  {"rps": 200, "durationSecs": 30}
+  {"rpm": 50, "durationSecs": 30},
+  {"rpm": 100, "durationSecs": 30},
+  {"rpm": 200, "durationSecs": 30}
 ]}
 
-// Poisson RPS — random inter-arrival times (realistic traffic simulation)
-{"mode": "poissonRps", "targetRps": 100}
+// Poisson RPM — random inter-arrival times (realistic traffic simulation)
+{"mode": "poissonRpm", "targetRpm": 100}
 ```
 
 **Environment variable expansion:** Any config value can contain `${VAR}` references, which are expanded before JSON parsing. Variables are resolved from (highest priority first): `.env.local`, `.env`, process environment. Missing variables fail fast with a clear error.
@@ -533,7 +533,7 @@ gauntlet/
 │   │   │   └── Env.hs      # .env/.env.local loading, ${VAR} interpolation
 │   │   ├── Execution/      # Runtime execution
 │   │   │   ├── Environment.hs  # Git switch + docker-compose + health check
-│   │   │   ├── RateLimiter.hs  # unthrottled, constantRps, rampUp, stepLoad
+│   │   │   ├── RateLimiter.hs  # unthrottled, constantRpm, rampUp, stepLoad
 │   │   │   └── Validation.hs   # Per-response JSON field validation
 │   │   ├── Network/        # HTTP client (Auth, Exec, Request)
 │   │   ├── TUI.hs          # Real-time terminal UI

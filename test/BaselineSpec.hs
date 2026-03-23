@@ -9,7 +9,7 @@ import Data.IORef
 import Data.List (find)
 import Data.Text qualified as T
 import Log (Logger)
-import System.Directory (createDirectoryIfMissing, withCurrentDirectory)
+import System.Directory (withCurrentDirectory)
 import System.IO.Temp (withSystemTempDirectory)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)
@@ -157,11 +157,14 @@ handleBaselineSpec =
         ]
     , testGroup
         "CompareBaseline"
-        [ cleanTest "returns RunSuccess with error log when baseline missing" $
+        [ cleanTest "returns RunError when baseline missing" $
             inTempDir $ do
               (logger, logRef) <- makeTestLogger
-              result <- handleBaseline (ReportingContext noOpReporter (CompareBaseline "missing") logger) hbTimestamp hbStats
-              result `shouldBe` RunSuccess
+              result <-
+                handleBaseline (ReportingContext noOpReporter (CompareBaseline "missing") logger) hbTimestamp hbStats
+              case result of
+                RunError _ -> pure ()
+                other -> error $ "Expected RunError, got: " <> show other
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]
               logText `shouldSatisfy` T.isInfixOf "not found"
@@ -191,7 +194,8 @@ handleBaselineSpec =
               (logger, _) <- makeTestLogger
               _ <- handleBaseline (ReportingContext noOpReporter (SaveBaseline "compare") logger) hbTimestamp hbStats
               (logger2, logRef) <- makeTestLogger
-              result <- handleBaseline (ReportingContext noOpReporter (SaveAndCompare "save" "compare") logger2) hbTimestamp hbStats
+              result <-
+                handleBaseline (ReportingContext noOpReporter (SaveAndCompare "save" "compare") logger2) hbTimestamp hbStats
               result `shouldBe` RunSuccess
               msgs <- readIORef logRef
               let logText = T.concat [msg | (_, msg) <- msgs]

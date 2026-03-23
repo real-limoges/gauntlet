@@ -20,12 +20,13 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Foldable (toList)
 import Data.Sequence qualified as Seq
 import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
 import Data.Time (diffUTCTime, getCurrentTime)
 import GHC.IO.Handle (hDuplicate, hDuplicateTo)
 import Graphics.Vty qualified as V
 import Graphics.Vty.CrossPlatform (mkVty)
 import System.Directory (getTemporaryDirectory, removeFile)
-import System.IO (hClose, hFlush, hPutStr, openTempFile, stderr)
+import System.IO (hClose, hFlush, openTempFile, stderr)
 
 data CustomEvent
   = Tick
@@ -61,7 +62,7 @@ runTUI eventChan initialSt = do
           event <- atomically $ readTChan eventChan
           writeBChan brickChan (BenchEvent event)
         tid2 <- forkIO $ forever $ do
-          threadDelay 100_000
+          threadDelay 100_000 -- 100ms tick for elapsed-time updates
           writeBChan brickChan Tick
         return (tid1, tid2)
     )
@@ -92,9 +93,9 @@ withStderrBuffered action =
       hFlush stderr
       hDuplicateTo stderrSaved stderr
       hClose stderrSaved
-      content <- try (readFile tmpPath) :: IO (Either SomeException String)
+      content <- try (TIO.readFile tmpPath) :: IO (Either SomeException T.Text)
       case content of
-        Right s -> unless (null s) $ hPutStr stderr s
+        Right s -> unless (T.null s) $ TIO.hPutStr stderr s
         Left _ -> return ()
       _ <- try (removeFile tmpPath) :: IO (Either SomeException ())
       return ()

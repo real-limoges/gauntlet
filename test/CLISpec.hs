@@ -21,22 +21,40 @@ cliSpec =
         "commandParser"
         [ testCase "parses benchmark --config foo.json" $ do
             parse ["benchmark", "--config", "foo.json"]
-              `shouldBe` Just (Benchmark "foo.json" NoBaseline OutputTerminal Nothing)
+              `shouldBe` Just (Benchmark "foo.json" NoBaseline OutputTerminal Nothing Nothing Nothing Nothing)
         , testCase "parses benchmark with --save-baseline" $ do
             parse ["benchmark", "--config", "f.json", "--save-baseline", "v1"]
-              `shouldBe` Just (Benchmark "f.json" (SaveBaseline "v1") OutputTerminal Nothing)
+              `shouldBe` Just (Benchmark "f.json" (SaveBaseline "v1") OutputTerminal Nothing Nothing Nothing Nothing)
         , testCase "parses benchmark with --compare-baseline" $ do
             parse ["benchmark", "--config", "f.json", "--compare-baseline", "v1"]
-              `shouldBe` Just (Benchmark "f.json" (CompareBaseline "v1") OutputTerminal Nothing)
+              `shouldBe` Just (Benchmark "f.json" (CompareBaseline "v1") OutputTerminal Nothing Nothing Nothing Nothing)
         , testCase "parses benchmark with --save-baseline and --compare-baseline" $ do
             parse ["benchmark", "--config", "f.json", "--save-baseline", "v2", "--compare-baseline", "v1"]
-              `shouldBe` Just (Benchmark "f.json" (SaveAndCompare "v2" "v1") OutputTerminal Nothing)
+              `shouldBe` Just (Benchmark "f.json" (SaveAndCompare "v2" "v1") OutputTerminal Nothing Nothing Nothing Nothing)
         , testCase "parses benchmark with --output markdown" $ do
             parse ["benchmark", "--config", "foo.json", "--output", "markdown"]
-              `shouldBe` Just (Benchmark "foo.json" NoBaseline (OutputMarkdown "results/report.md") Nothing)
+              `shouldBe` Just (Benchmark "foo.json" NoBaseline (OutputMarkdown "results/report.md") Nothing Nothing Nothing Nothing)
         , testCase "parses benchmark with --output markdown --report-path custom.md" $ do
             parse ["benchmark", "--config", "foo.json", "--output", "markdown", "--report-path", "custom.md"]
-              `shouldBe` Just (Benchmark "foo.json" NoBaseline (OutputMarkdown "custom.md") Nothing)
+              `shouldBe` Just (Benchmark "foo.json" NoBaseline (OutputMarkdown "custom.md") Nothing Nothing Nothing Nothing)
+        , testCase "parses benchmark with --junit-report" $ do
+            parse ["benchmark", "--config", "foo.json", "--junit-report", "report.xml"]
+              `shouldBe` Just (Benchmark "foo.json" NoBaseline OutputTerminal Nothing (Just "report.xml") Nothing Nothing)
+        , testCase "parses benchmark with --html-report" $ do
+            parse ["benchmark", "--config", "foo.json", "--html-report", "out.html"]
+              `shouldBe` Just (Benchmark "foo.json" NoBaseline OutputTerminal Nothing Nothing (Just "out.html") Nothing)
+        , testCase "parses benchmark with --prometheus-pushgateway" $ do
+            parse ["benchmark", "--config", "foo.json", "--prometheus-pushgateway", "http://localhost:9091"]
+              `shouldBe` Just
+                ( Benchmark
+                    "foo.json"
+                    NoBaseline
+                    OutputTerminal
+                    Nothing
+                    Nothing
+                    Nothing
+                    (Just ("http://localhost:9091", "gauntlet"))
+                )
         , testCase "fails on missing --config" $ do
             parse ["benchmark"] `shouldBe` Nothing
         , testCase "fails on unknown subcommand" $ do

@@ -20,10 +20,11 @@ import Data.ByteString.Lazy qualified as LBS
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Time (diffUTCTime, getCurrentTime)
 import Network.HTTP.Client (Manager, Response, httpLbs, parseRequest, responseStatus)
 import Network.HTTP.Types.Status qualified as Status
 import System.Exit (ExitCode (..))
-import System.Process (CreateProcess (..), readCreateProcessWithExitCode, proc, shell)
+import System.Process (CreateProcess (..), proc, readCreateProcessWithExitCode, shell)
 import System.Timeout (timeout)
 
 {-| Run setup phase for a target: optionally switch git branch, run setup hook,
@@ -65,13 +66,13 @@ The command is executed via @\/bin\/sh -c@. If 'hookTimeoutSecs' is set
 with the captured stderr.
 -}
 runHook :: HookCommand -> (Text -> PerfTestError) -> IO (Either PerfTestError ())
-runHook HookCommand{..} mkError = do
+runHook HookCommand {..} mkError = do
   let timeoutUs = fromMaybe 300 hookTimeoutSecs * 1_000_000
       proc_ = (shell (T.unpack hookCmd)) {cwd = hookWorkingDir}
   mResult <-
     timeout timeoutUs $
       try (readCreateProcessWithExitCode proc_ "") ::
-        IO (Maybe (Either IOException (ExitCode, String, String)))
+      IO (Maybe (Either IOException (ExitCode, String, String)))
   case mResult of
     Nothing ->
       return $ Left $ HookTimeoutError hookCmd (fromMaybe 300 hookTimeoutSecs)
@@ -98,21 +99,25 @@ switchBranch branch = do
 
 -- | Poll the health URL until it returns 200 or the timeout budget is exhausted.
 waitForHealth :: Manager -> HealthCheckConfig -> IO (Either PerfTestError ())
-waitForHealth mgr HealthCheckConfig{..} = loop 0
+waitForHealth mgr HealthCheckConfig {..} = do
+  start <- getCurrentTime
+  loop start
   where
-    maxRetries = fromMaybe 60 hcTimeoutSecs
+    timeoutSecs = fromMaybe 60 hcTimeoutSecs
     intervalUs = fromMaybe 1000 hcIntervalMs * 1000
-    loop count
-      | count >= maxRetries =
-          return $ Left (HealthCheckTimeout hcUrl maxRetries)
-      | otherwise = do
-          result <-
-            try (parseRequest (T.unpack hcUrl) >>= \req -> httpLbs req mgr) ::
-              IO (Either SomeException (Response LBS.ByteString))
-          case result of
-            Right resp
-              | Status.statusCode (responseStatus resp) == 200 ->
-                  return $ Right ()
-            _ -> do
+    loop start = do
+      result <-
+        try (parseRequest (T.unpack hcUrl) >>= \req -> httpLbs req mgr) ::
+          IO (Either SomeException (Response LBS.ByteString))
+      case result of
+        Right resp
+          | Status.statusCode (responseStatus resp) == 200 ->
+              return $ Right ()
+        _ -> do
+          now <- getCurrentTime
+          let elapsed = realToFrac (diffUTCTime now start) :: Double
+          if elapsed >= fromIntegral timeoutSecs
+            then return $ Left (HealthCheckTimeout hcUrl timeoutSecs)
+            else do
               threadDelay intervalUs
-              loop (count + 1)
+              loop start

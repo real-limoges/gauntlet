@@ -4,6 +4,7 @@ module ConfigSpec (configSpec) where
 import Benchmark.Config.Loader
 import Benchmark.Types
 import Data.Aeson (eitherDecode)
+import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
 import TastyCompat (shouldBe, shouldContain, shouldNotContain, textShouldContain)
 import Test.Tasty (TestTree, testGroup)
@@ -93,30 +94,30 @@ configSpec =
     , testGroup
         "buildEndpoints"
         [ testCase "builds endpoints for primary target" $ do
-            let endpoints = buildEndpoints "http://primary.test" (benchPayloads makeValidConfig)
-            case endpoints of
+            let endpoints = buildEndpoints "http://primary.test" (NE.fromList (benchPayloads makeValidConfig))
+            case NE.toList endpoints of
               [ep] -> url ep `shouldBe` "http://primary.test/api/test"
               _ -> assertFailure "Expected exactly one endpoint"
         , testCase "builds endpoints for candidate target" $ do
-            let endpoints = buildEndpoints "http://candidate.test" (benchPayloads makeValidConfig)
-            case endpoints of
+            let endpoints = buildEndpoints "http://candidate.test" (NE.fromList (benchPayloads makeValidConfig))
+            case NE.toList endpoints of
               [ep] -> url ep `shouldBe` "http://candidate.test/api/test"
               _ -> assertFailure "Expected exactly one endpoint"
         , testCase "preserves method and body from payload spec" $ do
-            case buildEndpoints "http://primary.test" (benchPayloads makeValidConfig) of
+            case NE.toList (buildEndpoints "http://primary.test" (NE.fromList (benchPayloads makeValidConfig))) of
               [ep] -> do
                 method ep `shouldBe` "POST"
                 body ep `shouldBe` Nothing
               _ -> assertFailure "Expected exactly one endpoint"
         , testCase "sets content-type header" $ do
-            case buildEndpoints "http://primary.test" (benchPayloads makeValidConfig) of
+            case NE.toList (buildEndpoints "http://primary.test" (NE.fromList (benchPayloads makeValidConfig))) of
               [ep] -> headers ep `shouldContain` [("Content-Type", "application/json")]
               _ -> assertFailure "Expected exactly one endpoint"
         , testCase "includes custom headers from PayloadSpec" $ do
             let customHeaders = Map.fromList [("X-API-Key", "secret"), ("X-Request-ID", "123")]
             let payload = PayloadSpec "test" "GET" "/api" Nothing (Just customHeaders) Nothing
             let cfg = makeValidConfig {benchPayloads = [payload]}
-            case buildEndpoints "http://primary.test" (benchPayloads cfg) of
+            case NE.toList (buildEndpoints "http://primary.test" (NE.fromList (benchPayloads cfg))) of
               [ep] -> do
                 headers ep `shouldContain` [("X-API-Key", "secret")]
                 headers ep `shouldContain` [("X-Request-ID", "123")]
@@ -125,7 +126,7 @@ configSpec =
             let customHeaders = Map.fromList [("X-Custom", "value")]
             let payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders) Nothing
             let cfg = makeValidConfig {benchPayloads = [payload]}
-            case buildEndpoints "http://primary.test" (benchPayloads cfg) of
+            case NE.toList (buildEndpoints "http://primary.test" (NE.fromList (benchPayloads cfg))) of
               [ep] -> do
                 headers ep `shouldContain` [("Content-Type", "application/json")]
                 headers ep `shouldContain` [("X-Custom", "value")]
@@ -135,7 +136,7 @@ configSpec =
             let customHeaders = Map.fromList [("Content-Type", "text/xml")]
             let payload = PayloadSpec "test" "POST" "/api" Nothing (Just customHeaders) Nothing
             let cfg = makeValidConfig {benchPayloads = [payload]}
-            case buildEndpoints "http://primary.test" (benchPayloads cfg) of
+            case NE.toList (buildEndpoints "http://primary.test" (NE.fromList (benchPayloads cfg))) of
               [ep] -> do
                 headers ep `shouldContain` [("Content-Type", "text/xml")]
                 headers ep `shouldNotContain` [("Content-Type", "application/json")]
@@ -144,7 +145,7 @@ configSpec =
         , testCase "handles empty custom headers" $ do
             let payload = PayloadSpec "test" "GET" "/api" Nothing (Just Map.empty) Nothing
             let cfg = makeValidConfig {benchPayloads = [payload]}
-            case buildEndpoints "http://primary.test" (benchPayloads cfg) of
+            case NE.toList (buildEndpoints "http://primary.test" (NE.fromList (benchPayloads cfg))) of
               [ep] -> headers ep `shouldBe` [("Content-Type", "application/json")]
               _ -> assertFailure "Expected exactly one endpoint"
         ]
@@ -192,7 +193,9 @@ configSpec =
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects rampUp with startRpm=0" $ do
             let cfg =
-                  makeValidConfig {benchSettings = (benchSettings makeValidConfig) {loadMode = Just (LoadRampUp (RampUpConfig 0 100 60))}}
+                  makeValidConfig
+                    { benchSettings = (benchSettings makeValidConfig) {loadMode = Just (LoadRampUp (RampUpConfig 0 100 60))}
+                    }
             case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) -> msg `textShouldContain` "startRpm"
               _ -> assertFailure "Expected ConfigValidationError"
@@ -210,12 +213,18 @@ configSpec =
               Left (ConfigValidationError msg) -> msg `textShouldContain` "steps must not be empty"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects stepLoad with zero rpm" $ do
-            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 0 30])}}
+            let cfg =
+                  makeValidConfig
+                    { benchSettings = (benchSettings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 0 30])}
+                    }
             case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) -> msg `textShouldContain` "step rpm"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects stepLoad with zero durationSecs" $ do
-            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 50 0])}}
+            let cfg =
+                  makeValidConfig
+                    { benchSettings = (benchSettings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 50 0])}
+                    }
             case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) -> msg `textShouldContain` "step durationSecs"
               _ -> assertFailure "Expected ConfigValidationError"
@@ -228,7 +237,8 @@ configSpec =
         , testCase "accepts valid stepLoad" $ do
             let cfg =
                   makeValidConfig
-                    { benchSettings = (benchSettings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 20 30, LoadStep 50 30])}
+                    { benchSettings =
+                        (benchSettings makeValidConfig) {loadMode = Just (LoadStepLoad [LoadStep 20 30, LoadStep 50 30])}
                     }
             validateBenchmarkConfig cfg `shouldBe` Right cfg
         , testCase "accepts Nothing loadMode" $ do

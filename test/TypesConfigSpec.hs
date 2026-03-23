@@ -2,7 +2,7 @@
 module TypesConfigSpec (typesConfigSpec) where
 
 import Benchmark.Types
-import Data.Aeson (decode, encode, eitherDecode)
+import Data.Aeson (decode, eitherDecode, encode)
 import TastyCompat (shouldBe)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
@@ -24,7 +24,9 @@ typesConfigSpec =
             totalRequestsForMode (LoadRampUp (RampUpConfig 600 1200 5)) 0 `shouldBe` 75
         , testCase "LoadStepLoad sums rpm/60*duration per step" $
             let steps =
-                  [LoadStep {loadStepRpm = 600, loadStepDurationSecs = 5}, LoadStep {loadStepRpm = 1200, loadStepDurationSecs = 3}]
+                  [ LoadStep {loadStepRpm = 600, loadStepDurationSecs = 5}
+                  , LoadStep {loadStepRpm = 1200, loadStepDurationSecs = 3}
+                  ]
              in totalRequestsForMode (LoadStepLoad steps) 0 `shouldBe` 110
         ]
     , testGroup

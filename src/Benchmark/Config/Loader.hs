@@ -8,11 +8,11 @@ where
 
 import Benchmark.Config.Env (interpolateEnv, loadEnvVars)
 import Benchmark.Types
-import Benchmark.Types.Config (HealthCheckConfig (..), HookCommand (..), LifecycleHooks (..), NamedTarget (..))
 import Control.Exception (IOException, try)
 import Control.Monad (unless, when)
 import Data.Aeson (FromJSON, eitherDecode)
 import Data.ByteString.Lazy qualified as LBS
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -34,11 +34,9 @@ loadConfigAs path = do
         Left err -> return $ Left err
         Right interpolated -> return $ eitherDecode (LBS.fromStrict (encodeUtf8 interpolated))
 
-{-| Build endpoint list from config, selecting primary or candidate target.
-When useCandidate is True, uses candidate target; otherwise uses primary.
--}
-buildEndpoints :: Text -> [PayloadSpec] -> [Endpoint]
-buildEndpoints baseUrl = map (toEndpoint baseUrl)
+-- | Build endpoint list from a base URL and payload specs.
+buildEndpoints :: Text -> NonEmpty PayloadSpec -> NonEmpty Endpoint
+buildEndpoints baseUrl = fmap (toEndpoint baseUrl)
 
 toEndpoint :: Text -> PayloadSpec -> Endpoint
 toEndpoint baseUrl spec =
@@ -144,17 +142,20 @@ validateTargetLifecycle t = case targetLifecycle t of
     mapM_ validateHealthCheck (hookHealthCheck hooks)
 
 validateHookCommand :: Text -> HookCommand -> Either PerfTestError ()
-validateHookCommand label HookCommand{..} = do
+validateHookCommand label HookCommand {..} = do
   when (T.null (T.strip hookCmd)) $
-    Left $ ConfigValidationError $ label <> " hook: cmd must not be empty"
+    Left $
+      ConfigValidationError $
+        label <> " hook: cmd must not be empty"
   case hookTimeoutSecs of
     Just t | t <= 0 -> Left $ ConfigValidationError $ label <> " hook: timeoutSecs must be greater than 0"
     _ -> Right ()
 
 validateHealthCheck :: HealthCheckConfig -> Either PerfTestError ()
-validateHealthCheck HealthCheckConfig{..} = do
+validateHealthCheck HealthCheckConfig {..} = do
   when (T.null (T.strip hcUrl)) $
-    Left $ ConfigValidationError "lifecycle healthCheck: url must not be empty"
+    Left $
+      ConfigValidationError "lifecycle healthCheck: url must not be empty"
   case hcTimeoutSecs of
     Just t | t <= 0 -> Left $ ConfigValidationError "lifecycle healthCheck: timeoutSecs must be greater than 0"
     _ -> Right ()

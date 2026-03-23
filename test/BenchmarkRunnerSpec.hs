@@ -57,7 +57,8 @@ benchmarkRunnerSpec =
                 msg `textShouldContain` "Invalid HTTP method"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts valid 2-target config" $ do
-            let cfg = makeBenchmarkConfig [NamedTarget "a" "http://a" Nothing Nothing, NamedTarget "b" "http://b" Nothing Nothing]
+            let cfg =
+                  makeBenchmarkConfig [NamedTarget "a" "http://a" Nothing Nothing, NamedTarget "b" "http://b" Nothing Nothing]
             validateBenchmarkConfig cfg `shouldBe` Right cfg
         ]
     , testGroup

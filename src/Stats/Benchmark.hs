@@ -84,8 +84,8 @@ expectedShortfall sorted
   | V.null sorted = 0
   | otherwise =
       let n = V.length sorted
-          threshold = floor (esPercentile * (fromIntegral n :: Double))
-          tailVals = V.drop threshold sorted
+          tailSize = max 1 $ ceiling ((1 - esPercentile) * fromIntegral n) :: Int
+          tailVals = V.drop (n - tailSize) sorted
        in if V.null tailVals
             then V.last sorted
             else V.foldl' (+) 0 tailVals / fromIntegral (V.length tailVals)
@@ -148,9 +148,11 @@ compareBayesian statsA statsB =
         }
   where
     -- P(mean_B < mean_A) using population-level standard error σ/√n
-    probFaster muDiff varA varB countA countB =
-      let sigmaDiff = sqrt ((varA / countA) + (varB / countB))
-       in if sigmaDiff > 0 then standardNormalCDF (muDiff / sigmaDiff) else 0.5
+    probFaster muDiff varA varB countA countB
+      | countA <= 0 || countB <= 0 = 0.5
+      | otherwise =
+          let sigmaDiff = sqrt ((varA / countA) + (varB / countB))
+           in if sigmaDiff > 0 then standardNormalCDF (muDiff / sigmaDiff) else 0.5
 
     ciLower muDiff varA varB countA countB =
       muDiff - z95 * sqrt ((varA / countA) + (varB / countB))
@@ -274,6 +276,7 @@ computeEMDGeneral a b
       | px <= py = x : merge xs (y : ys)
       | otherwise = y : merge (x : xs) ys
 
+    -- Walk the merged event stream, accumulating CDF area between the two distributions
     integrate _ _ [] = 0
     integrate _ _ [_] = 0
     integrate cdfA cdfB ((x, dA, dB) : rest@((nextX, _, _) : _)) =

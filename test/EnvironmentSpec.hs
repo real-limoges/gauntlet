@@ -2,8 +2,7 @@
 module EnvironmentSpec (environmentSpec) where
 
 import Benchmark.Execution.Environment (runHook, waitForHealth)
-import Benchmark.Types (PerfTestError (..))
-import Benchmark.Types (HealthCheckConfig (..), HookCommand (..))
+import Benchmark.Types (HealthCheckConfig (..), HookCommand (..), PerfTestError (..))
 import Data.Text qualified as T
 import MockServer (mockFailThenSucceed, mockStatus)
 import Network.HTTP.Client (newManager)

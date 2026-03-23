@@ -7,8 +7,8 @@ module Runner.Context
   )
 where
 
-import Benchmark.Network.Exec (BenchmarkEnv (..))
 import Benchmark.Network.Auth (readToken)
+import Benchmark.Network.Exec (BenchmarkEnv (..))
 import Benchmark.Network.Request (initNetwork)
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types (Settings (..), exitWithError)
