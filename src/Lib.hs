@@ -7,7 +7,7 @@ module Lib (run) where
 import Control.Exception (SomeException, catch)
 import Control.Monad (forM_)
 import Data.ByteString.Char8 qualified as BC8
-import Data.FileEmbed (embedFile)
+import Data.FileEmbed (embedFile, makeRelativeToProject)
 import Data.Maybe (catMaybes)
 import Data.Text qualified as T
 import Data.Time.Clock (diffUTCTime, getCurrentTime)
@@ -68,7 +68,7 @@ run = do
       runValidate cfgPath doCheck
     Schema -> do
       createDirectoryIfMissing True "schema"
-      BC8.writeFile "schema/config-schema.json" $(embedFile "schema/config-schema.json")
+      BC8.writeFile "schema/config-schema.json" $(makeRelativeToProject "schema/config-schema.json" >>= embedFile)
       putStrLn "Wrote schema/config-schema.json"
       pure RunSuccess
   exitWithResult result
