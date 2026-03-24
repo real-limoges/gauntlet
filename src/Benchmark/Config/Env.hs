@@ -16,6 +16,7 @@ import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import System.Directory (doesFileExist)
 import System.Environment (getEnvironment)
+import System.IO (hPutStrLn, stderr)
 
 {-| Parse a .env file into a map of key-value pairs.
 Skips blank lines and lines starting with '#'.
@@ -59,7 +60,9 @@ readEnvFile path = do
     then do
       result <- try (TIO.readFile path) :: IO (Either IOException Text)
       case result of
-        Left _ -> return Map.empty
+        Left err -> do
+          hPutStrLn stderr $ "Warning: could not read " ++ path ++ ": " ++ show err
+          return Map.empty
         Right content -> return (parseEnvFile content)
     else return Map.empty
 

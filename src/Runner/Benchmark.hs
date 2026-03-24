@@ -25,7 +25,7 @@ import Benchmark.Types
   )
 import Benchmark.Types.Error (formatError)
 import Control.Concurrent.Async (async, cancel, wait)
-import Control.Concurrent.STM (TChan, newTChanIO)
+import Control.Concurrent.STM (TBQueue, newTBQueueIO)
 import Control.Exception (SomeAsyncException, SomeException, catch, fromException, throwIO, try)
 import Control.Monad (forM, forM_, void, when)
 import Data.List.NonEmpty qualified as NE
@@ -65,7 +65,7 @@ data BenchmarkResult = BenchmarkResult
 Emits 'BenchmarkFinished' or 'BenchmarkFailed' into the event channel, then
 waits for the TUI to exit before returning the action's result.
 -}
-withTUI :: TChan BenchmarkEvent -> TUIState -> IO a -> IO a
+withTUI :: TBQueue BenchmarkEvent -> TUIState -> IO a -> IO a
 withTUI eventChan tuiState work = do
   benchmarkWork <- async $ do
     result <- try work
@@ -129,7 +129,7 @@ runBenchmarkWithTUI BenchmarkRunConfig {..} = do
       eps = buildEndpoints "" (NE.fromList (benchPayloads brcConfig))
       numEndpoints = length eps
       perTargetRequests = iterations setts * numEndpoints
-  eventChan <- newTChanIO
+  eventChan <- newTBQueueIO 10_000
   let tuiState = initialState "Starting..." perTargetRequests numEndpoints
   ctx <- initContext setts brcCsvFile brcTimestamp (Just eventChan)
   let fullReporter = addPlotReporter (rcLogger ctx) brcCharts brcCsvFile brcReporter
@@ -153,7 +153,7 @@ addPlotReporter _ Nothing _ r = r
 addPlotReporter logger (Just cs) csvFile r = combineReporters [r, plotReporter logger cs csvFile]
 
 -- | Execute benchmarks for all targets sequentially.
-runAllTargets :: RunContext -> BenchmarkConfig -> Maybe (TChan BenchmarkEvent) -> IO [BenchmarkResult]
+runAllTargets :: RunContext -> BenchmarkConfig -> Maybe (TBQueue BenchmarkEvent) -> IO [BenchmarkResult]
 runAllTargets ctx cfg eventChan = do
   let setts = benchSettings cfg
   forM (zip [1 ..] (benchTargets cfg)) $ \(idx, t) -> do

@@ -6,7 +6,7 @@ import Benchmark.Network.Request (initNetwork)
 import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types
 import Control.Concurrent (newQSem)
-import Control.Concurrent.STM (TChan, atomically, newTChanIO, readTChan)
+import Control.Concurrent.STM (TBQueue, atomically, newTBQueueIO, readTBQueue)
 import Control.Monad (replicateM)
 import Data.Text qualified as T
 import Log (makeLogger)
@@ -21,14 +21,14 @@ execSpec =
   testGroup
     "Benchmark.Network.Exec"
     [ testCase "runBenchmark with events emits one event per iteration" $ do
-        chan <- newTChanIO
+        chan <- newTBQueueIO 100
         mockJson "{}" $ \port -> do
           mgr <- initNetwork testSettings
           sem <- newQSem 1
-          let env = BenchmarkEnv testSettings sem mgr 1 (Just (chan :: TChan BenchmarkEvent)) (makeLogger defaultLogLevel)
+          let env = BenchmarkEnv testSettings sem mgr 1 (Just (chan :: TBQueue BenchmarkEvent)) (makeLogger defaultLogLevel)
           results <- runBenchmark env 5 (testEndpoint port) Nothing
           length results `shouldBe` 5
-          events <- replicateM 5 (atomically (readTChan chan))
+          events <- replicateM 5 (atomically (readTBQueue chan))
           length events `shouldBe` 5
     , testCase "all-500 server returns responses with status 500" $ do
         mockStatus status500 $ \port -> do

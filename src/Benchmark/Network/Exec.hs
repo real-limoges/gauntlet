@@ -17,7 +17,7 @@ import Benchmark.Types
 import Control.Concurrent (QSem)
 import Control.Concurrent.Async (replicateConcurrently)
 import Control.Concurrent.QSem (signalQSem, waitQSem)
-import Control.Concurrent.STM (TChan, atomically, writeTChan)
+import Control.Concurrent.STM (TBQueue, atomically, writeTBQueue)
 import Control.Exception (bracket_)
 import Control.Monad (when)
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
@@ -38,7 +38,7 @@ data BenchmarkEnv = BenchmarkEnv
   -- ^ HTTP connection manager (shared across all requests)
   , bePayloadIndex :: Int
   -- ^ Index of the current payload\/endpoint (for progress logging)
-  , beEventChan :: Maybe (TChan BenchmarkEvent)
+  , beEventChan :: Maybe (TBQueue BenchmarkEvent)
   -- ^ Optional TUI event channel for real-time feedback
   , beLogger :: Logger
   -- ^ Logger for progress output
@@ -123,13 +123,13 @@ workerLoop BenchmarkEnv {..} preparedReq deadline countRef limiter = go []
               go (res : acc)
 
 -- | Emit a TUI event for a completed request when a channel is present.
-emitEvent :: Maybe (TChan BenchmarkEvent) -> TestingResponse -> IO ()
+emitEvent :: Maybe (TBQueue BenchmarkEvent) -> TestingResponse -> IO ()
 emitEvent Nothing _ = pure ()
 emitEvent (Just chan) res = do
   let event = case errorMessage res of
         Nothing -> RequestCompleted (durationNs res) (statusCode res)
         Just err -> RequestFailed (T.pack err)
-  atomically $ writeTChan chan event
+  atomically $ writeTBQueue chan event
 
 printProgressBar :: Logger -> Int -> Int -> Int -> IO ()
 printProgressBar logger idx c total = do

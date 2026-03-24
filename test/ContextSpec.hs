@@ -3,7 +3,7 @@ module ContextSpec (contextSpec) where
 
 import Benchmark.TUI.State (BenchmarkEvent (..))
 import Benchmark.Types (BenchmarkConfig (..), Settings (..))
-import Control.Concurrent.STM (atomically, newTChanIO, readTChan)
+import Control.Concurrent.STM (atomically, newTBQueueIO, readTBQueue)
 import Data.Text qualified as T
 import Runner.Context (RunContext (..), emitEvent, initContext)
 import System.IO (hClose, hFlush)
@@ -22,9 +22,9 @@ contextSpec =
         [ testCase "Nothing channel is a no-op" $
             emitEvent Nothing (PhaseStarted 1) `shouldReturn` ()
         , testCase "Just channel writes the event" $ do
-            chan <- newTChanIO
+            chan <- newTBQueueIO 100
             emitEvent (Just chan) (PhaseStarted 1)
-            event <- atomically $ readTChan chan
+            event <- atomically $ readTBQueue chan
             event `shouldBe` PhaseStarted 1
         ]
     , testGroup
