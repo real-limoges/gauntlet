@@ -13,8 +13,8 @@ import Brick.BChan (newBChan, writeBChan)
 import Brick.Widgets.Border (borderWithLabel, hBorder)
 import Brick.Widgets.Center (hCenter)
 import Control.Concurrent (forkIO, killThread, threadDelay)
-import Control.Concurrent.STM
-import Control.Exception (SomeException, bracket, try)
+import Control.Concurrent.STM (TBQueue, atomically, readTBQueue)
+import Control.Exception (SomeException, bracket, finally, try)
 import Control.Monad (forever, unless)
 import Control.Monad.IO.Class (liftIO)
 import Data.Foldable (toList)
@@ -52,14 +52,14 @@ errorRateWarning = 1000
 
 -- ── Runner ────────────────────────────────────────────────────────────────────
 
-runTUI :: TChan BenchmarkEvent -> TUIState -> IO TUIState
+runTUI :: TBQueue BenchmarkEvent -> TUIState -> IO TUIState
 runTUI eventChan initialSt = do
   brickChan <- newBChan 1000
 
   bracket
     ( do
         tid1 <- forkIO $ forever $ do
-          event <- atomically $ readTChan eventChan
+          event <- atomically $ readTBQueue eventChan
           writeBChan brickChan (BenchEvent event)
         tid2 <- forkIO $ forever $ do
           threadDelay 100_000 -- 100ms tick for elapsed-time updates
@@ -91,8 +91,7 @@ withStderrBuffered action =
       return (stderrSaved, tmpPath)
     release (stderrSaved, tmpPath) = do
       hFlush stderr
-      hDuplicateTo stderrSaved stderr
-      hClose stderrSaved
+      hDuplicateTo stderrSaved stderr `finally` hClose stderrSaved
       content <- try (TIO.readFile tmpPath) :: IO (Either SomeException T.Text)
       case content of
         Right s -> unless (T.null s) $ TIO.hPutStr stderr s

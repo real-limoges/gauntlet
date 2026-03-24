@@ -14,7 +14,7 @@ import Benchmark.TUI.State (BenchmarkEvent)
 import Benchmark.Types (Settings (..), exitWithError)
 import Benchmark.Types qualified as PT
 import Control.Concurrent (QSem)
-import Control.Concurrent.STM (TChan, atomically, writeTChan)
+import Control.Concurrent.STM (TBQueue, atomically, writeTBQueue)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -33,7 +33,7 @@ data RunContext = RunContext
   -- ^ Path to the CSV latency output file
   , rcTimestamp :: String
   -- ^ ISO-8601 timestamp string identifying this run
-  , rcEventChan :: Maybe (TChan BenchmarkEvent)
+  , rcEventChan :: Maybe (TBQueue BenchmarkEvent)
   -- ^ Optional TUI event channel for real-time progress
   , rcLogger :: Logger
   -- ^ Logger with configured verbosity level
@@ -42,7 +42,7 @@ data RunContext = RunContext
   }
 
 -- | Initialise a 'RunContext' from benchmark settings.
-initContext :: Settings -> FilePath -> String -> Maybe (TChan BenchmarkEvent) -> IO RunContext
+initContext :: Settings -> FilePath -> String -> Maybe (TBQueue BenchmarkEvent) -> IO RunContext
 initContext setts csvFile timestamp eventChan = do
   token <- case secrets setts of
     Nothing -> return T.empty
@@ -74,6 +74,6 @@ makeBenchmarkEnv RunContext {..} sem idx =
     }
 
 -- | Emit an event to the TUI channel when one is present.
-emitEvent :: Maybe (TChan BenchmarkEvent) -> BenchmarkEvent -> IO ()
+emitEvent :: Maybe (TBQueue BenchmarkEvent) -> BenchmarkEvent -> IO ()
 emitEvent Nothing _ = return ()
-emitEvent (Just chan) event = atomically $ writeTChan chan event
+emitEvent (Just chan) event = atomically $ writeTBQueue chan event

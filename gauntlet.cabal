@@ -12,7 +12,7 @@ category:           Testing, Benchmarking
 
 
 common warnings
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -O2
 
 -- Define runtime options specifically for executables and tests
 common rts-properties

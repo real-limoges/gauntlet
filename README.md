@@ -1,815 +1,130 @@
 # gauntlet
 
-**Statistically rigorous HTTP performance benchmarking with A/B testing and distributed tracing.**
+HTTP performance benchmarking with Bayesian A/B analysis, regression detection, and CI integration.
 
-A Haskell-based performance testing tool that goes beyond simple request/second metrics, providing Bayesian statistical analysis, regression detection, and CI/CD integration for production-grade performance monitoring.
+Sends real HTTP requests, measures latency at nanosecond precision, and gives direct probability answers like "94% chance the candidate is faster." Supports 1-N targets with automatic pairwise comparison.
 
-[![GHC Version](https://img.shields.io/badge/GHC-9.12%2B-blue)](https://www.haskell.org/ghc/)
-[![Cabal Version](https://img.shields.io/badge/Cabal-3.12%2B-blue)](https://www.haskell.org/cabal/)
-[![Language](https://img.shields.io/badge/Language-GHC2024-purple)](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/control.html#extension-GHC2024)
-
----
-
-## Features
-
-### Core Capabilities
-- **A/B Comparison Testing** - Compare two API versions with statistical rigor
-- **Multi-Target Comparison Testing** - Compare multiple API targets simultaneously
-- **Bayesian Statistical Analysis** - Get probability distributions, not just p-values
-- **Nanosecond Precision** - High-resolution timing for accurate latency measurement
-- **Concurrent Execution** - Configurable concurrency with STM-based coordination
-- **Connection Pooling** - Efficient HTTP connection reuse
-
-### Statistical Analysis
-- **Bayesian Comparison** - Three probability metrics: P(candidate faster, means), P(single request faster), P(candidate less jittery)
-- **Effect Size Calculation** - Cohen's d for practical significance
-- **Percentile Analysis** - P50, P95, P99 with Maritz-Jarrett standard errors
-- **Earth Mover's Distance** - 1-Wasserstein distance for distribution comparison
-- **Credible Intervals** - 95% Bayesian credible intervals for mean differences
-- **Expected Shortfall** - Mean latency of the worst 1% of requests (E[X | X > p99])
-
-### Observability
-- **Real-time TUI** - Live progress tracking with Brick-based terminal UI
-- **Grafana Tempo Integration** - Distributed trace collection and analysis
-- **Structured Logging** - Configurable log levels (debug, info, warning, error)
-- **Multiple Output Formats** - Terminal, JSON, CSV, Markdown
-
-### Production Ready
-- **Regression Detection** - Compare against saved baselines with configurable thresholds
-- **CI/CD Integration** - Native GitLab CI and GitHub Actions support with automatic step summaries
-- **Markdown Reports** - Full stats, Bayesian analysis, and validation results in a single `.md` file
-- **Retry Logic** - Exponential backoff for flaky networks
-- **Warmup Support** - Prime caches before benchmarking
-- **Custom Headers** - Full HTTP header control per endpoint
-
----
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [User Guide](#user-guide)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Statistical Methodology](#statistical-methodology)
-- [Examples](#examples)
-- [Development](#development)
-- [Testing](#testing)
-- [Architecture](#architecture)
-- [CI/CD Integration](#cicd-integration)
-- [Contributing](#contributing)
-
----
-
-## Installation
-
-### Prerequisites
-
-- **GHC 9.12+** - Haskell compiler
-- **Cabal 3.12+** - Haskell build tool
-
-### macOS
+## Build & Run
 
 ```bash
-# Install GHC and Cabal via GHCup (recommended)
-curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+# Build
+cabal build
 
-# Or via Homebrew
-brew install ghc cabal-install
+# Run a benchmark
+cabal run gauntlet-exe -- benchmark --config config.json
+
+# Tests
+cabal test --test-show-details=direct
 ```
-
-### Linux
-
-```bash
-# Via GHCup (recommended)
-curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
-
-# Or via package manager
-# Ubuntu/Debian
-sudo apt-get install ghc cabal-install
-
-# Arch Linux
-sudo pacman -S ghc cabal-install
-```
-
-### Build from Source
-
-```bash
-git clone https://github.com/real-limoges/gauntlet.git
-cd gauntlet
-
-# Build with optimizations
-cabal build -O2
-
-# Or use Makefile
-make build
-```
-
----
 
 ## Quick Start
-
-### 1. Create a minimal configuration
-
-```json
-{
-  "targets": {
-    "primary": "http://api.example.com",
-    "candidate": "http://api-new.example.com"
-  },
-  "settings": {
-    "iterations": 1000,
-    "concurrency": 10
-  },
-  "payloads": [
-    {
-      "name": "health-check",
-      "method": "GET",
-      "path": "/health"
-    }
-  ]
-}
-```
-
-Save as `config.json`.
-
-### 2. Run the benchmark
-
-```bash
-cabal run gauntlet-exe -- benchmark --config config.json
-```
-
-### 3. View results
-
-```
-=== Benchmark Results ===
-
-Endpoint: health-check
-
-PRIMARY (http://api.example.com)
-  Mean: 45.2ms (±2.3ms)
-  P50:  42.1ms
-  P95:  78.3ms
-  P99:  95.1ms
-
-CANDIDATE (http://api-new.example.com)
-  Mean: 38.7ms (±1.9ms)
-  P50:  36.2ms
-  P95:  65.4ms
-  P99:  82.7ms
-
-BAYESIAN COMPARISON
-  Probability candidate is faster: 94.7%
-  Mean difference: -6.5ms [-9.2ms, -3.8ms]
-  Effect size (Cohen's d): 0.32 (small to medium)
-  Earth Mover's Distance: 0.15
-```
-
----
-
-## User Guide
-
-For a comprehensive walkthrough of all features, configuration options (with explanations of *why* each setting exists), output interpretation, and example configs, see the **[User Guide](docs/USER_GUIDE.md)**.
-
----
-
-## Usage
-
-### Available Commands
-
-```bash
-# Run benchmark (supports 1+ targets; mode determined automatically from config)
-cabal run gauntlet-exe -- benchmark --config config.json
-```
-
-### Command-Line Options
-
-```bash
-# Specify configuration file
---config FILE              Path to JSON/YAML config
-
-# Markdown report output
---output markdown          Write a markdown report in addition to terminal output
---report-path FILE         Path for the markdown report (default: results/report.md)
-
-# Baseline comparison
---save-baseline NAME       Save results as baseline
---compare-baseline NAME    Compare against saved baseline (exit 1 on regression)
-```
-
-### Exit Codes
-
-- `0` - Success
-- `1` - Performance regression detected (when baseline comparison enabled)
-- `2` - Error occurred during execution
-
----
-
-## Configuration
-
-### Minimal Configuration (A/B)
-
-```json
-{
-  "targets": {
-    "primary": "http://api.example.com"
-  },
-  "git": {
-    "primary": "main",
-    "candidate": "main"
-  },
-  "settings": {
-    "iterations": 100,
-    "concurrency": 10,
-    "secrets": ".secrets/token.txt"
-  },
-  "payloads": [
-    {
-      "name": "endpoint-name",
-      "method": "GET",
-      "path": "/api/endpoint"
-    }
-  ]
-}
-```
-
-### Multi-Target Configuration
 
 ```json
 {
   "targets": [
     { "name": "prod", "url": "http://prod.example.com:8080" },
-    { "name": "staging", "url": "http://staging.example.com:8080" },
-    { "name": "dev", "url": "http://dev.example.com:8080" }
+    { "name": "staging", "url": "http://staging.example.com:8080" }
   ],
   "settings": {
     "iterations": 1000,
-    "concurrency": 10,
-    "secrets": ".secrets/token.txt"
+    "concurrency": 10
   },
   "payloads": [
-    {
-      "name": "endpoint-name",
-      "method": "GET",
-      "path": "/api/endpoint"
-    }
+    { "name": "health", "method": "GET", "path": "/health" }
   ]
 }
 ```
 
-Targets are an array of objects with `name`, `url`, and optional `branch` fields. All pairwise Bayesian comparisons are computed automatically.
+See `examples/` for more config patterns (A/B comparison, load modes, auth, validation).
 
-### Full Configuration
+## CLI Options
 
-```json
-{
-  "targets": {
-    "primary": "http://api-v1.example.com",
-    "candidate": "http://api-v2.example.com"
-  },
-  "git": {
-    "primary": "main",
-    "candidate": "feature/my-branch"
-  },
-  "settings": {
-    "iterations": 10000,
-    "concurrency": 100,
-    "maxConnections": 50,
-    "requestTimeout": 60,
-    "logLevel": "info",
-    "secrets": ".secrets/token.txt",
-    "healthCheckPath": "/health",
-    "healthCheckTimeout": 60,
+```
+benchmark --config FILE                   Run benchmark
+          --output markdown               Also write markdown report
+          --report-path FILE              Markdown output path (default: results/report.md)
+          --save-baseline NAME            Save results as named baseline
+          --compare-baseline NAME         Compare against baseline (exit 1 on regression)
 
-    "warmup": {
-      "warmupIterations": 10
-    },
+compare   --baseline-a NAME --baseline-b NAME   Compare two saved baselines
 
-    "retry": {
-      "retryMaxAttempts": 3,
-      "retryInitialDelayMs": 1000,
-      "retryBackoffMultiplier": 2.0
-    },
+validate  --config FILE                   Validate config without running
 
-    "tempo": {
-      "tempoUrl": "http://tempo:3200",
-      "tempoServiceName": "my-service",
-      "tempoEnabled": true,
-      "tempoAuthToken": "optional-bearer-token"
-    }
-  },
-  "payloads": [
-    {
-      "name": "create-user",
-      "method": "POST",
-      "path": "/api/users",
-      "headers": {
-        "X-API-Key": "your-key",
-        "Content-Type": "application/json"
-      },
-      "body": {
-        "name": "test-user",
-        "email": "test@example.com"
-      },
-      "validate": {
-        "status": 201,
-        "fields": {
-          "$.id": {"present": true},
-          "$.status": {"eq": "active"}
-        }
-      }
-    }
-  ]
-}
+schema                                    Print JSON schema for config format
 ```
 
-### Configuration Reference
+Exit codes: `0` success, `1` regression detected, `2` error.
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `targets.primary` | string | required | Primary endpoint base URL |
-| `targets.candidate` | string | - | Candidate endpoint base URL for A/B testing |
-| `git.primary` | string | required | Git branch for primary target |
-| `git.candidate` | string | required | Git branch for candidate target |
-| `settings.iterations` | int | required | Number of requests to execute |
-| `settings.concurrency` | int | required | Concurrent request limit |
-| `settings.secrets` | string | required | Path to file containing Bearer token |
-| `settings.maxConnections` | int | 10 | HTTP connection pool size |
-| `settings.requestTimeout` | int | 30 | Request timeout (seconds) |
-| `settings.logLevel` | string | `"info"` | Log level: `debug`, `info`, `warning`, `error` |
-| `settings.healthCheckPath` | string | `"/health"` | Path appended to service URL for health polling |
-| `settings.healthCheckTimeout` | int | 60 | Health check poll timeout (seconds) |
-| `settings.warmup.warmupIterations` | int | 1 | Warmup iterations before benchmark |
-| `settings.retry.retryMaxAttempts` | int | 3 | Maximum retry attempts |
-| `settings.retry.retryInitialDelayMs` | int | 1000 | Initial retry delay (ms) |
-| `settings.retry.retryBackoffMultiplier` | double | 2.0 | Exponential backoff multiplier |
-| `payloads[].headers` | object | - | Custom HTTP headers (key/value map) |
-| `payloads[].validate.status` | int | - | Expected HTTP status code |
-| `payloads[].validate.fields` | object | - | Dot-path field assertions (`present: true` or `eq: value`) |
-| `settings.loadMode` | object | `unthrottled` | Load control mode: `unthrottled`, `constantRpm`, `rampUp`, `stepLoad`, `poissonRpm` |
+## Configuration
 
-**Load Control Modes:**
+Full reference in the [User Guide](docs/USER_GUIDE.md). Key fields:
 
-```json
-// Unthrottled (default) — no rate limiting
-{"mode": "unthrottled"}
+| Field | Description |
+|-------|-------------|
+| `targets` | Array of `{name, url, branch?}` or object with `primary`/`candidate` URLs |
+| `settings.iterations` | Requests per endpoint |
+| `settings.concurrency` | Concurrent request limit |
+| `settings.secrets` | Path to Bearer token file |
+| `settings.loadMode` | `unthrottled`, `constantRpm`, `rampUp`, `stepLoad`, `poissonRpm` |
+| `settings.requestTimeout` | Per-request timeout in seconds (default: 30) |
+| `settings.warmup` | `{warmupIterations: N}` |
+| `settings.retry` | `{retryMaxAttempts, retryInitialDelayMs, retryBackoffMultiplier}` |
+| `settings.tempo` | Grafana Tempo tracing config |
+| `payloads[].validate` | Per-response assertions: `{status: 200, fields: {"$.path": {eq: val}}}` |
 
-// Constant RPM — steady request rate
-{"mode": "constantRpm", "targetRpm": 100}
+Environment variables: `${VAR}` in any config value, resolved from `.env.local` > `.env` > process env.
 
-// Ramp Up — linearly increasing rate
-{"mode": "rampUp", "startRpm": 10, "endRpm": 200, "durationSecs": 60}
+## Statistical Output
 
-// Step Load — discrete rate steps
-{"mode": "stepLoad", "steps": [
-  {"rpm": 50, "durationSecs": 30},
-  {"rpm": 100, "durationSecs": 30},
-  {"rpm": 200, "durationSecs": 30}
-]}
+**Per-target:** mean, stddev, P50/P95/P99, expected shortfall (mean of worst 1%).
 
-// Poisson RPM — random inter-arrival times (realistic traffic simulation)
-{"mode": "poissonRpm", "targetRpm": 100}
+**Pairwise Bayesian comparison:**
+- `probBFasterThanA` -- P(mean_B < mean_A), population-level
+- `probSingleRequestFaster` -- P(X_B < X_A), individual request
+- `probBLessJittery` -- P(sigma_B < sigma_A)
+- Mean difference with 95% credible intervals
+- Cohen's d effect size
+- Earth Mover's Distance (1-Wasserstein)
+
+## Reporters
+
+Six built-in output formats, combinable:
+
+- **Terminal** -- real-time TUI with rolling stats, histogram, request timeline
+- **Markdown** -- full report for CI artifacts
+- **JUnit XML** -- test framework integration
+- **Prometheus** -- metrics export
+- **HTML** -- static report with SVG charts
+- **CI** -- GitHub Actions step summary / GitLab CI collapsible sections
+
+## CI Integration
+
+```yaml
+# GitHub Actions -- results appear in step summary automatically
+- run: |
+    cabal run gauntlet-exe -- benchmark \
+      --config config.json \
+      --compare-baseline prod \
+      --output markdown --report-path results/report.md
 ```
 
-**Environment variable expansion:** Any config value can contain `${VAR}` references, which are expanded before JSON parsing. Variables are resolved from (highest priority first): `.env.local`, `.env`, process environment. Missing variables fail fast with a clear error.
-
-See [`examples/`](examples/) directory for complete configuration examples.
-
----
-
-## Statistical Methodology
-
-### Bayesian A/B Comparison
-
-Instead of traditional hypothesis testing (p-values), gauntlet uses **Bayesian inference** to provide direct probability statements:
-
-- **"95% probability candidate is faster"** - Clear, interpretable results
-- **95% Credible Intervals** - Range of plausible mean differences
-- **Effect Size (Cohen's d)** - Practical significance measurement
-
-Two distinct probability metrics are reported:
-
-| Metric | Formula | Answers |
-|--------|---------|---------|
-| `probBFasterThanA` | Φ((μ_A - μ_B) / √(σ_A²/n_A + σ_B²/n_B)) | Is B's *average* faster? |
-| `probSingleRequestFaster` | Φ((μ_A - μ_B) / √(σ_A² + σ_B²)) | Will a *single* request to B be faster? |
-
-#### How It Works
-
-1. **Conjugate Normal Model** - Assumes response times follow a normal distribution
-2. **Posterior Distribution** - Computes exact posterior using conjugate priors
-3. **Analytical Computation** - Closed-form probability via the normal CDF (no MCMC sampling)
-4. **Comparison** - Computes P(B faster than A) directly from posterior parameters
-
-#### Interpretation Guide
-
-| Cohen's d | Effect Size | Interpretation |
-|-----------|-------------|----------------|
-| < 0.2 | Negligible | Difference is negligible |
-| 0.2 - 0.5 | Small | Noticeable but small difference |
-| 0.5 - 0.8 | Medium | Moderate performance improvement |
-| > 0.8 | Large | Substantial performance improvement |
-
-### Percentile Calculations
-
-- **Method**: R-7 (Excel/NumPy default)
-- **Standard Errors**: Maritz-Jarrett method for percentile uncertainty
-- **Percentiles Reported**: P50 (median), P95, P99
-
-### Distribution Comparison
-
-**Earth Mover's Distance (1-Wasserstein)**
-- Measures "cost" to transform one distribution into another
-- Scale: 0 (identical) to 1 (completely different)
-- Useful for detecting distribution shifts beyond mean differences
-
-**Expected Shortfall (ES)**
-- `esMs` = E[X | X > p99]: mean latency of the worst 1% of requests
-- Captures tail risk beyond what p99 alone conveys
-
----
-
-## Examples
-
-### Example 1: Simple Health Check
-
-```bash
-cabal run gauntlet-exe -- benchmark \
-  --config examples/minimal.json
-```
-
-### Example 2: A/B API Comparison with Markdown Report
-
-```bash
-cabal run gauntlet-exe -- benchmark \
-  --config examples/ab-comparison.json \
-  --output markdown \
-  --report-path results/report.md
-```
-
-### Example 3: Regression Detection
-
-```bash
-# Save baseline
-cabal run gauntlet-exe -- benchmark \
-  --config examples/simple-benchmark.json \
-  --save-baseline prod-baseline
-
-# Compare against baseline (exits 1 if regression detected)
-cabal run gauntlet-exe -- benchmark \
-  --config examples/simple-benchmark.json \
-  --compare-baseline prod-baseline
-```
-
-### Example 4: Authenticated API with Custom Headers
-
-```bash
-# Create secrets file
-mkdir -p .secrets
-echo "Bearer your-token-here" > .secrets/token.txt
-
-cabal run gauntlet-exe -- benchmark \
-  --config examples/api-with-auth.json
-```
-
-See [`examples/README.md`](examples/README.md) for more examples.
-
----
+When `GITHUB_ACTIONS=true`, regression reports are appended to `$GITHUB_STEP_SUMMARY`.
+When `GITLAB_CI=true`, collapsible section markers are emitted.
 
 ## Development
 
-### Prerequisites
-
-- **GHC 9.12+** with GHC2024 language standard
-- **Cabal 3.12+**
-- **fourmolu** (for code formatting)
-
-### Setup
+Requires GHC 9.12+ and Cabal 3.12+. Uses GHC2024 language standard.
 
 ```bash
-# Clone repository
-git clone https://github.com/real-limoges/gauntlet.git
-cd gauntlet
-
-# Install dependencies
-cabal build --only-dependencies
-
-# Build with optimizations
-cabal build -O2
+make build      # Build with -O2
+make test       # Run tests
+make format     # Format with fourmolu
+make repl       # GHCi REPL
 ```
 
-### Development Workflow
-
-```bash
-# Start REPL
-cabal repl
-
-# Build
-cabal build
-
-# Run tests
-cabal test
-
-# Format code
-fourmolu --mode inplace $(find src test -name '*.hs')
-
-# Or use Makefile
-make build
-make test
-make format
-```
-
-### Project Structure
-
-```
-gauntlet/
-├── src/
-│   ├── Benchmark/          # HTTP benchmarking engine
-│   │   ├── Types.hs        # Core data types (re-exports Types/ sub-modules)
-│   │   ├── Types/          # Type sub-modules (Baseline, Config, Error, Internal, Response, Stats, Units)
-│   │   ├── Config/         # Configuration
-│   │   │   ├── Loader.hs   # JSON/YAML config parsing
-│   │   │   ├── CLI.hs      # Command-line argument parsing
-│   │   │   └── Env.hs      # .env/.env.local loading, ${VAR} interpolation
-│   │   ├── Execution/      # Runtime execution
-│   │   │   ├── Environment.hs  # Git switch + docker-compose + health check
-│   │   │   ├── RateLimiter.hs  # unthrottled, constantRpm, rampUp, stepLoad
-│   │   │   └── Validation.hs   # Per-response JSON field validation
-│   │   ├── Network/        # HTTP client (Auth, Exec, Request)
-│   │   ├── TUI.hs          # Real-time terminal UI
-│   │   ├── TUI/            # TUI sub-modules (State, Widgets)
-│   │   ├── Report.hs       # Terminal output formatting
-│   │   ├── Report/         # Report sub-modules
-│   │   │   ├── Baseline.hs # Baseline save/load/regression detection
-│   │   │   ├── CI.hs       # GitLab CI / GitHub Actions integration
-│   │   │   ├── Formatting.hs  # Validation error formatting
-│   │   │   ├── Markdown.hs    # Markdown report generation
-│   │   │   └── Output.hs   # JSON/CSV serialization
-│   │   ├── Compare.hs      # Offline comparison of saved benchmark results
-│   │   ├── Reporter.hs     # Reporter record, combineReporters, noOpReporter
-│   │   └── Reporter/       # Built-in reporters (Terminal, Markdown, CI, Plot)
-│   ├── Runner/             # Benchmark orchestration
-│   │   ├── Context.hs      # RunContext, initContext, setupOrFail
-│   │   ├── Loop.hs         # Concurrent benchmark loops
-│   │   ├── Benchmark.hs    # Multi-target benchmark orchestration
-│   │   ├── Warmup.hs       # Warmup execution
-│   │   └── Tracing.hs      # Tempo trace fetching
-│   ├── Stats/              # Statistical analysis
-│   │   ├── Common.hs       # Percentiles, std dev
-│   │   └── Benchmark.hs    # Bayesian comparison
-│   ├── Tracing/            # Grafana Tempo integration
-│   │   ├── Types.hs        # Trace data structures
-│   │   ├── Client.hs       # Tempo HTTP client (query construction + execution)
-│   │   └── Report.hs       # Trace terminal output
-│   ├── Log.hs              # Structured logging
-│   ├── Runner.hs           # Top-level entry points
-│   └── Lib.hs              # Main dispatcher
-├── test/                   # Test suite (Tasty, 39 files)
-│   ├── Spec.hs             # Test suite entry point
-│   ├── StatsSpec.hs        # Statistical tests
-│   ├── StatsCommonSpec.hs  # Common stats utilities
-│   ├── BayesianSpec.hs     # Bayesian analysis tests
-│   ├── ConfigSpec.hs       # Config parsing tests
-│   ├── BaselineSpec.hs     # Baseline tests
-│   ├── BenchmarkRunnerSpec.hs  # Benchmark runner tests
-│   ├── BenchmarkIntegrationSpec.hs  # Benchmark end-to-end tests
-│   ├── TracingSpec.hs      # Tracing analysis tests
-│   ├── TracingClientSpec.hs    # Tempo client tests
-│   ├── TracingReportSpec.hs    # Trace report tests
-│   ├── AuthSpec.hs         # Auth token tests
-│   ├── CISpec.hs           # CI integration tests
-│   ├── CLISpec.hs          # CLI parsing tests
-│   ├── ContextSpec.hs      # RunContext tests
-│   ├── EnvSpec.hs          # Env var expansion tests
-│   ├── EnvironmentSpec.hs  # Environment setup tests
-│   ├── ExecSpec.hs         # Request execution tests
-│   ├── FormattingSpec.hs   # Validation error formatting tests
-│   ├── LoadControlIntegrationSpec.hs  # Load control tests
-│   ├── LogSpec.hs          # Logging tests
-│   ├── LoopSpec.hs         # Benchmark loop tests
-│   ├── MarkdownSpec.hs     # Markdown report tests
-│   ├── OutputSpec.hs       # CSV/JSON output tests
-│   ├── RateLimiterSpec.hs  # Rate limiter tests
-│   ├── ReportSpec.hs       # Terminal report tests
-│   ├── ReporterSpec.hs     # Reporter interface tests
-│   ├── RequestSpec.hs      # HTTP request tests
-│   ├── TypesConfigSpec.hs  # Config type tests
-│   ├── TypesJsonSpec.hs    # JSON serialization tests
-│   ├── TypesSpec.hs        # Type tests
-│   ├── ValidationSpec.hs   # Validation tests
-│   ├── WarmupSpec.hs       # Warmup tests
-│   ├── Integration.hs      # HTTP execution tests
-│   ├── PropertySpec.hs     # QuickCheck properties
-│   ├── TUISpec.hs          # Brick widget tests
-│   ├── TestHelpers.hs      # Shared test fixtures
-│   ├── TastyCompat.hs      # Test compatibility helpers
-│   └── MockServer.hs       # HTTP mock utilities
-├── examples/               # Example configurations
-└── CLAUDE.md               # Architecture guide
-```
-
----
-
-## Testing
-
-### Run All Tests
-
-```bash
-cabal test
-```
-
-### Run Specific Test Suite
-
-```bash
-# Run only unit tests
-cabal test --test-options="-p 'StatsSpec'"
-
-# Run with verbose output
-cabal test --test-show-details=direct
-```
-
-### Test Coverage
-
-- **Unit Tests**: Statistical functions, config parsing, baseline comparison
-- **Integration Tests**: HTTP operations with mock server
-- **Property Tests**: QuickCheck for statistical invariants
-- **UI Tests**: Brick TUI widget testing
-
-### Test Framework
-
-- **Tasty** - Test framework with `tasty-hunit` and `tasty-quickcheck`
-- **QuickCheck** - Property-based testing
-- **MockServer** - HTTP mock utilities for integration tests
-
----
-
-## Architecture
-
-### Core Design Principles
-
-1. **Type Safety** - Newtypes prevent unit conversion bugs (`Nanoseconds`, `Milliseconds`)
-2. **Concurrency** - STM channels for thread-safe concurrent execution
-3. **Statistical Rigor** - Bayesian inference over frequentist hypothesis testing
-4. **Observability** - Structured logging and distributed tracing
-
-### Data Flow
-
-```
-CLI Parse → Config Load → Endpoint Build
-    ↓
-For each target (sequentially):
-  Optional Git Switch → docker-compose up → Health Check
-  Warmup → Concurrent Execution (STM) → Nanosecond-timed Responses
-    ↓
-Statistical Analysis → Bayesian Comparison (all pairs) → Report
-    ↓
-Optional: Fetch Traces → Aggregate Spans → Trace Report
-    ↓
-Optional: Compare Baseline → Detect Regressions
-    ↓
-Terminal Output + Optional Markdown Report + Exit Code
-```
-
-### Key Modules
-
-- **Benchmark.Network.{Auth,Exec,Request}** - HTTP client with connection pooling and retries
-- **Stats.Benchmark** - Bayesian comparison and percentile calculations
-- **Benchmark.TUI** - Real-time Brick-based terminal UI
-- **Tracing.Client** - Grafana Tempo integration
-- **Benchmark.Report.Baseline** - Regression detection
-- **Benchmark.Reporter** - Output abstraction; combines terminal, markdown, and CI reporters
-
-See [`CLAUDE.md`](CLAUDE.md) for detailed architecture documentation.
-
----
-
-## CI/CD Integration
-
-### GitLab CI Example
-
-When `GITLAB_CI=true` is set, gauntlet automatically emits collapsible section markers and writes a markdown artifact report.
-
-```yaml
-performance-test:
-  stage: test
-  script:
-    - cabal build
-    - cabal run gauntlet-exe -- benchmark \
-        --config config.json \
-        --compare-baseline prod-baseline
-  artifacts:
-    paths:
-      - results/benchmark-report-*.md
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-```
-
-### GitHub Actions Example
-
-When `GITHUB_ACTIONS=true` is set, gauntlet automatically appends the regression report to `$GITHUB_STEP_SUMMARY`, making results visible directly in the Actions UI.
-
-```yaml
-name: Performance Tests
-
-on: [pull_request]
-
-jobs:
-  benchmark:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Haskell
-        uses: haskell/actions/setup@v2
-        with:
-          ghc-version: '9.12'
-          cabal-version: '3.12'
-
-      - name: Run benchmark
-        run: |
-          cabal build
-          cabal run gauntlet-exe -- benchmark \
-            --config config.json \
-            --compare-baseline prod-baseline \
-            --output markdown \
-            --report-path results/report.md
-
-      - name: Upload report
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-report
-          path: results/report.md
-```
-
-### Markdown Reports
-
-Use `--output markdown` to write a full report covering stats, Bayesian analysis, and validation results:
-
-```bash
-cabal run gauntlet-exe -- benchmark \
-  --config config.json \
-  --output markdown \
-  --report-path /tmp/report.md
-```
-
-The markdown report is written **in addition to** terminal output — it does not replace it.
-
-### Exit Codes for CI
-
-- **Exit 0** - Success, no regression
-- **Exit 1** - Performance regression detected (fails CI)
-- **Exit 2** - Error during execution (fails CI)
-
----
-
-## Contributing
-
-Contributions are welcome! Please follow these guidelines:
-
-1. **Code Style** - Format with `fourmolu` before committing
-2. **Tests** - Add tests for new features
-3. **Documentation** - Update README and docs for user-facing changes
-4. **Commit Messages** - Use conventional commit format
-
-```bash
-# Format code
-fourmolu --mode inplace $(find src test -name '*.hs')
-
-# Run tests
-cabal test
-
-# Build and verify
-cabal build -O2
-```
-
----
+Architecture details in [CLAUDE.md](CLAUDE.md).
 
 ## License
 
-This project is proprietary software. All rights reserved.
-
+Proprietary. All rights reserved.
 **Author**: Real Limoges
-**Maintainer**: b.real.limoges@gmail.com
-
----
-
-## Acknowledgments
-
-Built with:
-- [Haskell](https://www.haskell.org/) - Functional programming language
-- [http-client](https://hackage.haskell.org/package/http-client) - HTTP client library
-- [statistics](https://hackage.haskell.org/package/statistics) - Statistical analysis
-- [brick](https://hackage.haskell.org/package/brick) - Terminal UI framework
-- [aeson](https://hackage.haskell.org/package/aeson) - JSON parsing
-- [vector](https://hackage.haskell.org/package/vector) - High-performance arrays
-
-Statistical methodology inspired by Bayesian Data Analysis (Gelman et al.) and practical A/B testing literature.
-
----
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/real-limoges/gauntlet/issues)
-- **Examples**: See [`examples/`](examples/) directory
-
-For questions or feature requests, please open an issue.
