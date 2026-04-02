@@ -1,7 +1,7 @@
 -- | Tests for Benchmark.Types.
 module TypesSpec (typesSpec) where
 
-import Benchmark.Types
+import Benchmark.Types (PerfTestError (..), formatError)
 import TastyCompat (shouldBe)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)

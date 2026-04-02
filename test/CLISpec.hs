@@ -1,9 +1,9 @@
 -- | Tests for Benchmark.Config.CLI.
 module CLISpec (cliSpec) where
 
-import Benchmark.Config.CLI
+import Benchmark.Config.CLI (BaselineMode (..), Command (..), commandParser)
 import Benchmark.Types (OutputFormat (..))
-import Options.Applicative
+import Options.Applicative (defaultPrefs, execParserPure, getParseResult, helper, info, (<**>))
 import TastyCompat (shouldBe)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)

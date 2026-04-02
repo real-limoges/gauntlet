@@ -33,23 +33,22 @@ printMultipleBenchmarkReport ComparisonReport {..} = do
   putStrLn ""
   printHeader "Benchmark Report:"
 
-  printf "(%s):" (T.unpack crNameA)
-  putStrLn ""
+  putStrLn $ bold $ "(" <> T.unpack crNameA <> "):"
   printStats crStatsA
 
   putStrLn ""
 
-  printf "(%s):" (T.unpack crNameB)
-  putStrLn ""
+  putStrLn $ bold $ "(" <> T.unpack crNameB <> "):"
   printStats crStatsB
 
   putStrLn ""
   printHeader "Bayesian Analysis"
 
-  printf "Probability Candidate is Faster (means):   %.2f%%\n" (probBFasterThanA crBayes * 100.0)
-  printf "Probability Single Request Faster:          %.2f%%\n" (probSingleRequestFaster crBayes * 100.0)
-  printf "Probability Candidate Less Jittery:         %.2f%%\n" (probBLessJittery crBayes * 100.0)
-  printf "Mean Difference: %.2f ms\n" (meanDifference crBayes)
+  let pct p = colorPct p (printf "%.2f%%" p :: String)
+  printf "P(%s faster than %s, means): %s\n" (T.unpack crNameB) (T.unpack crNameA) (pct $ probBFasterThanA crBayes * 100.0)
+  printf "P(%s faster, single request): %s\n" (T.unpack crNameB) (pct $ probSingleRequestFaster crBayes * 100.0)
+  printf "P(%s less jittery): %s\n" (T.unpack crNameB) (pct $ probBLessJittery crBayes * 100.0)
+  printf "Mean Difference (%s - %s): %.2f ms\n" (T.unpack crNameB) (T.unpack crNameA) (meanDifference crBayes)
   printf
     "95%% Credible Interval: [%.2f ms, %.2f ms]\n"
     (credibleIntervalLower crBayes)
@@ -66,7 +65,7 @@ printMultipleBenchmarkReport ComparisonReport {..} = do
     (pctDifference p95)
     (pctCredibleLower p95)
     (pctCredibleUpper p95)
-  printf "P95 Regression Probability: %.2f%%\n" (probPctRegression p95 * 100.0)
+  printf "P95 Regression Probability: %s\n" (pct $ probPctRegression p95 * 100.0)
 
   let p99 = p99Comparison crBayes
   printf
@@ -74,14 +73,20 @@ printMultipleBenchmarkReport ComparisonReport {..} = do
     (pctDifference p99)
     (pctCredibleLower p99)
     (pctCredibleUpper p99)
-  printf "P99 Regression Probability: %.2f%%\n" (probPctRegression p99 * 100.0)
+  printf "P99 Regression Probability: %s\n" (pct $ probPctRegression p99 * 100.0)
+
+  case emd crBayes of
+    Just d -> do
+      putStrLn ""
+      printHeader "Distribution"
+      printf "Earth Mover's Distance: %.3f ms\n" d
+    Nothing -> pure ()
 
 -- | Print a single target's benchmark statistics to stdout.
 printSingleBenchmarkReport :: Text -> BenchmarkStats -> IO ()
 printSingleBenchmarkReport name stats = do
   putStrLn ""
-
-  printf "(%s):" (T.unpack name)
+  putStrLn $ bold $ "(" <> T.unpack name <> "):"
   printStats stats
 
 {-| Print validation results. Silently no-ops when the list is empty
@@ -105,7 +110,9 @@ printValidationSummary summaries = do
     putStrLn ""
     let allErrors = nub (concatMap validationErrors summaries)
         displayErrors = take 10 allErrors
-    forM_ displayErrors (putStrLn . ("  " ++) . T.unpack . formatValidationError)
+    forM_ displayErrors $ \err -> do
+      let formatted = T.unpack (formatValidationError err)
+      putStrLn ("  " ++ formatted)
     when (length allErrors > 10) $
       printf "  ... and %d more unique error(s)\n" (length allErrors - 10)
 
@@ -175,9 +182,50 @@ printStats stats = do
   printf "  Min:     %.2f ms\n" (minMs stats)
   printf "  Max:     %.2f ms\n" (maxMs stats)
   printf "  Success: %d / %d\n" (countSuccess stats) (totalRequests stats)
+  unless (null (histogram stats)) $ do
+    putStrLn ""
+    printHistogram (histogram stats)
+
+-- | Render a latency distribution as an ASCII horizontal bar chart.
+printHistogram :: [(Double, Int)] -> IO ()
+printHistogram bins = do
+  putStrLn "  Distribution:"
+  let maxCount = maximum (map snd bins)
+      maxBarWidth = 40 :: Int
+      scale c
+        | maxCount <= 0 = 0
+        | otherwise = round (fromIntegral c / fromIntegral maxCount * fromIntegral maxBarWidth :: Double)
+  forM_ bins $ \(lo, count) ->
+    when (count > 0) $
+      let barLen = scale count :: Int
+          bar = replicate barLen '█'
+       in printf "  %7.1f ms  %s %d\n" lo bar count
 
 printHeader :: String -> IO ()
-printHeader h = putStrLn $ "#----- " ++ h ++ " -----#"
+printHeader h = putStrLn $ "\ESC[1;36m── " <> h <> " ──\ESC[0m"
+
+-- ---------------------------------------------------------------------------
+-- ANSI formatting helpers
+-- ---------------------------------------------------------------------------
+
+bold :: String -> String
+bold s = "\ESC[1m" <> s <> "\ESC[0m"
+
+green :: String -> String
+green s = "\ESC[32m" <> s <> "\ESC[0m"
+
+yellow :: String -> String
+yellow s = "\ESC[33m" <> s <> "\ESC[0m"
+
+blue :: String -> String
+blue s = "\ESC[34m" <> s <> "\ESC[0m"
+
+-- | Color a percentage string: green ≥ 90%, yellow ≥ 60%, blue otherwise.
+colorPct :: Double -> String -> String
+colorPct p s
+  | p >= 90.0 = green s
+  | p >= 60.0 = yellow s
+  | otherwise = blue s
 
 -- | Look up stats for a target by name, defaulting to zero stats if missing.
 lookupStats :: Text -> Map Text BenchmarkStats -> BenchmarkStats
@@ -198,13 +246,14 @@ emptyStats =
     , p95Ms = 0
     , p99Ms = 0
     , esMs = 0
+    , histogram = []
     }
 
 -- | Print a regression result summary to stdout.
 printRegressionResult :: RegressionResult -> IO ()
 printRegressionResult regression = do
   putStrLn ""
-  putStrLn $ "#----- Regression Check vs '" ++ T.unpack (regressionBaseline regression) ++ "' -----#"
+  printHeader $ "Regression Check vs '" <> T.unpack (regressionBaseline regression) <> "'"
   putStrLn ""
   printf
     "%-8s %12s %12s %10s %10s %s\n"
@@ -218,8 +267,8 @@ printRegressionResult regression = do
   mapM_ printMetric (regressionMetrics regression)
   putStrLn ""
   if regressionPassed regression
-    then putStrLn "Result: PASSED (no regressions detected)"
-    else putStrLn "Result: FAILED (regression detected)"
+    then putStrLn $ green "Result: PASSED (no regressions detected)"
+    else putStrLn $ blue "Result: FAILED (regression detected)"
 
 printMetric :: MetricRegression -> IO ()
 printMetric m =
@@ -230,4 +279,4 @@ printMetric m =
     (metricCurrent m)
     (metricChange m * 100)
     (metricThreshold m * 100)
-    (if metricRegressed m then "REGRESSED" else "ok" :: String)
+    (if metricRegressed m then blue "REGRESSED" else green "ok" :: String)

@@ -1,8 +1,8 @@
 -- | Tests for Runner.Warmup.
 module WarmupSpec (warmupSpec) where
 
-import Benchmark.Types
-import Data.IORef
+import Benchmark.Types (Endpoint (..), LogLevel (..), Settings (..), WarmupSettings (..), benchSettings)
+import Data.IORef (IORef, newIORef, readIORef)
 import Data.Text (Text)
 import Data.Text qualified as T
 import MockServer (mockCountedRequests)

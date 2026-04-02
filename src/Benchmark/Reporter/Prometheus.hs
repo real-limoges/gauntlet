@@ -31,16 +31,15 @@ import Network.HTTP.Types.Status (statusIsSuccessful)
 prometheusReporter :: Logger -> Manager -> Text -> Text -> Reporter
 prometheusReporter logger mgr pushgatewayUrl jobName =
   Reporter
-    { reportSingle = \targetUrl stats valids -> do
-        let body = formatSingleMetrics targetUrl stats valids
-        pushMetrics logger mgr pushgatewayUrl jobName body
-    , reportBenchmark = \namedStats pairs valids -> do
-        let body = formatBenchmarkMetrics namedStats pairs valids
-        pushMetrics logger mgr pushgatewayUrl jobName body
-    , reportRegression = \regression -> do
-        let body = formatRegressionMetrics regression
-        pushMetrics logger mgr pushgatewayUrl jobName body
+    { reportSingle = \targetUrl stats valids ->
+        push (formatSingleMetrics targetUrl stats valids)
+    , reportBenchmark = \namedStats pairs valids ->
+        push (formatBenchmarkMetrics namedStats pairs valids)
+    , reportRegression = \regression ->
+        push (formatRegressionMetrics regression)
     }
+  where
+    push = pushMetrics logger mgr pushgatewayUrl jobName
 
 -- | Push metrics to the Pushgateway via PUT.
 pushMetrics :: Logger -> Manager -> Text -> Text -> Text -> IO ()
@@ -126,6 +125,7 @@ comparisonMetrics _a _b BayesianComparison {..} =
   , ("cohens_d", effectSize)
   , ("mean_diff_ms", meanDifference)
   ]
+    ++ maybe [] (\d -> [("emd_ms", d)]) emd
 
 validationMetrics :: [ValidationSummary] -> [(Text, [(Text, Double)])]
 validationMetrics [] = []

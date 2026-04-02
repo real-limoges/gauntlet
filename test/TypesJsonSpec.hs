@@ -2,6 +2,13 @@
 module TypesJsonSpec (typesJsonSpec) where
 
 import Benchmark.Types
+  ( BenchmarkConfig
+  , FieldAssertion (..)
+  , LogLevel (..)
+  , NamedTarget (..)
+  , PayloadSpec (..)
+  , ValidationSpec (..)
+  )
 import Data.Aeson (ToJSON (..), decode, encode)
 import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Map.Strict qualified as Map

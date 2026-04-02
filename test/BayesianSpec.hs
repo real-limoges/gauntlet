@@ -6,7 +6,7 @@ import Stats.Benchmark (compareBayesian)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)
-import TestHelpers
+import TestHelpers (mockStats)
 
 bayesianSpec :: TestTree
 bayesianSpec =
@@ -74,8 +74,8 @@ bayesianSpec =
             let result = compareBayesian (mockStats 100.0 0.0) (mockStats 100.0 0.0)
             probBLessJittery result `shouldBe` 0.5
         , testCase "n=1 (countSuccess=1) returns 0.5" $ do
-            let s = (mockStats 100.0 10.0) {countSuccess = 1}
-            let result = compareBayesian s s
+            let singleRequestStats = (mockStats 100.0 10.0) {countSuccess = 1}
+            let result = compareBayesian singleRequestStats singleRequestStats
             probBLessJittery result `shouldBe` 0.5
         ]
     ]

@@ -1,7 +1,7 @@
 -- | Tests for Benchmark.Report.CI.
 module CISpec (ciSpec) where
 
-import Benchmark.Report.CI
+import Benchmark.Report.CI (CIMode (..), detectCIMode, formatForCI, writeArtifactReport)
 import Benchmark.Types (MetricRegression (..), RegressionResult (..))
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO

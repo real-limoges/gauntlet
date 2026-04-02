@@ -102,6 +102,7 @@ comparisonSection nameA nameB comp =
     <> row "Relative effect" (showPct (relativeEffect comp / 100))
     <> pctRow "p95" (p95Comparison comp)
     <> pctRow "p99" (p99Comparison comp)
+    <> maybe mempty (\d -> row "EMD (ms)" (showD d)) (emd comp)
     <> "</table>\n"
 
 pctRow :: B.Builder -> PercentileComparison -> B.Builder
@@ -178,29 +179,29 @@ svgBarChart BenchmarkStats {..} =
         <> showI (chartH + 40)
         <> "\" role=\"img\">\n"
         <> mconcat
-          [ let h = scale v
-                x = i * (barW + barGap) + 10
-                y = chartH - h
+          [ let barHeight = scale v
+                barX = i * (barW + barGap) + 10
+                barY = chartH - barHeight
              in "<rect class=\"bar\" x=\""
-                  <> showI x
+                  <> showI barX
                   <> "\" y=\""
-                  <> showI y
+                  <> showI barY
                   <> "\" width=\""
                   <> showI barW
                   <> "\" height=\""
-                  <> showI h
+                  <> showI barHeight
                   <> "\"/>\n"
                   <> "<text x=\""
-                  <> showI (x + barW `div` 2)
+                  <> showI (barX + barW `div` 2)
                   <> "\" y=\""
                   <> showI (chartH + 15)
                   <> "\" text-anchor=\"middle\" font-size=\"12\">"
                   <> B.fromString lbl
                   <> "</text>\n"
                   <> "<text x=\""
-                  <> showI (x + barW `div` 2)
+                  <> showI (barX + barW `div` 2)
                   <> "\" y=\""
-                  <> showI (y - 5)
+                  <> showI (barY - 5)
                   <> "\" text-anchor=\"middle\" font-size=\"11\">"
                   <> showD1 v
                   <> "</text>\n"
@@ -250,4 +251,9 @@ showI = B.fromString . show . toInteger
 
 -- | Escape HTML entities for safe embedding in markup.
 esc :: Text -> B.Builder
-esc = B.fromText . T.replace "&" "&amp;" . T.replace "<" "&lt;" . T.replace ">" "&gt;" . T.replace "\"" "&quot;"
+esc raw =
+  let escaped = T.replace "&" "&amp;"
+              $ T.replace "<" "&lt;"
+              $ T.replace ">" "&gt;"
+              $ T.replace "\"" "&quot;" raw
+   in B.fromText escaped

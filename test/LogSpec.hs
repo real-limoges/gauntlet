@@ -3,10 +3,10 @@ module LogSpec (logSpec) where
 
 import Benchmark.Types (LogLevel (..))
 import Control.Monad (when)
-import Data.IORef
+import Data.IORef (IORef, modifyIORef, newIORef, readIORef)
 import Data.Text qualified as T
 import Data.Time (UTCTime, defaultTimeLocale, parseTimeOrError)
-import Log
+import Log (Logger (..), formatMessage, logAt)
 import TastyCompat (shouldBe)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase)

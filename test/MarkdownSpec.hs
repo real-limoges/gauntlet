@@ -1,8 +1,14 @@
 -- | Tests for Benchmark.Report.Markdown.
 module MarkdownSpec (markdownSpec) where
 
-import Benchmark.Report.Markdown
+import Benchmark.Report.Markdown (markdownBenchmarkReport, markdownMultipleReport, markdownRegressionReport, markdownSingleReport, markdownValidationReport)
 import Benchmark.Types
+  ( ComparisonReport (..)
+  , MetricRegression (..)
+  , RegressionResult (..)
+  , ValidationError (..)
+  , ValidationSummary (..)
+  )
 import Data.Aeson (toJSON)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
@@ -55,7 +61,7 @@ markdownSpec =
                 , testCase "includes Bayesian Analysis section" $ do
                     report `shouldSatisfy` T.isInfixOf "Bayesian Analysis"
                 , testCase "includes probability of candidate being faster" $ do
-                    report `shouldSatisfy` T.isInfixOf "P(candidate faster"
+                    report `shouldSatisfy` T.isInfixOf "P(candidate-branch faster"
                 , testCase "includes Cohen's d" $ do
                     report `shouldSatisfy` T.isInfixOf "Cohen"
                 , testCase "includes credible interval" $ do
@@ -63,6 +69,12 @@ markdownSpec =
                 , testCase "includes both stats sections" $ do
                     report `shouldSatisfy` T.isInfixOf "#### primary-branch"
                     report `shouldSatisfy` T.isInfixOf "#### candidate-branch"
+                , testCase "includes Earth Mover's Distance" $ do
+                    report `shouldSatisfy` T.isInfixOf "Earth Mover"
+                , testCase "includes relative effect row" $ do
+                    report `shouldSatisfy` T.isInfixOf "Relative effect"
+                , testCase "includes jitter probability" $ do
+                    report `shouldSatisfy` T.isInfixOf "less jittery"
                 ]
         ]
     , testGroup
@@ -104,8 +116,8 @@ markdownSpec =
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "PASSED"
         , testCase "shows FAILED status when regression detected" $ do
-            let m = MetricRegression "p99" 100.0 130.0 0.3 0.2 True
-            let result = mockRegressionResult "baseline" False [m]
+            let metric = MetricRegression "p99" 100.0 130.0 0.3 0.2 True
+            let result = mockRegressionResult "baseline" False [metric]
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "FAILED"
         , testCase "includes metric table header" $ do
@@ -113,21 +125,21 @@ markdownSpec =
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "| Metric |"
         , testCase "formats metric rows with PASS/FAIL" $ do
-            let mPass = MetricRegression "p50" 50.0 52.0 0.04 0.2 False
-            let mFail = MetricRegression "p99" 100.0 130.0 0.30 0.2 True
-            let result = mockRegressionResult "baseline" False [mPass, mFail]
+            let metricPass = MetricRegression "p50" 50.0 52.0 0.04 0.2 False
+            let metricFail = MetricRegression "p99" 100.0 130.0 0.30 0.2 True
+            let result = mockRegressionResult "baseline" False [metricPass, metricFail]
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "PASS"
             report `shouldSatisfy` T.isInfixOf "FAIL"
         , testCase "pass result contains 'All metrics within'" $ do
-            let mPass = MetricRegression "mean" 50.0 52.0 0.04 0.10 False
-            let result = mockRegressionResult "baseline" True [mPass]
+            let metricPass = MetricRegression "mean" 50.0 52.0 0.04 0.10 False
+            let result = mockRegressionResult "baseline" True [metricPass]
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "All metrics within acceptable thresholds"
         , testCase "fail result lists regressed metric names" $ do
-            let m1 = MetricRegression "p95" 80.0 100.0 0.25 0.10 True
-            let m2 = MetricRegression "p99" 100.0 140.0 0.40 0.15 True
-            let result = mockRegressionResult "baseline" False [m1, m2]
+            let metricP95 = MetricRegression "p95" 80.0 100.0 0.25 0.10 True
+            let metricP99 = MetricRegression "p99" 100.0 140.0 0.40 0.15 True
+            let result = mockRegressionResult "baseline" False [metricP95, metricP99]
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "Regressed metrics:"
             report `shouldSatisfy` T.isInfixOf "p95"
@@ -138,50 +150,50 @@ markdownSpec =
         [ testCase "returns empty for empty list" $ do
             markdownValidationReport [] `shouldBe` T.empty
         , testCase "includes Validation Results heading for non-empty input" $ do
-            let s = ValidationSummary 10 2 []
-            let report = markdownValidationReport [s]
+            let summary = ValidationSummary 10 2 []
+            let report = markdownValidationReport [summary]
             report `shouldSatisfy` T.isInfixOf "Validation Results"
         , testCase "includes counts in table rows" $ do
-            let s = ValidationSummary 10 3 []
-            let report = markdownValidationReport [s]
+            let summary = ValidationSummary 10 3 []
+            let report = markdownValidationReport [summary]
             -- 10 total, 7 passed, 3 failed
             report `shouldSatisfy` T.isInfixOf "10"
             report `shouldSatisfy` T.isInfixOf "7"
             report `shouldSatisfy` T.isInfixOf "3"
         , testCase "includes validation errors when present" $ do
-            let s = ValidationSummary 5 1 [StatusCodeMismatch 200 404]
-            let report = markdownValidationReport [s]
+            let summary = ValidationSummary 5 1 [StatusCodeMismatch 200 404]
+            let report = markdownValidationReport [summary]
             report `shouldSatisfy` T.isInfixOf "Status code mismatch"
         , testCase "describes FieldNotFound errors" $ do
-            let s = ValidationSummary 5 1 [FieldNotFound "data.id"]
-            let report = markdownValidationReport [s]
+            let summary = ValidationSummary 5 1 [FieldNotFound "data.id"]
+            let report = markdownValidationReport [summary]
             report `shouldSatisfy` T.isInfixOf "Field not found"
             report `shouldSatisfy` T.isInfixOf "data.id"
         , testCase "describes FieldValueMismatch errors" $ do
-            let s =
+            let summary =
                   ValidationSummary 5 1 [FieldValueMismatch "user.name" (toJSON ("alice" :: T.Text)) (toJSON ("bob" :: T.Text))]
-            let report = markdownValidationReport [s]
+            let report = markdownValidationReport [summary]
             report `shouldSatisfy` T.isInfixOf "Field value mismatch"
             report `shouldSatisfy` T.isInfixOf "user.name"
         , testCase "describes BodyAbsent error" $ do
-            let s = ValidationSummary 5 1 [BodyAbsent]
-            let report = markdownValidationReport [s]
+            let summary = ValidationSummary 5 1 [BodyAbsent]
+            let report = markdownValidationReport [summary]
             report `shouldSatisfy` T.isInfixOf "Response body absent"
         , testCase "describes BodyInvalidJSON error" $ do
-            let s = ValidationSummary 5 1 [BodyInvalidJSON]
-            let report = markdownValidationReport [s]
+            let summary = ValidationSummary 5 1 [BodyInvalidJSON]
+            let report = markdownValidationReport [summary]
             report `shouldSatisfy` T.isInfixOf "not valid JSON"
         , testCase "renders multiple validation summaries" $ do
-            let s1 = ValidationSummary 10 0 []
-                s2 = ValidationSummary 5 2 [FieldNotFound "$.x"]
-            let report = markdownValidationReport [s1, s2]
+            let summary1 = ValidationSummary 10 0 []
+                summary2 = ValidationSummary 5 2 [FieldNotFound "$.x"]
+            let report = markdownValidationReport [summary1, summary2]
             report `shouldSatisfy` T.isInfixOf "Field not found"
         ]
     , testGroup
         "markdownRegressionReport with regressed metrics"
         [ testCase "lists regressed metric names in summary" $ do
-            let m = MetricRegression "p99" 100.0 130.0 0.3 0.15 True
-            let result = mockRegressionResult "baseline" False [m]
+            let metric = MetricRegression "p99" 100.0 130.0 0.3 0.15 True
+            let result = mockRegressionResult "baseline" False [metric]
             let report = markdownRegressionReport result
             report `shouldSatisfy` T.isInfixOf "Regressed metrics:"
             report `shouldSatisfy` T.isInfixOf "p99"

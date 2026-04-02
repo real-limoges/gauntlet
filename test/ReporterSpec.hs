@@ -2,8 +2,8 @@
 module ReporterSpec (reporterSpec) where
 
 import Benchmark.Reporter (Reporter (..), combineReporters, markdownReporter, noOpReporter)
-import Benchmark.Types
-import Data.IORef
+import Benchmark.Types (BayesianComparison (..), BenchmarkStats (..), RegressionResult (..))
+import Data.IORef (IORef, modifyIORef, newIORef, readIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -76,32 +76,32 @@ combineReportersSpec =
   testGroup
     "combineReporters"
     [ testCase "empty list produces no-op reporter" $ do
-        let r = combineReporters []
-        reportSingle r "http://example.com" sampleStats []
-        reportBenchmark r Map.empty [] []
-        reportRegression r sampleRegressionResult
+        let combined = combineReporters []
+        reportSingle combined "http://example.com" sampleStats []
+        reportBenchmark combined Map.empty [] []
+        reportRegression combined sampleRegressionResult
     , testCase "reportSingle invokes all reporters" $ do
         ref <- newIORef []
-        let r = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
-        reportSingle r "http://example.com" sampleStats []
+        let combined = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
+        reportSingle combined "http://example.com" sampleStats []
         calls <- readIORef ref
         length calls `shouldBe` 2
     , testCase "reportBenchmark invokes all reporters" $ do
         ref <- newIORef []
-        let r = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
-        reportBenchmark r Map.empty [] []
+        let combined = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
+        reportBenchmark combined Map.empty [] []
         calls <- readIORef ref
         length calls `shouldBe` 2
     , testCase "reportRegression invokes all reporters" $ do
         ref <- newIORef []
-        let r = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
-        reportRegression r sampleRegressionResult
+        let combined = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
+        reportRegression combined sampleRegressionResult
         calls <- readIORef ref
         length calls `shouldBe` 2
     , testCase "preserves call order (r1 before r2)" $ do
         ref <- newIORef []
-        let r = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
-        reportSingle r "http://example.com" sampleStats []
+        let combined = combineReporters [countingReporter "r1" ref, countingReporter "r2" ref]
+        reportSingle combined "http://example.com" sampleStats []
         -- IORef prepends so order is reversed
         calls <- readIORef ref
         calls `shouldBe` ["r2", "r1"]
@@ -118,26 +118,26 @@ markdownReporterSpec =
     [ testCase "reportSingle writes non-empty file" $
         withSystemTempFile "report.md" $ \path h -> do
           hClose h
-          let r = markdownReporter path
-          reportSingle r "http://example.com" sampleStats []
+          let reporter = markdownReporter path
+          reportSingle reporter "http://example.com" sampleStats []
           content <- TIO.readFile path
           content `shouldSatisfy` (not . null . show)
     , testCase "reportBenchmark writes non-empty file" $
         withSystemTempFile "report.md" $ \path h -> do
           hClose h
-          let r = markdownReporter path
+          let reporter = markdownReporter path
               namedStats = Map.fromList [("primary", sampleStats), ("candidate", sampleStats)]
               pairs = [("primary", "candidate", sampleBayes)]
-          reportBenchmark r namedStats pairs []
+          reportBenchmark reporter namedStats pairs []
           content <- TIO.readFile path
           content `shouldSatisfy` (not . null . show)
     , testCase "reportRegression appends rather than overwrites" $
         withSystemTempFile "report.md" $ \path h -> do
           hClose h
-          let r = markdownReporter path
-          reportSingle r "http://example.com" sampleStats []
+          let reporter = markdownReporter path
+          reportSingle reporter "http://example.com" sampleStats []
           firstContent <- TIO.readFile path
-          reportRegression r sampleRegressionResult
+          reportRegression reporter sampleRegressionResult
           finalContent <- TIO.readFile path
           -- Final content should be strictly longer (regression section appended)
           T.length finalContent `shouldSatisfy` (> T.length firstContent)

@@ -2,10 +2,18 @@
 module BaselineSpec (baselineSpec) where
 
 import Benchmark.Config.CLI (BaselineMode (..))
-import Benchmark.Report.Baseline
+import Benchmark.Report.Baseline (compareToBaseline, handleBaseline)
 import Benchmark.Reporter (ReportingContext (..), noOpReporter)
 import Benchmark.Types
-import Data.IORef
+  ( BenchmarkStats (..)
+  , LogLevel (..)
+  , MetricRegression (..)
+  , RegressionResult (..)
+  , RegressionThresholds (..)
+  , RunResult (..)
+  , defaultThresholds
+  )
+import Data.IORef (IORef, newIORef, readIORef)
 import Data.List (find)
 import Data.Text qualified as T
 import Log (Logger)
@@ -14,7 +22,7 @@ import System.IO.Temp (withSystemTempDirectory)
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (DependencyType (..), TestTree, sequentialTestGroup, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
-import TestHelpers
+import TestHelpers (cleanTest, makeBaseline, makeCapturingLogger, mockStats)
 
 baselineSpec :: TestTree
 baselineSpec =

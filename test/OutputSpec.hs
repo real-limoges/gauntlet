@@ -1,7 +1,7 @@
 -- | Tests for Benchmark.Report.Output.
 module OutputSpec (outputSpec) where
 
-import Benchmark.Report.Output
+import Benchmark.Report.Output (formatResultBuilder, formatRow, initOutputFiles, writeLatenciesWithTarget)
 import Benchmark.Types (Endpoint (..), Nanoseconds (..), TestingResponse (..))
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
@@ -92,8 +92,8 @@ outputSpec =
         "formatRow (pure Builder)"
         [ testCase "produces comma-separated fields" $ do
             let ep = testEndpoint "http://example.com/api"
-                r = makeResp 200 1_000_000
-                row = TL.toStrict $ toLazyText $ formatRow "svc" 1 ep r
+                resp = makeResp 200 1_000_000
+                row = TL.toStrict $ toLazyText $ formatRow "svc" 1 ep resp
                 fields = T.splitOn "," (T.stripEnd row)
             length fields `shouldBe` 7
         , testCase "includes the target name as first field" $ do

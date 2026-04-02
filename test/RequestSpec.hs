@@ -2,7 +2,7 @@
 module RequestSpec (requestSpec) where
 
 import Benchmark.Network.Request (initNetwork, prepareRequest, timedRequest)
-import Benchmark.Types
+import Benchmark.Types (Endpoint (..), RetrySettings (..), Settings (..), TestingResponse (..))
 import Data.Aeson (object, (.=))
 import Data.Text (Text)
 import Data.Text qualified as T

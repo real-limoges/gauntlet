@@ -145,6 +145,7 @@ comparisonTestCases _nameA _nameB BayesianComparison {..} =
   , tc "cohens_d" (showD effectSize)
   , tc "mean_diff_ms" (showD meanDifference)
   ]
+    ++ maybe [] (\d -> [tc "emd_ms" (showD d)]) emd
   where
     tc name _val =
       TestCase
@@ -204,4 +205,8 @@ showI = B.fromString . show . toInteger
 
 -- | Escape XML special characters for safe embedding in attributes and text.
 esc :: Text -> Text
-esc = T.replace "&" "&amp;" . T.replace "<" "&lt;" . T.replace ">" "&gt;" . T.replace "\"" "&quot;"
+esc raw =
+  T.replace "&" "&amp;"
+    $ T.replace "<" "&lt;"
+    $ T.replace ">" "&gt;"
+    $ T.replace "\"" "&quot;" raw

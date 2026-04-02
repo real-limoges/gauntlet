@@ -2,6 +2,23 @@
 module TypesConfigSpec (typesConfigSpec) where
 
 import Benchmark.Types
+  ( HealthCheckConfig (..)
+  , HookCommand (..)
+  , LifecycleHooks (..)
+  , LoadMode (..)
+  , LoadStep (..)
+  , LogLevel (..)
+  , NamedTarget (..)
+  , RampUpConfig (..)
+  , RetrySettings (..)
+  , WarmupSettings (..)
+  , defaultLogLevel
+  , defaultRetrySettings
+  , defaultWarmupSettings
+  , isDurationBased
+  , loadModeDurationSecs
+  , totalRequestsForMode
+  )
 import Data.Aeson (decode, eitherDecode, encode)
 import TastyCompat (shouldBe)
 import Test.Tasty (TestTree, testGroup)

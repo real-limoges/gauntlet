@@ -4,7 +4,7 @@ module TracingSpec (tracingSpec) where
 import TastyCompat (shouldBe, shouldSatisfy)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
-import TestHelpers
+import TestHelpers (makeSpan)
 import Tracing.Report (aggregateBySpanName)
 import Tracing.Types (SpanAggregation (..))
 
