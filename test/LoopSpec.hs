@@ -1,7 +1,13 @@
 -- | Tests for Runner.Loop.
 module LoopSpec (loopSpec) where
 
-import Benchmark.Types (Endpoint (..), RetrySettings (..), Settings (..), ValidationSpec (..), WarmupSettings (..))
+import Benchmark.Types
+  ( Endpoint (..)
+  , RetrySettings (..)
+  , Settings (..)
+  , ValidationSpec (..)
+  , WarmupSettings (..)
+  )
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text qualified as T
 import MockServer (mockJson)

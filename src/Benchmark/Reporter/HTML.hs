@@ -252,8 +252,9 @@ showI = B.fromString . show . toInteger
 -- | Escape HTML entities for safe embedding in markup.
 esc :: Text -> B.Builder
 esc raw =
-  let escaped = T.replace "&" "&amp;"
-              $ T.replace "<" "&lt;"
-              $ T.replace ">" "&gt;"
-              $ T.replace "\"" "&quot;" raw
+  let escaped =
+        T.replace "&" "&amp;" $
+          T.replace "<" "&lt;" $
+            T.replace ">" "&gt;" $
+              T.replace "\"" "&quot;" raw
    in B.fromText escaped

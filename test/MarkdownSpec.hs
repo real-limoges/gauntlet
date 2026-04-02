@@ -1,7 +1,13 @@
 -- | Tests for Benchmark.Report.Markdown.
 module MarkdownSpec (markdownSpec) where
 
-import Benchmark.Report.Markdown (markdownBenchmarkReport, markdownMultipleReport, markdownRegressionReport, markdownSingleReport, markdownValidationReport)
+import Benchmark.Report.Markdown
+  ( markdownBenchmarkReport
+  , markdownMultipleReport
+  , markdownRegressionReport
+  , markdownSingleReport
+  , markdownValidationReport
+  )
 import Benchmark.Types
   ( ComparisonReport (..)
   , MetricRegression (..)

@@ -1,7 +1,12 @@
 -- | Tests for Benchmark.Report.
 module ReportSpec (reportSpec) where
 
-import Benchmark.Report (printBenchmarkReport, printMultipleBenchmarkReport, printSingleBenchmarkReport, printValidationSummary)
+import Benchmark.Report
+  ( printBenchmarkReport
+  , printMultipleBenchmarkReport
+  , printSingleBenchmarkReport
+  , printValidationSummary
+  )
 import Benchmark.Types
   ( BenchmarkStats (..)
   , ComparisonReport (..)

@@ -34,11 +34,11 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Vector.Unboxed qualified as V
 import Log (Logger, logInfo, logWarning)
 import Runner.Context (RunContext (..), emitEvent, initContext)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
-import Data.Vector.Unboxed qualified as V
 import Stats.Benchmark (calculateStats, compareBayesian, earthMoversDistance, extractDurations)
 import System.Clock (Clock (Realtime), getTime, toNanoSecs)
 import System.IO (hIsTerminalDevice, stdin)
@@ -217,7 +217,8 @@ postAnalysis rctx ctx timestamp results = do
   handleBenchmarkBaseline rctx (T.pack timestamp) namedStats
 
 -- | Attach Earth Mover's Distance to a pairwise comparison using stored duration vectors.
-attachEMD :: Map Text (V.Vector Double) -> (Text, Text, BayesianComparison) -> (Text, Text, BayesianComparison)
+attachEMD ::
+  Map Text (V.Vector Double) -> (Text, Text, BayesianComparison) -> (Text, Text, BayesianComparison)
 attachEMD durMap (a, b, cmp) =
   case (Map.lookup a durMap, Map.lookup b durMap) of
     (Just dA, Just dB) -> (a, b, cmp {emd = Just (earthMoversDistance dA dB)})

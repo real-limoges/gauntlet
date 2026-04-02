@@ -4,7 +4,13 @@ module ExecSpec (execSpec) where
 import Benchmark.Network.Exec (BenchmarkEnv (..), runBenchmark)
 import Benchmark.Network.Request (initNetwork)
 import Benchmark.TUI.State (BenchmarkEvent)
-import Benchmark.Types (Endpoint (..), RetrySettings (..), Settings (..), TestingResponse (..), defaultLogLevel)
+import Benchmark.Types
+  ( Endpoint (..)
+  , RetrySettings (..)
+  , Settings (..)
+  , TestingResponse (..)
+  , defaultLogLevel
+  )
 import Control.Concurrent (newQSem)
 import Control.Concurrent.STM (TBQueue, atomically, newTBQueueIO, readTBQueue)
 import Control.Monad (replicateM)

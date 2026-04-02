@@ -4,7 +4,15 @@ module Integration (integrationSpec) where
 import Benchmark.Network.Exec (BenchmarkEnv (..), runBenchmark)
 import Benchmark.Network.Request (timedRequest)
 import Benchmark.Report.Baseline (baselineDir, listBaselines, loadBaseline, saveBaseline)
-import Benchmark.Types (Baseline (..), BenchmarkStats (..), Endpoint (..), RetrySettings (..), Settings (..), TestingResponse (..), defaultLogLevel)
+import Benchmark.Types
+  ( Baseline (..)
+  , BenchmarkStats (..)
+  , Endpoint (..)
+  , RetrySettings (..)
+  , Settings (..)
+  , TestingResponse (..)
+  , defaultLogLevel
+  )
 import Control.Concurrent.QSem (newQSem)
 import Data.Aeson (object, (.=))
 import Data.Text (Text)

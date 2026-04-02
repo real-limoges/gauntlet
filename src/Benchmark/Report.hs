@@ -45,7 +45,11 @@ printMultipleBenchmarkReport ComparisonReport {..} = do
   printHeader "Bayesian Analysis"
 
   let pct p = colorPct p (printf "%.2f%%" p :: String)
-  printf "P(%s faster than %s, means): %s\n" (T.unpack crNameB) (T.unpack crNameA) (pct $ probBFasterThanA crBayes * 100.0)
+  printf
+    "P(%s faster than %s, means): %s\n"
+    (T.unpack crNameB)
+    (T.unpack crNameA)
+    (pct $ probBFasterThanA crBayes * 100.0)
   printf "P(%s faster, single request): %s\n" (T.unpack crNameB) (pct $ probSingleRequestFaster crBayes * 100.0)
   printf "P(%s less jittery): %s\n" (T.unpack crNameB) (pct $ probBLessJittery crBayes * 100.0)
   printf "Mean Difference (%s - %s): %.2f ms\n" (T.unpack crNameB) (T.unpack crNameA) (meanDifference crBayes)

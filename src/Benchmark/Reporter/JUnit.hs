@@ -206,7 +206,7 @@ showI = B.fromString . show . toInteger
 -- | Escape XML special characters for safe embedding in attributes and text.
 esc :: Text -> Text
 esc raw =
-  T.replace "&" "&amp;"
-    $ T.replace "<" "&lt;"
-    $ T.replace ">" "&gt;"
-    $ T.replace "\"" "&quot;" raw
+  T.replace "&" "&amp;" $
+    T.replace "<" "&lt;" $
+      T.replace ">" "&gt;" $
+        T.replace "\"" "&quot;" raw
