@@ -35,8 +35,7 @@ prometheusReporter logger mgr pushgatewayUrl jobName =
         push (formatSingleMetrics targetUrl stats valids)
     , reportBenchmark = \namedStats pairs valids ->
         push (formatBenchmarkMetrics namedStats pairs valids)
-    , reportRegression = \regression ->
-        push (formatRegressionMetrics regression)
+    , reportRegression = push . formatRegressionMetrics
     }
   where
     push = pushMetrics logger mgr pushgatewayUrl jobName

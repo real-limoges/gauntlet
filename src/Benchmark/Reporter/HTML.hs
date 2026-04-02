@@ -102,7 +102,7 @@ comparisonSection nameA nameB comp =
     <> row "Relative effect" (showPct (relativeEffect comp / 100))
     <> pctRow "p95" (p95Comparison comp)
     <> pctRow "p99" (p99Comparison comp)
-    <> maybe mempty (\d -> row "EMD (ms)" (showD d)) (emd comp)
+    <> maybe mempty (row "EMD (ms)" . showD) (emd comp)
     <> "</table>\n"
 
 pctRow :: B.Builder -> PercentileComparison -> B.Builder
