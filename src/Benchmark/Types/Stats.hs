@@ -25,6 +25,8 @@ data BenchmarkStats = BenchmarkStats
   , p99Ms :: Double
   , esMs :: Double
   -- ^ Expected Shortfall: mean latency of the worst 1% of requests (E[X | X > p99])
+  , histogram :: [(Double, Int)]
+  -- ^ Latency distribution histogram: (binLowerBound, count) pairs
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (FromJSON, ToJSON)
@@ -67,6 +69,8 @@ data BayesianComparison = BayesianComparison
   -- ^ Percentage improvement (positive = candidate faster)
   , p95Comparison :: PercentileComparison
   , p99Comparison :: PercentileComparison
+  , emd :: Maybe Double
+  -- ^ Earth Mover's Distance (1-Wasserstein) between latency distributions. Nothing when raw data unavailable (e.g. offline compare).
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (ToJSON)

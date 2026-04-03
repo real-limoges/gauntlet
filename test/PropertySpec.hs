@@ -2,12 +2,12 @@
 module PropertySpec (propertySpec) where
 
 import Benchmark.Report.Baseline (compareToBaseline)
-import Benchmark.Types
+import Benchmark.Types (BenchmarkStats (..), RegressionResult (..), defaultThresholds)
 import Stats.Benchmark (calculateStats)
-import Test.QuickCheck
+import Test.QuickCheck (NonEmptyList (..), Positive (..), choose, forAll, (==>))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
-import TestHelpers
+import TestHelpers (makeBaseline, makeErrorResult, makeResult, makeSpan, mockStats)
 import Tracing.Report (aggregateBySpanName)
 import Tracing.Types (SpanAggregation (..))
 

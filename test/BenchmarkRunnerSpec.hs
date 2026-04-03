@@ -3,6 +3,13 @@ module BenchmarkRunnerSpec (benchmarkRunnerSpec) where
 
 import Benchmark.Config.Loader (validateBenchmarkConfig)
 import Benchmark.Types
+  ( BenchmarkConfig (..)
+  , BenchmarkStats (..)
+  , NamedTarget (..)
+  , PayloadSpec (..)
+  , PerfTestError (..)
+  , Settings (..)
+  )
 import Data.Text (Text)
 import Data.Text qualified as T
 import Runner.Benchmark (allPairComparisons)

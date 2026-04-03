@@ -51,7 +51,7 @@ markdownMultipleReport ComparisonReport {..} =
       ++ ["", "#### " <> crNameB, ""]
       ++ statsTable crStatsB
       ++ ["", "### Bayesian Analysis", ""]
-      ++ bayesTable crBayes
+      ++ bayesTable crNameA crNameB crBayes
 
 -- | Markdown report for a multi-target comparison with ranking and per-pair detail.
 markdownBenchmarkReport :: Map Text BenchmarkStats -> [(Text, Text, BayesianComparison)] -> Text
@@ -186,21 +186,24 @@ statsTable s =
   where
     row label val = T.pack $ printf "| %s | %s |" (label :: String) (val :: String)
 
-bayesTable :: BayesianComparison -> [Text]
-bayesTable b =
+bayesTable :: Text -> Text -> BayesianComparison -> [Text]
+bayesTable nameA nameB b =
   [ "| Metric | Value |"
   , "|--------|-------|"
-  , row "P(candidate faster, means)" (printf "%.1f%%" (probBFasterThanA b * 100))
-  , row "P(single request faster)" (printf "%.1f%%" (probSingleRequestFaster b * 100))
-  , row "P(candidate less jittery)" (printf "%.1f%%" (probBLessJittery b * 100))
-  , row "Mean difference" (printf "%+.2f ms" (meanDifference b))
+  , row ("P(" <> nb <> " faster than " <> na <> ", means)") (printf "%.1f%%" (probBFasterThanA b * 100))
+  , row ("P(" <> nb <> " faster, single request)") (printf "%.1f%%" (probSingleRequestFaster b * 100))
+  , row ("P(" <> nb <> " less jittery)") (printf "%.1f%%" (probBLessJittery b * 100))
+  , row ("Mean difference (" <> nb <> " - " <> na <> ")") (printf "%+.2f ms" (meanDifference b))
   , row "95% credible interval" credInterval
   , row "Effect size (Cohen's d)" (printf "%.3f" (effectSize b))
-  , row "Relative effect" (printf "%+.1f%%" (relativeEffect b * 100))
+  , row "Relative effect" (printf "%+.1f%%" (relativeEffect b))
   , row "p95 difference" (pctRow $ p95Comparison b)
   , row "p99 difference" (pctRow $ p99Comparison b)
   ]
+    ++ maybe [] (\d -> [row "Earth Mover's Distance" (printf "%.3f ms" d)]) (emd b)
   where
+    na = T.unpack nameA
+    nb = T.unpack nameB
     row label val = T.pack $ printf "| %s | %s |" (label :: String) (val :: String)
     credInterval =
       printf

@@ -1,15 +1,29 @@
 -- | Tests for Benchmark.Config.Loader.
 module ConfigSpec (configSpec) where
 
-import Benchmark.Config.Loader
+import Benchmark.Config.Loader (buildEndpoints, validateBenchmarkConfig)
 import Benchmark.Types
+  ( BenchmarkConfig (..)
+  , Endpoint (..)
+  , HealthCheckConfig (..)
+  , HookCommand (..)
+  , LifecycleHooks (..)
+  , LoadMode (..)
+  , LoadStep (..)
+  , NamedTarget (..)
+  , PayloadSpec (..)
+  , PerfTestError (..)
+  , RampUpConfig (..)
+  , RetrySettings (..)
+  , Settings (..)
+  )
 import Data.Aeson (eitherDecode)
 import Data.List.NonEmpty qualified as NE
 import Data.Map.Strict qualified as Map
 import TastyCompat (shouldBe, shouldContain, shouldNotContain, textShouldContain)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertFailure, testCase)
-import TestHelpers
+import TestHelpers (makeHookCommand, makeLifecycleHooks, makeValidConfig)
 
 configSpec :: TestTree
 configSpec =
@@ -66,29 +80,29 @@ configSpec =
             let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {requestTimeout = Just 30}}
             validateBenchmarkConfig cfg `shouldBe` Right cfg
         , testCase "rejects retryBackoffMultiplier < 1.0" $ do
-            let r = RetrySettings 3 1000 0.5
-            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {retry = Just r}}
+            let retryConfig = RetrySettings 3 1000 0.5
+            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {retry = Just retryConfig}}
             case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) ->
                 msg `textShouldContain` "retryBackoffMultiplier"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects negative retryMaxAttempts" $ do
-            let r = RetrySettings (-1) 1000 2.0
-            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {retry = Just r}}
+            let retryConfig = RetrySettings (-1) 1000 2.0
+            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {retry = Just retryConfig}}
             case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) ->
                 msg `textShouldContain` "retryMaxAttempts"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "rejects zero retryInitialDelayMs" $ do
-            let r = RetrySettings 3 0 2.0
-            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {retry = Just r}}
+            let retryConfig = RetrySettings 3 0 2.0
+            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {retry = Just retryConfig}}
             case validateBenchmarkConfig cfg of
               Left (ConfigValidationError msg) ->
                 msg `textShouldContain` "retryInitialDelayMs"
               _ -> assertFailure "Expected ConfigValidationError"
         , testCase "accepts valid retry settings" $ do
-            let r = RetrySettings 3 1000 2.0
-            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {retry = Just r}}
+            let retryConfig = RetrySettings 3 1000 2.0
+            let cfg = makeValidConfig {benchSettings = (benchSettings makeValidConfig) {retry = Just retryConfig}}
             validateBenchmarkConfig cfg `shouldBe` Right cfg
         ]
     , testGroup
@@ -159,10 +173,10 @@ configSpec =
         , testCase "parses rampUp" $ do
             let json = "{\"mode\": \"rampUp\", \"startRpm\": 10.0, \"endRpm\": 100.0, \"durationSecs\": 60.0}"
             case eitherDecode json :: Either String LoadMode of
-              Right (LoadRampUp RampUpConfig {rampStartRpm = s, rampEndRpm = e, rampDurationSecs = d}) -> do
-                s `shouldBe` 10.0
-                e `shouldBe` 100.0
-                d `shouldBe` 60.0
+              Right (LoadRampUp RampUpConfig {rampStartRpm = start, rampEndRpm = end, rampDurationSecs = duration}) -> do
+                start `shouldBe` 10.0
+                end `shouldBe` 100.0
+                duration `shouldBe` 60.0
               other -> assertFailure $ "Expected LoadRampUp, got: " ++ show other
         , testCase "parses stepLoad" $ do
             let json =

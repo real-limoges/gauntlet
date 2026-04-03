@@ -9,6 +9,10 @@ module Stats.Benchmark
 
     -- * Distribution Comparison
   , earthMoversDistance
+  , extractDurations
+
+    -- * Histogram
+  , computeHistogram
   )
 where
 
@@ -62,6 +66,7 @@ calculateStats results =
       es
         | success == 0 = 0
         | otherwise = expectedShortfall sorted
+      hist = computeHistogram sorted
    in BenchmarkStats
         { totalRequests = total
         , countSuccess = success
@@ -74,6 +79,7 @@ calculateStats results =
         , p95Ms = pct95
         , p99Ms = pct99
         , esMs = es
+        , histogram = hist
         }
 
 {-| Expected Shortfall: mean of the worst 1% of observations (E[X | X > p99]).
@@ -96,6 +102,10 @@ getDuration response =
   case errorMessage response of
     Just _ -> Nothing
     Nothing -> Just $ unMilliseconds $ nsToMs (durationNs response)
+
+-- | Extract successful durations from responses as an unboxed vector.
+extractDurations :: [TestingResponse] -> V.Vector Double
+extractDurations = V.fromList . M.mapMaybe getDuration
 
 {-| Bayesian comparison of two benchmark results.
 
@@ -145,6 +155,7 @@ compareBayesian statsA statsB =
                 , piCountA = countA
                 , piCountB = countB
                 }
+        , emd = Nothing
         }
   where
     -- P(mean_B < mean_A) using population-level standard error σ/√n
@@ -154,11 +165,13 @@ compareBayesian statsA statsB =
           let sigmaDiff = sqrt ((varA / countA) + (varB / countB))
            in if sigmaDiff > 0 then standardNormalCDF (muDiff / sigmaDiff) else 0.5
 
-    ciLower muDiff varA varB countA countB =
-      muDiff - z95 * sqrt ((varA / countA) + (varB / countB))
+    ciLower muDiff varA varB countA countB
+      | countA <= 0 || countB <= 0 = muDiff
+      | otherwise = muDiff - z95 * sqrt ((varA / countA) + (varB / countB))
 
-    ciUpper muDiff varA varB countA countB =
-      muDiff + z95 * sqrt ((varA / countA) + (varB / countB))
+    ciUpper muDiff varA varB countA countB
+      | countA <= 0 || countB <= 0 = muDiff
+      | otherwise = muDiff + z95 * sqrt ((varA / countA) + (varB / countB))
 
     -- Cohen's d using pooled standard deviation
     cohenD muDiff varA varB countA countB =
@@ -195,20 +208,29 @@ data PercentileInput = PercentileInput
 
 -- | Compare percentiles between primary and candidate with Maritz-Jarrett SE.
 comparePercentile :: PercentileInput -> PercentileComparison
-comparePercentile PercentileInput {..} =
-  let k = percentileSEMultiplier piQuantile
-      seA = k * piStdDevA / sqrt piCountA
-      seB = k * piStdDevB / sqrt piCountB
-      seDiff = sqrt (seA ** 2 + seB ** 2)
-      diff = piValueA - piValueB
-      zPct = if seDiff > 0 then diff / seDiff else 0
-      probRegress = 1 - standardNormalCDF zPct
-   in PercentileComparison
-        { pctDifference = diff
-        , pctCredibleLower = diff - z95 * seDiff
-        , pctCredibleUpper = diff + z95 * seDiff
-        , probPctRegression = probRegress
-        }
+comparePercentile PercentileInput {..}
+  | piCountA <= 0 || piCountB <= 0 =
+      let diff = piValueA - piValueB
+       in PercentileComparison
+            { pctDifference = diff
+            , pctCredibleLower = diff
+            , pctCredibleUpper = diff
+            , probPctRegression = 0.5
+            }
+  | otherwise =
+      let k = percentileSEMultiplier piQuantile
+          seA = k * piStdDevA / sqrt piCountA
+          seB = k * piStdDevB / sqrt piCountB
+          seDiff = sqrt (seA ** 2 + seB ** 2)
+          diff = piValueA - piValueB
+          zPct = if seDiff > 0 then diff / seDiff else 0
+          probRegress = 1 - standardNormalCDF zPct
+       in PercentileComparison
+            { pctDifference = diff
+            , pctCredibleLower = diff - z95 * seDiff
+            , pctCredibleUpper = diff + z95 * seDiff
+            , probPctRegression = probRegress
+            }
 
 -- | Maritz-Jarrett standard error multiplier for percentiles.
 percentileSEMultiplier :: Double -> Double
@@ -285,3 +307,26 @@ computeEMDGeneral a b
           width = nextX - x
           area = width * abs (cdfA' - cdfB')
        in area + integrate cdfA' cdfB' rest
+
+{-| Compute a latency histogram from a sorted vector of durations.
+Uses Sturges' rule for bin count, clamped to [8, 20].
+Returns (binLowerBound, count) pairs.
+-}
+computeHistogram :: V.Vector Double -> [(Double, Int)]
+computeHistogram sorted
+  | V.null sorted = []
+  | V.length sorted == 1 = [(V.head sorted, 1)]
+  | otherwise =
+      let n = V.length sorted
+          lo = V.head sorted
+          hi = V.last sorted
+          range = hi - lo
+          numBins = max 8 $ min 20 $ ceiling (logBase 2 (fromIntegral n :: Double) + 1)
+          binWidth = range / fromIntegral numBins
+          binOf x
+            | binWidth <= 0 = 0
+            | otherwise = min (numBins - 1) $ floor ((x - lo) / binWidth)
+          indices = V.map (\x -> (binOf x, 1 :: Int)) sorted
+          counts = V.accumulate (+) (V.replicate numBins (0 :: Int)) indices
+          binStart i = lo + fromIntegral i * binWidth
+       in zip (map binStart [0 .. numBins - 1]) (V.toList counts)

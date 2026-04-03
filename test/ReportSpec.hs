@@ -2,7 +2,19 @@
 module ReportSpec (reportSpec) where
 
 import Benchmark.Report
+  ( printBenchmarkReport
+  , printMultipleBenchmarkReport
+  , printSingleBenchmarkReport
+  , printValidationSummary
+  )
 import Benchmark.Types
+  ( BenchmarkStats (..)
+  , ComparisonReport (..)
+  , MetricRegression (..)
+  , RegressionResult (..)
+  , ValidationError (..)
+  , ValidationSummary (..)
+  )
 import Data.List (isInfixOf)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
@@ -27,6 +39,13 @@ reportSpec =
                 mapM_
                   (\label -> output `shouldSatisfy` (label `isInfixOf`))
                   ["Mean:", "StdDev:", "p50:", "p95:", "p99:", "ES(p99):", "Min:", "Max:", "Success:"]
+            , testCase "shows histogram when stats have histogram data" $ do
+                output <- captureStdout $ printSingleBenchmarkReport "ep" stats
+                output `shouldSatisfy` ("Distribution:" `isInfixOf`)
+            , testCase "hides histogram when stats have no histogram data" $ do
+                let emptyHist = stats {histogram = []}
+                output <- captureStdout $ printSingleBenchmarkReport "ep" emptyHist
+                output `shouldSatisfy` (not . ("Distribution:" `isInfixOf`))
             ]
     , let statsA = mockStats 50.0 5.0
           statsB = mockStats 45.0 4.0
@@ -57,8 +76,8 @@ reportSpec =
                   captureStdout $
                     printMultipleBenchmarkReport
                       ComparisonReport {crNameA = "a", crNameB = "b", crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
-                output `shouldSatisfy` ("Probability Candidate is Faster" `isInfixOf`)
-                output `shouldSatisfy` ("Probability Single Request Faster" `isInfixOf`)
+                output `shouldSatisfy` ("P(b faster than a, means)" `isInfixOf`)
+                output `shouldSatisfy` ("P(b faster, single request)" `isInfixOf`)
             , testCase "contains Tail Analysis header" $ do
                 output <-
                   captureStdout $
@@ -89,6 +108,32 @@ reportSpec =
             output <- captureStdout $ printValidationSummary [summary]
             output `shouldSatisfy` ("and 2 more" `isInfixOf`)
         ]
+    , let statsA = mockStats 50.0 5.0
+          statsB = mockStats 45.0 4.0
+          bayes = mockBayesianComparison
+       in testGroup
+            "printMultipleBenchmarkReport (distribution)"
+            [ testCase "shows Distribution header when EMD present" $ do
+                output <-
+                  captureStdout $
+                    printMultipleBenchmarkReport
+                      ComparisonReport {crNameA = "a", crNameB = "b", crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
+                output `shouldSatisfy` ("Distribution" `isInfixOf`)
+            , testCase "shows Earth Mover's Distance value" $ do
+                output <-
+                  captureStdout $
+                    printMultipleBenchmarkReport
+                      ComparisonReport {crNameA = "a", crNameB = "b", crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
+                output `shouldSatisfy` ("Earth Mover" `isInfixOf`)
+            , testCase "shows histogram bars for each target" $ do
+                output <-
+                  captureStdout $
+                    printMultipleBenchmarkReport
+                      ComparisonReport {crNameA = "a", crNameB = "b", crStatsA = statsA, crStatsB = statsB, crBayes = bayes}
+                -- Histogram renders █ bars
+                output `shouldSatisfy` ("█" `isInfixOf`)
+                output `shouldSatisfy` ("Distribution:" `isInfixOf`)
+            ]
     , let statsA = mockStats 50.0 5.0
           statsB = mockStats 45.0 4.0
           namedStats = Map.fromList [("target-a", statsA), ("target-b", statsB)]

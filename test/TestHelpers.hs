@@ -19,9 +19,23 @@ module TestHelpers
 where
 
 import Benchmark.Types
+  ( Baseline (..)
+  , BayesianComparison (..)
+  , BenchmarkConfig (..)
+  , BenchmarkStats (..)
+  , HookCommand (..)
+  , LifecycleHooks (..)
+  , LogLevel (..)
+  , NamedTarget (..)
+  , Nanoseconds (..)
+  , PayloadSpec (..)
+  , PercentileComparison (..)
+  , Settings (..)
+  , TestingResponse (..)
+  )
 import Control.Monad (when)
 import Data.ByteString.Lazy qualified as LBS
-import Data.IORef
+import Data.IORef (IORef, modifyIORef)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Time (UTCTime (..), fromGregorian)
@@ -33,7 +47,7 @@ import System.IO (hClose, hFlush, hSetEncoding, stdout, utf8)
 import System.IO.Temp (withSystemTempFile)
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCase)
-import Tracing.Types
+import Tracing.Types (Span (..), SpanKind (..), SpanStatus (..))
 
 epoch :: UTCTime
 epoch = UTCTime (fromGregorian 2000 1 1) 0
@@ -86,6 +100,7 @@ mockStats mean dev =
     , p95Ms = mean + 1.65 * dev
     , p99Ms = mean + 2.33 * dev
     , esMs = mean + 3 * dev
+    , histogram = [(mean - 3 * dev, 2), (mean - dev, 10), (mean, 12), (mean + dev, 4), (mean + 3 * dev, 2)]
     }
 
 -- | A valid 'BenchmarkConfig' with two named targets and one payload.
@@ -188,6 +203,7 @@ mockBayesianComparison =
     , relativeEffect = 10.0
     , p95Comparison = mockPercentileComparison
     , p99Comparison = mockPercentileComparison
+    , emd = Just 2.5
     }
 
 -- | Fixture PercentileComparison.

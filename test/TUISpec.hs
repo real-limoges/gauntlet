@@ -1,8 +1,8 @@
 -- | Tests for Benchmark.TUI.
 module TUISpec (tuiStateSpec, tuiWidgetsSpec) where
 
-import Benchmark.TUI.State
-import Benchmark.TUI.Widgets
+import Benchmark.TUI.State (BenchmarkEvent (..), TUIState (..), initialState, updateState)
+import Benchmark.TUI.Widgets (formatDuration, formatElapsed, formatRPM)
 import Benchmark.Types (Nanoseconds (..))
 import Data.Sequence qualified as Seq
 import Data.Time (addUTCTime, getCurrentTime)

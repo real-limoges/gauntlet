@@ -10,7 +10,7 @@ import Benchmark.Reporter (Reporter (..), ReportingContext (..), combineReporter
 import Benchmark.TUI (runTUI)
 import Benchmark.TUI.State (BenchmarkEvent (..), TUIState, initialState, tsError, tsFinished)
 import Benchmark.Types
-  ( BayesianComparison
+  ( BayesianComparison (..)
   , BenchmarkConfig (..)
   , BenchmarkStats
   , ChartsSettings
@@ -34,11 +34,12 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Vector.Unboxed qualified as V
 import Log (Logger, logInfo, logWarning)
 import Runner.Context (RunContext (..), emitEvent, initContext)
 import Runner.Loop (benchmarkEndpoints)
 import Runner.Tracing (runTraceAnalysis)
-import Stats.Benchmark (calculateStats, compareBayesian)
+import Stats.Benchmark (calculateStats, compareBayesian, earthMoversDistance, extractDurations)
 import System.Clock (Clock (Realtime), getTime, toNanoSecs)
 import System.IO (hIsTerminalDevice, stdin)
 import Tracing.Types qualified as TT
@@ -56,6 +57,7 @@ data BenchmarkRunConfig = BenchmarkRunConfig
 data BenchmarkResult = BenchmarkResult
   { nrName :: Text
   , nrStats :: BenchmarkStats
+  , nrDurations :: V.Vector Double
   , nrValidations :: [ValidationSummary]
   , nrStartNs :: TT.Nanoseconds
   , nrEndNs :: TT.Nanoseconds
@@ -185,6 +187,7 @@ runAllTargets ctx cfg eventChan = do
       BenchmarkResult
         { nrName = targetName t
         , nrStats = calculateStats timings
+        , nrDurations = extractDurations timings
         , nrValidations = validSummaries
         , nrStartNs = startNs
         , nrEndNs = endNs
@@ -200,7 +203,9 @@ targetNeedsSetup t =
 postAnalysis :: ReportingContext -> RunContext -> String -> [BenchmarkResult] -> IO RunResult
 postAnalysis rctx ctx timestamp results = do
   let namedStats = Map.fromList [(nrName r, nrStats r) | r <- results]
-      pairs = allPairComparisons [(nrName r, nrStats r) | r <- results]
+      durMap = Map.fromList [(nrName r, nrDurations r) | r <- results]
+      pairs0 = allPairComparisons [(nrName r, nrStats r) | r <- results]
+      pairs = map (attachEMD durMap) pairs0
       validAll = concatMap nrValidations results
 
   reportBenchmark (rctxReporter rctx) namedStats pairs validAll
@@ -210,6 +215,14 @@ postAnalysis rctx ctx timestamp results = do
     runTraceAnalysis ctx timestamp (nrStartNs r) (nrEndNs r)
 
   handleBenchmarkBaseline rctx (T.pack timestamp) namedStats
+
+-- | Attach Earth Mover's Distance to a pairwise comparison using stored duration vectors.
+attachEMD ::
+  Map Text (V.Vector Double) -> (Text, Text, BayesianComparison) -> (Text, Text, BayesianComparison)
+attachEMD durMap (a, b, cmp) =
+  case (Map.lookup a durMap, Map.lookup b durMap) of
+    (Just dA, Just dB) -> (a, b, cmp {emd = Just (earthMoversDistance dA dB)})
+    _ -> (a, b, cmp)
 
 -- | Run baseline operations for each target, aggregate results.
 handleBenchmarkBaseline :: ReportingContext -> Text -> Map Text BenchmarkStats -> IO RunResult
