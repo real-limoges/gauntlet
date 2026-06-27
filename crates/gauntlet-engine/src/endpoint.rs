@@ -1,0 +1,200 @@
+//! Per-endpoint execution. Two shapes, chosen by load mode:
+//!
+//! - **fixed-count** (`Unthrottled`/`ConstantRpm`/`PoissonRpm`): fire
+//!   `total_requests` requests, pacing dispatch through the limiter and capping
+//!   in-flight requests with a `Semaphore`.
+//! - **duration-based** (`RampUp`/`StepLoad`): spawn `concurrency` workers that
+//!   each loop until the deadline, sharing one limiter.
+//!
+//! Pacing (limiter) and concurrency (semaphore) are independent gates, so they
+//! compose without double-counting.
+
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use gauntlet_core::{
+    extract_durations, Endpoint, HttpMethod, TestingResponse, ValidationSummary,
+    MAX_VALIDATION_ERRORS,
+};
+use gauntlet_stats::{calculate_stats, BenchmarkStats};
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
+
+use crate::context::RunContext;
+use crate::csv_out::CsvRow;
+use crate::error::Result;
+use crate::exec::{self, RequestOutcome};
+use crate::rate_limiter::RateLimiter;
+
+/// The outcome of benchmarking one endpoint: the latency samples (as
+/// `TestingResponse`s), the validation summary, and the computed stats.
+#[derive(Clone, Debug)]
+pub struct EndpointResult {
+    pub name: String,
+    pub url: String,
+    pub method: HttpMethod,
+    pub responses: Vec<TestingResponse>,
+    pub validation: ValidationSummary,
+    pub stats: BenchmarkStats,
+}
+
+/// Warm up an endpoint: fire `n` sequential requests and discard the results, so
+/// connection pools and JIT paths are primed before measurement.
+pub async fn warmup(ctx: &RunContext, endpoint: &Endpoint, n: u32) {
+    for _ in 0..n {
+        let _ = exec::execute(
+            &ctx.client,
+            endpoint,
+            ctx.token.as_deref(),
+            &ctx.settings.retry,
+        )
+        .await;
+    }
+}
+
+/// Benchmark a single endpoint to completion.
+pub async fn run_endpoint(
+    ctx: Arc<RunContext>,
+    target_name: String,
+    payload_name: String,
+    endpoint: Endpoint,
+) -> Result<EndpointResult> {
+    let load_mode = ctx.settings.load_mode.clone();
+    let outcomes = if load_mode.is_duration_based() {
+        run_duration_based(&ctx, &endpoint).await
+    } else {
+        run_fixed_count(&ctx, &endpoint).await
+    };
+
+    if let Some(csv) = &ctx.csv {
+        let mut sink = csv.lock().expect("csv mutex not poisoned");
+        for o in &outcomes {
+            sink.write_row(&CsvRow {
+                target_name: &target_name,
+                payload_id: &payload_name,
+                url: &endpoint.url,
+                method: endpoint.method,
+                response: &o.response,
+                requested_at: o.requested_at,
+            })?;
+        }
+    }
+
+    let responses: Vec<TestingResponse> = outcomes.iter().map(|o| o.response.clone()).collect();
+    let validation = summarize_validation(&endpoint, &outcomes);
+    let durations = extract_durations(&responses);
+    let stats = calculate_stats(responses.len(), &durations);
+
+    Ok(EndpointResult {
+        name: payload_name,
+        url: endpoint.url,
+        method: endpoint.method,
+        responses,
+        validation,
+        stats,
+    })
+}
+
+/// Fixed-count modes: pace dispatch (limiter), cap in-flight (semaphore).
+async fn run_fixed_count(ctx: &RunContext, endpoint: &Endpoint) -> Vec<RequestOutcome> {
+    let settings = &ctx.settings;
+    let total = settings.load_mode.total_requests(settings.iterations.get()) as usize;
+    let concurrency = settings.concurrency.get() as usize;
+    let limiter = RateLimiter::new(settings.load_mode.clone(), Instant::now()).map(Arc::new);
+    let sem = Arc::new(Semaphore::new(concurrency));
+
+    let mut set = JoinSet::new();
+    for _ in 0..total {
+        if let Some(l) = &limiter {
+            l.wait_for_slot().await;
+        }
+        let permit = sem.clone().acquire_owned().await.expect("semaphore open");
+        let client = ctx.client.clone();
+        let endpoint = endpoint.clone();
+        let token = ctx.token.clone();
+        let retry = settings.retry.clone();
+        set.spawn(async move {
+            let outcome = exec::execute(&client, &endpoint, token.as_deref(), &retry).await;
+            drop(permit);
+            outcome
+        });
+    }
+
+    collect(set, total).await
+}
+
+/// Duration-based modes: `concurrency` workers loop until the shared deadline,
+/// pacing each request through one shared limiter.
+async fn run_duration_based(ctx: &RunContext, endpoint: &Endpoint) -> Vec<RequestOutcome> {
+    let settings = &ctx.settings;
+    let concurrency = settings.concurrency.get() as usize;
+    let start = Instant::now();
+    let deadline = start + Duration::from_secs_f64(settings.load_mode.duration_secs());
+    let limiter = Arc::new(
+        RateLimiter::new(settings.load_mode.clone(), start)
+            .expect("duration-based modes always have a limiter"),
+    );
+
+    let mut set = JoinSet::new();
+    for _ in 0..concurrency {
+        let client = ctx.client.clone();
+        let endpoint = endpoint.clone();
+        let token = ctx.token.clone();
+        let retry = settings.retry.clone();
+        let limiter = limiter.clone();
+        set.spawn(async move {
+            let mut outs = Vec::new();
+            loop {
+                limiter.wait_for_slot().await;
+                if Instant::now() >= deadline {
+                    break;
+                }
+                outs.push(exec::execute(&client, &endpoint, token.as_deref(), &retry).await);
+            }
+            outs
+        });
+    }
+
+    let mut outcomes = Vec::new();
+    while let Some(r) = set.join_next().await {
+        if let Ok(mut outs) = r {
+            outcomes.append(&mut outs);
+        }
+    }
+    outcomes
+}
+
+async fn collect(mut set: JoinSet<RequestOutcome>, hint: usize) -> Vec<RequestOutcome> {
+    let mut outcomes = Vec::with_capacity(hint);
+    while let Some(r) = set.join_next().await {
+        if let Ok(outcome) = r {
+            outcomes.push(outcome);
+        }
+    }
+    outcomes
+}
+
+/// Aggregate per-response validation errors into the endpoint summary. Errors are
+/// collected from at most the first `MAX_VALIDATION_ERRORS` failing responses.
+fn summarize_validation(endpoint: &Endpoint, outcomes: &[RequestOutcome]) -> ValidationSummary {
+    if endpoint.validate.is_none() {
+        return ValidationSummary::default();
+    }
+    let mut summary = ValidationSummary {
+        total: outcomes.len(),
+        failed: 0,
+        errors: Vec::new(),
+    };
+    let mut failing_collected = 0;
+    for o in outcomes {
+        if o.validation_errors.is_empty() {
+            continue;
+        }
+        summary.failed += 1;
+        if failing_collected < MAX_VALIDATION_ERRORS {
+            summary.errors.extend(o.validation_errors.iter().cloned());
+            failing_collected += 1;
+        }
+    }
+    summary
+}

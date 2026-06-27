@@ -1,0 +1,30 @@
+[package]
+name = "gauntlet-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Async measurement loop: networking, rate limiting, validation, warmup (M3)."
+
+[dependencies]
+gauntlet-core.workspace = true
+gauntlet-stats.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+bytes.workspace = true
+rand.workspace = true
+rand_distr.workspace = true
+regex.workspace = true
+csv.workspace = true
+chrono.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+# The M3-A spike measures reqwest vs hyper; hyper + its plumbing are dev-only
+# (the spike example) so the production engine keeps a single client.
+hyper.workspace = true
+hyper-util.workspace = true
+http-body-util.workspace = true
+axum.workspace = true
+tokio = { workspace = true, features = ["full"] }

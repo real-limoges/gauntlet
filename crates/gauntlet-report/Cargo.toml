@@ -1,0 +1,7 @@
+[package]
+name = "gauntlet-report"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Reporter backends + baselines: markdown, JUnit, Prometheus, HTML, CI (M4)."

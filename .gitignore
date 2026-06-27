@@ -1,5 +1,6 @@
 dist-newstyle/build/**/*
 dist-newstyle/
+target/
 src/.DS_Store
 .idea/
 docker-compose-dev.yml

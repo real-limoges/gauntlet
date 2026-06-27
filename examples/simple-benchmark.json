@@ -1,12 +1,15 @@
 {
   "targets": [
-    { "name": "local", "url": "http://localhost:8080" }
+    {
+      "name": "local",
+      "url": "http://localhost:8080"
+    }
   ],
   "settings": {
     "iterations": 1000,
     "concurrency": 20,
-    "requestTimeout": 30,
-    "logLevel": "info"
+    "request_timeout_secs": 30,
+    "log_level": "info"
   },
   "payloads": [
     {
