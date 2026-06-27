@@ -7,15 +7,15 @@
       "lifecycle": {
         "setup": {
           "cmd": "docker-compose --profile testing up -d --build",
-          "timeoutSecs": 120
+          "timeout_secs": 120
         },
         "teardown": {
           "cmd": "docker-compose down"
         },
-        "healthCheck": {
+        "health_check": {
           "url": "http://primary-service.internal:8080/health",
-          "timeoutSecs": 60,
-          "intervalMs": 1000
+          "timeout_secs": 60,
+          "interval_ms": 1000
         }
       }
     },
@@ -26,15 +26,15 @@
       "lifecycle": {
         "setup": {
           "cmd": "docker-compose --profile testing up -d --build",
-          "timeoutSecs": 120
+          "timeout_secs": 120
         },
         "teardown": {
           "cmd": "docker-compose down"
         },
-        "healthCheck": {
+        "health_check": {
           "url": "http://candidate-service.internal:8080/health",
-          "timeoutSecs": 60,
-          "intervalMs": 1000
+          "timeout_secs": 60,
+          "interval_ms": 1000
         }
       }
     }
@@ -43,26 +43,26 @@
     "iterations": 10000,
     "concurrency": 100,
     "secrets": ".secrets/service-token.txt",
-    "maxConnections": 200,
-    "requestTimeout": 120,
-    "logLevel": "debug",
+    "max_connections": 200,
+    "request_timeout_secs": 120,
+    "log_level": "debug",
     "warmup": {
-      "warmupIterations": 20
+      "iterations": 20
     },
     "retry": {
-      "retryMaxAttempts": 10,
-      "retryInitialDelayMs": 2000,
-      "retryBackoffMultiplier": 2.5
+      "max_attempts": 10,
+      "initial_delay_ms": 2000,
+      "backoff_multiplier": 2.5
     },
     "tempo": {
-      "tempoUrl": "http://tempo:3200",
-      "tempoServiceName": "my-service",
-      "tempoEnabled": true,
-      "tempoAuthToken": "optional-tempo-bearer-token"
+      "url": "http://tempo:3200",
+      "service_name": "my-service",
+      "enabled": true,
+      "auth_token": "optional-tempo-bearer-token"
     },
-    "loadMode": {
-      "mode": "constantRpm",
-      "targetRpm": 6000
+    "load_mode": {
+      "mode": "constant_rpm",
+      "target_rpm": 6000
     }
   },
   "payloads": [
@@ -82,13 +82,25 @@
           "end": "2026-02-16T23:59:59Z"
         },
         "aggregations": [
-          {"field": "revenue", "function": "sum"},
-          {"field": "orders", "function": "count"}
+          {
+            "field": "revenue",
+            "function": "sum"
+          },
+          {
+            "field": "orders",
+            "function": "count"
+          }
         ],
-        "groupBy": ["region", "category"],
+        "groupBy": [
+          "region",
+          "category"
+        ],
         "filters": {
           "status": "completed",
-          "paymentMethod": ["credit_card", "paypal"]
+          "paymentMethod": [
+            "credit_card",
+            "paypal"
+          ]
         }
       }
     },
@@ -102,9 +114,24 @@
       },
       "body": {
         "operations": [
-          {"id": 1, "action": "update", "data": {"status": "processed"}},
-          {"id": 2, "action": "update", "data": {"status": "processed"}},
-          {"id": 3, "action": "delete"}
+          {
+            "id": 1,
+            "action": "update",
+            "data": {
+              "status": "processed"
+            }
+          },
+          {
+            "id": 2,
+            "action": "update",
+            "data": {
+              "status": "processed"
+            }
+          },
+          {
+            "id": 3,
+            "action": "delete"
+          }
         ]
       }
     }

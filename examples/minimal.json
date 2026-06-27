@@ -1,7 +1,13 @@
 {
   "targets": [
-    { "name": "primary", "url": "http://api.example.com" },
-    { "name": "candidate", "url": "http://api-new.example.com" }
+    {
+      "name": "primary",
+      "url": "http://api.example.com"
+    },
+    {
+      "name": "candidate",
+      "url": "http://api-new.example.com"
+    }
   ],
   "settings": {
     "iterations": 100,

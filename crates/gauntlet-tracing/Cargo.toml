@@ -1,0 +1,9 @@
+[package]
+name = "gauntlet-tracing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+# NOTE: "tracing" here means Grafana Tempo distributed-trace querying, NOT the
+# `tracing` logging crate. See the naming decision in docs/adr/M0-foundation.md.
+description = "Grafana Tempo trace querying and analysis (M6)."
