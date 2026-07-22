@@ -157,3 +157,58 @@ fn percentile_se_multiplier(p: f64) -> f64 {
         1.0
     }
 }
+
+/// Every unordered pair of targets, compared: `N*(N-1)/2` results in index
+/// order, each as `(index_a, index_b, comparison)` where `a < b`.
+///
+/// Indices rather than names keep this crate free of string handling — the
+/// caller already knows what each slot is called and maps them back.
+pub fn all_pair_comparisons(stats: &[BenchmarkStats]) -> Vec<(usize, usize, BayesianComparison)> {
+    let mut pairs = Vec::with_capacity(stats.len().saturating_sub(1) * stats.len() / 2);
+    for (i, a) in stats.iter().enumerate() {
+        for (j, b) in stats.iter().enumerate().skip(i + 1) {
+            pairs.push((i, j, compare_bayesian(a, b)));
+        }
+    }
+    pairs
+}
+
+#[cfg(test)]
+mod pair_tests {
+    use super::*;
+
+    fn stats(mean: f64) -> BenchmarkStats {
+        BenchmarkStats {
+            count_success: 100,
+            mean_ms: mean,
+            std_dev_ms: 1.0,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn fewer_than_two_targets_yields_no_pairs() {
+        assert!(all_pair_comparisons(&[]).is_empty());
+        assert!(all_pair_comparisons(&[stats(1.0)]).is_empty());
+    }
+
+    #[test]
+    fn n_targets_yield_n_choose_two_pairs_in_index_order() {
+        let four: Vec<BenchmarkStats> = (1..=4).map(|i| stats(i as f64)).collect();
+        let pairs = all_pair_comparisons(&four);
+
+        assert_eq!(pairs.len(), 6);
+        let indices: Vec<(usize, usize)> = pairs.iter().map(|(i, j, _)| (*i, *j)).collect();
+        assert_eq!(indices, [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]);
+    }
+
+    #[test]
+    fn each_pair_compares_the_right_two_targets() {
+        // b is much faster than a, so P(B faster) should be decisive.
+        let pairs = all_pair_comparisons(&[stats(100.0), stats(10.0)]);
+        let (_, _, comparison) = &pairs[0];
+        assert!(comparison.prob_b_faster_than_a > 0.99);
+        // Positive `mean_difference` means A is the slower of the two.
+        assert!(comparison.mean_difference > 0.0);
+    }
+}

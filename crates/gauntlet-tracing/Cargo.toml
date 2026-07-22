@@ -7,3 +7,17 @@ authors.workspace = true
 # NOTE: "tracing" here means Grafana Tempo distributed-trace querying, NOT the
 # `tracing` logging crate. See the naming decision in docs/adr/M0-foundation.md.
 description = "Grafana Tempo trace querying and analysis (M6)."
+
+[dependencies]
+gauntlet-core.workspace = true
+gauntlet-stats.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+# Loopback mock of the Tempo HTTP API, same pattern as gauntlet-engine's tests.
+axum.workspace = true
+tokio = { workspace = true, features = ["full"] }

@@ -5,3 +5,19 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 description = "Reporter backends + baselines: markdown, JUnit, Prometheus, HTML, CI (M4)."
+
+# Deliberately no `gauntlet-engine` dependency: this crate renders the plain
+# `BenchmarkReport` model, so a change in the measurement loop does not
+# recompile every renderer. See ADR M4-report.
+[dependencies]
+gauntlet-core.workspace = true
+gauntlet-stats.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+plotters.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

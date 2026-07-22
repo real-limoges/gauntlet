@@ -23,7 +23,14 @@ pub enum EngineError {
     Lifecycle { target: String, message: String },
 
     /// Writing the latency CSV failed.
-    #[error("could not write CSV {path}: {source}")]
+    #[error("could not read secrets file {path}")]
+    TokenRead {
+        path: std::path::PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("could not write CSV {path}")]
     Csv {
         path: PathBuf,
         #[source]

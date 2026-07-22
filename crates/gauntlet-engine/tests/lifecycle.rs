@@ -24,7 +24,7 @@ async fn setup_health_check_and_teardown_run() {
     ));
 
     let run = run_benchmark(&cfg, None).await.unwrap();
-    assert_eq!(run.targets[0].endpoints[0].responses.len(), 3);
+    assert_eq!(run.targets[0].endpoints[0].outcomes.len(), 3);
 }
 
 /// A failing setup hook aborts before any benchmark request is sent.

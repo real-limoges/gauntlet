@@ -17,4 +17,6 @@ pub struct RunContext {
     pub token: Option<String>,
     pub settings: Settings,
     pub csv: Option<Arc<Mutex<CsvSink>>>,
+    /// Live-UI event sink; `None` in headless runs.
+    pub events: crate::event::EventSink,
 }

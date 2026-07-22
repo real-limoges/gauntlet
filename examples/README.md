@@ -5,9 +5,14 @@ This directory contains sample configuration files demonstrating various feature
 ## Quick Start
 
 ```bash
-# Run a simple benchmark
-cabal run gauntlet-exe -- benchmark --config examples/simple-benchmark.json
+# Build once, then run the binary directly
+cargo build --release
+
+./target/release/gauntlet benchmark --config examples/simple-benchmark.json
 ```
+
+Every config in this directory is parsed and validated by the test suite
+(`crates/gauntlet-core/tests/examples.rs`), so these files are known-good.
 
 ## Example Files
 
@@ -58,11 +63,15 @@ cabal run gauntlet-exe -- benchmark --config examples/simple-benchmark.json
 ### `log-levels.json`
 **Log verbosity examples** - Demonstrates different log levels.
 
-Change `logLevel` to control output verbosity:
-- `"debug"` - Verbose output including request/response details
-- `"info"` - Normal output with progress updates (default)
+Change `log_level` to control diagnostic verbosity on stderr:
+- `"debug"` - Everything, including diagnostics that are normally suppressed
+- `"info"` - Normal progress notes, e.g. where a baseline was written (default)
 - `"warning"` - Only warnings and errors
-- `"error"` - Only critical errors
+- `"error"` - Only errors
+
+This filters *diagnostics*, not the benchmark report: the statistics, comparison,
+and validation output are the result of the command you ran and are always
+printed to stdout.
 
 ### `comparison.json`
 **Multi-target comparison** - Compare multiple API targets simultaneously.
@@ -114,40 +123,49 @@ Change `logLevel` to control output verbosity:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `secrets` | string | - | Path to file containing Bearer token |
-| `maxConnections` | int | 10 | HTTP connection pool size |
-| `requestTimeout` | int | 30 | Request timeout (seconds) |
-| `loadMode` | object | `unthrottled` | Load control: `unthrottled`, `constantRpm`, `rampUp`, `stepLoad`, `poissonRpm` |
-| `logLevel` | string | `"info"` | Log verbosity: `"debug"`, `"info"`, `"warning"`, `"error"` |
-| `warmup` | object | `{"warmupIterations": 1}` | Warmup configuration |
+| `secrets` | string | - | Path to a file holding a bearer token, sent as `Authorization: Bearer <token>` |
+| `max_connections` | int | 10 | HTTP connection pool size |
+| `request_timeout_secs` | int | 30 | Request timeout (seconds) |
+| `load_mode` | object | `unthrottled` | Load control: `unthrottled`, `constant_rpm`, `ramp_up`, `step_load`, `poisson_rpm` |
+| `log_level` | string | `"info"` | Diagnostic verbosity on stderr: `"debug"`, `"info"`, `"warning"`, `"error"`. Does not suppress the benchmark report itself. |
+| `warmup` | object | `{"iterations": 1}` | Warmup configuration |
 | `retry` | object | See below | Retry configuration |
 | `tempo` | object | - | Grafana Tempo tracing |
+
+All config keys are `snake_case`, and unknown keys are a hard error rather than
+being silently ignored — a typo fails `validate` instead of being dropped.
 
 ### Retry Settings
 
 ```json
 {
   "retry": {
-    "retryMaxAttempts": 3,
-    "retryInitialDelayMs": 1000,
-    "retryBackoffMultiplier": 2.0
+    "max_attempts": 3,
+    "initial_delay_ms": 1000,
+    "backoff_multiplier": 2.0
   }
 }
 ```
 
-- `retryMaxAttempts` - Number of retry attempts (default: 3)
-- `retryInitialDelayMs` - Initial delay in milliseconds (default: 1000)
-- `retryBackoffMultiplier` - Exponential backoff multiplier (default: 2.0)
+- `max_attempts` - Number of retries; `0` disables them (default: 3)
+- `initial_delay_ms` - Initial backoff delay (default: 1000)
+- `backoff_multiplier` - Exponential backoff multiplier, must be >= 1.0 (default: 2.0)
+
+Only *transport* failures retry (connection refused, timeout). Any HTTP status,
+including 500, is a final response and is recorded as one.
 
 ### Warmup Settings
 
 ```json
 {
   "warmup": {
-    "warmupIterations": 10
+    "iterations": 10
   }
 }
 ```
+
+Warmup primes connection pools before measurement. It runs against the target's
+**first** endpoint only, and its requests are discarded rather than measured.
 
 Warmup requests prime caches and JIT compilers before the actual benchmark.
 
@@ -182,9 +200,9 @@ Headers are per-payload. If `Content-Type` is not specified for POST/PUT request
       "name": "my-service",
       "url": "http://localhost:8080",
       "lifecycle": {
-        "setup": { "cmd": "docker-compose up -d", "timeoutSecs": 120 },
+        "setup": { "cmd": "docker-compose up -d", "timeout_secs": 120 },
         "teardown": { "cmd": "docker-compose down" },
-        "healthCheck": { "url": "http://localhost:8080/health", "timeoutSecs": 60 }
+        "health_check": { "url": "http://localhost:8080/health", "timeout_secs": 60 }
       }
     }
   ]
@@ -197,40 +215,49 @@ Setup runs before benchmarking each target; teardown runs after. Health check po
 
 ```json
 {
-  "tempo": {
-    "tempoUrl": "http://tempo:3200",
-    "tempoServiceName": "my-service",
-    "tempoEnabled": true,
-    "tempoAuthToken": "optional-bearer-token"
+  "settings": {
+    "tempo": {
+      "url": "http://tempo:3200",
+      "service_name": "my-service",
+      "enabled": true,
+      "auth_token": "optional-bearer-token"
+    }
   }
 }
 ```
+
+Trace analysis is a diagnostic: if Tempo is unreachable or has not yet ingested
+the run's spans, the section is skipped with a warning and the benchmark's own
+result is unaffected.
 
 Integrates with Grafana Tempo for distributed trace analysis.
 
 ## Running Examples
 
 ```bash
+GAUNTLET=./target/release/gauntlet
+
 # Basic benchmark
-cabal run gauntlet-exe -- benchmark --config examples/minimal.json
+$GAUNTLET benchmark --config examples/minimal.json
 
-# With baseline comparison
-cabal run gauntlet-exe -- benchmark \
-  --config examples/simple-benchmark.json \
-  --save-baseline my-baseline
-
-cabal run gauntlet-exe -- benchmark \
-  --config examples/simple-benchmark.json \
-  --compare-baseline my-baseline
+# Save this run as a baseline, then compare a later run against it.
+# A comparison that regresses exits 1, which is what CI keys on.
+$GAUNTLET benchmark --config examples/simple-benchmark.json --save-baseline my-baseline
+$GAUNTLET benchmark --config examples/simple-benchmark.json --compare-baseline my-baseline
 
 # Markdown report
-cabal run gauntlet-exe -- benchmark \
+$GAUNTLET benchmark \
   --config examples/simple-benchmark.json \
-  --output markdown \
-  --report-path results/report.md
+  --markdown-report results/report.md
 
-# Validate config without running
-cabal run gauntlet-exe -- validate --config examples/advanced-config.json
+# Charts + a self-contained HTML report
+$GAUNTLET benchmark \
+  --config examples/simple-benchmark.json \
+  --charts histogram,cdf,throughput \
+  --html-report results/report.html
+
+# Validate config without sending any requests
+$GAUNTLET validate --config examples/advanced-config.json
 ```
 
 ## Tips
@@ -240,7 +267,11 @@ cabal run gauntlet-exe -- validate --config examples/advanced-config.json
 3. **Tune Concurrency**: Match your target service's capacity
 4. **Enable Retries**: Use retry settings for flaky networks
 5. **Log Levels**: Use `"info"` for normal runs, `"debug"` for troubleshooting
-6. **Secrets Management**: Never commit `.secrets/` directory - add to `.gitignore`
+6. **Secrets Management**: Never commit `.secrets/` directory - add to `.gitignore`.
+   `settings.secrets` is a path to a file holding a bearer token; it is sent as
+   `Authorization: Bearer <token>` on every request that does not set its own.
+7. **Live UI**: benchmarks show a live terminal view when stdout is a TTY and no CI
+   is detected. Use `--no-tui` to force the plain output.
 
 ## See Also
 

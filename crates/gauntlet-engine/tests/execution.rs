@@ -23,12 +23,12 @@ async fn fixed_iterations_produce_one_response_each() {
     let run = run_benchmark(&cfg, None).await.unwrap();
     let ep = &run.targets[0].endpoints[0];
 
-    assert_eq!(ep.responses.len(), 10);
+    assert_eq!(ep.outcomes.len(), 10);
     assert_eq!(mock.request_count(), 10);
     assert!(ep
-        .responses
+        .outcomes
         .iter()
-        .all(|r| r.status == 200 && r.error.is_none()));
+        .all(|o| o.response.status == 200 && o.response.error.is_none()));
 }
 
 /// Warmup requests hit the server but are not counted in the results.
@@ -43,7 +43,7 @@ async fn warmup_requests_are_discarded() {
     ));
 
     let run = run_benchmark(&cfg, None).await.unwrap();
-    assert_eq!(run.targets[0].endpoints[0].responses.len(), 5);
+    assert_eq!(run.targets[0].endpoints[0].outcomes.len(), 5);
     assert_eq!(mock.request_count(), 8, "3 warmup + 5 measured");
 }
 
@@ -83,8 +83,8 @@ async fn http_500_is_captured_not_retried() {
     let run = run_benchmark(&cfg, None).await.unwrap();
     let ep = &run.targets[0].endpoints[0];
     assert_eq!(mock.request_count(), 1, "500 must not be retried");
-    assert_eq!(ep.responses[0].status, 500);
-    assert!(ep.responses[0].error.is_none());
+    assert_eq!(ep.outcomes[0].response.status, 500);
+    assert!(ep.outcomes[0].response.error.is_none());
 }
 
 /// A connection-refused target exhausts retries, yields an errored response with
@@ -102,9 +102,10 @@ async fn transport_failure_exhausts_retries_and_is_excluded() {
 
     let run = run_benchmark(&cfg, None).await.unwrap();
     let ep = &run.targets[0].endpoints[0];
-    assert_eq!(ep.responses[0].status, 0);
-    assert!(ep.responses[0].error.is_some());
-    assert!(extract_durations(&ep.responses).is_empty());
+    assert_eq!(ep.outcomes[0].response.status, 0);
+    assert!(ep.outcomes[0].response.error.is_some());
+    let responses: Vec<_> = ep.outcomes.iter().map(|o| o.response.clone()).collect();
+    assert!(extract_durations(&responses).is_empty());
 }
 
 /// The retry loop retries only while errors are retryable and attempts remain,

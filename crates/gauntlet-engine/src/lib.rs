@@ -10,11 +10,13 @@
 //! HTTP client choice is recorded in ADR `M3-A-client` (reqwest). The measurement
 //! clock is monotonic (`Instant`), an intentional improvement over the Haskell.
 
+pub mod auth;
 pub mod client;
 pub mod context;
 pub mod csv_out;
 pub mod endpoint;
 pub mod error;
+pub mod event;
 pub mod exec;
 pub mod lifecycle;
 pub mod rate_limiter;
@@ -29,6 +31,7 @@ use tokio::task::JoinSet;
 pub use context::RunContext;
 pub use endpoint::EndpointResult;
 pub use error::{EngineError, Result};
+pub use event::{BenchmarkEvent, EventSink};
 
 use csv_out::CsvSink;
 
@@ -52,19 +55,55 @@ pub async fn run_benchmark(
     config: &BenchmarkConfig,
     csv_path: Option<&Path>,
 ) -> Result<BenchmarkRun> {
+    run_benchmark_with_events(config, csv_path, None).await
+}
+
+/// As [`run_benchmark`], but also streaming progress to a live UI. The sender is
+/// unbounded on purpose — see `event`.
+pub async fn run_benchmark_with_events(
+    config: &BenchmarkConfig,
+    csv_path: Option<&Path>,
+    events: EventSink,
+) -> Result<BenchmarkRun> {
     config.validate()?;
 
     let client = client::build_client(&config.settings)?;
+    // Resolved once per run: the token is the same for every target and request.
+    let token = match &config.settings.secrets {
+        Some(path) => auth::read_token(path)?,
+        None => None,
+    };
     let csv = match csv_path {
         Some(path) => Some(Arc::new(Mutex::new(CsvSink::create(path)?))),
         None => None,
     };
 
     let mut targets = Vec::with_capacity(config.targets.len());
-    for target in &config.targets {
-        let result = run_target(config, target, &client, &csv).await?;
+    for (index, target) in config.targets.iter().enumerate() {
+        event::emit(
+            &events,
+            BenchmarkEvent::TargetStarted {
+                name: target.name.clone(),
+                index: index + 1,
+                total_requests: expected_requests(config),
+            },
+        );
+        let result =
+            match run_target(config, target, &client, token.as_deref(), &csv, &events).await {
+                Ok(result) => result,
+                Err(e) => {
+                    event::emit(
+                        &events,
+                        BenchmarkEvent::Failed {
+                            message: e.to_string(),
+                        },
+                    );
+                    return Err(e);
+                }
+            };
         targets.push(result);
     }
+    event::emit(&events, BenchmarkEvent::Finished);
 
     if let Some(csv) = &csv {
         csv.lock().expect("csv mutex not poisoned").flush()?;
@@ -73,15 +112,30 @@ pub async fn run_benchmark(
     Ok(BenchmarkRun { targets })
 }
 
+/// Requests one target is expected to issue: iterations x endpoints. A
+/// duration-based load mode has no such number up front, so the UI shows
+/// elapsed progress instead and this is only a hint.
+fn expected_requests(config: &BenchmarkConfig) -> usize {
+    config.settings.iterations.get() as usize * config.payloads.len()
+}
+
 async fn run_target(
     config: &BenchmarkConfig,
     target: &NamedTarget,
     client: &reqwest::Client,
+    token: Option<&str>,
     csv: &Option<Arc<Mutex<CsvSink>>>,
+    events: &EventSink,
 ) -> Result<TargetResult> {
     // --- setup + health check ----------------------------------------------
     if let Some(lifecycle) = &target.lifecycle {
         if let Some(setup) = &lifecycle.setup {
+            event::emit(
+                &events.clone(),
+                BenchmarkEvent::Status {
+                    message: format!("Setting up {}...", target.name),
+                },
+            );
             lifecycle::run_hook(&target.name, "setup", setup).await?;
         }
         if let Some(hc) = &lifecycle.health_check {
@@ -90,12 +144,12 @@ async fn run_target(
     }
 
     // teardown runs regardless of how the benchmark below turns out.
-    let outcome = run_target_endpoints(config, target, client, csv).await;
+    let outcome = run_target_endpoints(config, target, client, token, csv, events).await;
 
     if let Some(lifecycle) = &target.lifecycle {
         if let Some(teardown) = &lifecycle.teardown {
             if let Err(e) = lifecycle::run_hook(&target.name, "teardown", teardown).await {
-                eprintln!("warning: {e}");
+                gauntlet_core::log::warn(e.to_string());
             }
         }
     }
@@ -107,14 +161,17 @@ async fn run_target_endpoints(
     config: &BenchmarkConfig,
     target: &NamedTarget,
     client: &reqwest::Client,
+    token: Option<&str>,
     csv: &Option<Arc<Mutex<CsvSink>>>,
+    events: &EventSink,
 ) -> Result<TargetResult> {
     let endpoints = build_endpoints(&target.url, &config.payloads);
     let ctx = Arc::new(RunContext {
         client: client.clone(),
-        token: None,
+        token: token.map(str::to_string),
         settings: config.settings.clone(),
         csv: csv.clone(),
+        events: events.clone(),
     });
 
     // Warm up the first endpoint, discarding results.
@@ -126,7 +183,20 @@ async fn run_target_endpoints(
 
     // Run endpoints concurrently; each pairs with its payload (by build order).
     let mut set = JoinSet::new();
-    for (ep, payload) in endpoints.into_iter().zip(config.payloads.iter()) {
+    let endpoint_count = endpoints.len();
+    for (index, (ep, payload)) in endpoints
+        .into_iter()
+        .zip(config.payloads.iter())
+        .enumerate()
+    {
+        event::emit(
+            events,
+            BenchmarkEvent::EndpointStarted {
+                name: payload.name.clone(),
+                index: index + 1,
+                total: endpoint_count,
+            },
+        );
         let ctx = ctx.clone();
         let target_name = target.name.clone();
         let payload_name = payload.name.clone();

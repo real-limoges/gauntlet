@@ -33,6 +33,14 @@ pub struct CsvSink {
 impl CsvSink {
     /// Create (truncating) the CSV at `path` and write the header row.
     pub fn create(path: &Path) -> Result<Self> {
+        // The results directory usually does not exist yet on a fresh checkout
+        // or in CI, and failing the whole run over it would be absurd.
+        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent).map_err(|source| EngineError::Csv {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        }
         let mut writer = csv::Writer::from_path(path).map_err(|e| csv_err(path, e))?;
         writer
             .write_record([

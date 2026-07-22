@@ -10,10 +10,11 @@
 #![allow(dead_code)]
 
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
@@ -28,6 +29,8 @@ pub struct MockState {
     status: u16,
     body: serde_json::Value,
     delay_ms: u64,
+    /// The `Authorization` header seen on each request, in arrival order.
+    auth_headers: Arc<Mutex<Vec<Option<String>>>>,
 }
 
 /// A running mock server: its base URL plus observation counters.
@@ -46,6 +49,11 @@ impl Mock {
     pub fn max_in_flight(&self) -> usize {
         self.state.max_in_flight.load(Ordering::SeqCst)
     }
+
+    /// The `Authorization` header value seen on each request, in arrival order.
+    pub fn auth_headers(&self) -> Vec<Option<String>> {
+        self.state.auth_headers.lock().unwrap().clone()
+    }
 }
 
 /// Start a mock returning `status` + `body`, sleeping `delay_ms` per request.
@@ -57,6 +65,7 @@ pub async fn start(status: u16, body: serde_json::Value, delay_ms: u64) -> Mock 
         status,
         body,
         delay_ms,
+        auth_headers: Arc::new(Mutex::new(Vec::new())),
     };
     let app = axum::Router::new()
         .fallback(handler)
@@ -72,8 +81,14 @@ pub async fn start(status: u16, body: serde_json::Value, delay_ms: u64) -> Mock 
     }
 }
 
-async fn handler(State(s): State<MockState>) -> impl IntoResponse {
+async fn handler(State(s): State<MockState>, headers: HeaderMap) -> impl IntoResponse {
     s.count.fetch_add(1, Ordering::SeqCst);
+    s.auth_headers.lock().unwrap().push(
+        headers
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string),
+    );
     let now = s.in_flight.fetch_add(1, Ordering::SeqCst) + 1;
     s.max_in_flight.fetch_max(now, Ordering::SeqCst);
     if s.delay_ms > 0 {

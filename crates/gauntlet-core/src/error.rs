@@ -12,7 +12,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
     /// The config file could not be read.
-    #[error("could not read config {path}: {source}")]
+    #[error("could not read config {path}")]
     ReadConfig {
         path: PathBuf,
         #[source]
@@ -20,7 +20,7 @@ pub enum Error {
     },
 
     /// The config could not be parsed as JSON into the expected shape.
-    #[error("could not parse config: {0}")]
+    #[error("could not parse config")]
     ParseConfig(#[from] serde_json::Error),
 
     /// `${VAR}` interpolation referenced an undefined environment variable.

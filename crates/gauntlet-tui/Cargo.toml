@@ -4,4 +4,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Live terminal UI (ratatui) and the benchmark event state machine (M5)."
+description = "Live terminal UI over the engine's benchmark event stream (M5)."
+
+[dependencies]
+gauntlet-engine.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
