@@ -33,7 +33,11 @@ pub struct EndpointResult {
     pub name: String,
     pub url: String,
     pub method: HttpMethod,
-    pub responses: Vec<TestingResponse>,
+    /// Every request's outcome, each carrying its response *and* the wall-clock
+    /// time it was issued. Reporters need the timestamp for time-series charts
+    /// (throughput, error rate over time), so it is retained rather than
+    /// collapsed into a bare latency vector.
+    pub outcomes: Vec<RequestOutcome>,
     pub validation: ValidationSummary,
     pub stats: BenchmarkStats,
 }
@@ -80,16 +84,16 @@ pub async fn run_endpoint(
         }
     }
 
-    let responses: Vec<TestingResponse> = outcomes.iter().map(|o| o.response.clone()).collect();
     let validation = summarize_validation(&endpoint, &outcomes);
+    let responses: Vec<TestingResponse> = outcomes.iter().map(|o| o.response.clone()).collect();
     let durations = extract_durations(&responses);
-    let stats = calculate_stats(responses.len(), &durations);
+    let stats = calculate_stats(outcomes.len(), &durations);
 
     Ok(EndpointResult {
         name: payload_name,
         url: endpoint.url,
         method: endpoint.method,
-        responses,
+        outcomes,
         validation,
         stats,
     })
@@ -113,9 +117,13 @@ async fn run_fixed_count(ctx: &RunContext, endpoint: &Endpoint) -> Vec<RequestOu
         let endpoint = endpoint.clone();
         let token = ctx.token.clone();
         let retry = settings.retry.clone();
+        let events = ctx.events.clone();
         set.spawn(async move {
             let outcome = exec::execute(&client, &endpoint, token.as_deref(), &retry).await;
             drop(permit);
+            // Emitted here, not in `collect`: the UI must see each request as it
+            // lands, and `collect` does not run until every task is spawned.
+            crate::event::emit(&events, request_event(&outcome));
             outcome
         });
     }
@@ -142,6 +150,7 @@ async fn run_duration_based(ctx: &RunContext, endpoint: &Endpoint) -> Vec<Reques
         let token = ctx.token.clone();
         let retry = settings.retry.clone();
         let limiter = limiter.clone();
+        let events = ctx.events.clone();
         set.spawn(async move {
             let mut outs = Vec::new();
             loop {
@@ -149,7 +158,9 @@ async fn run_duration_based(ctx: &RunContext, endpoint: &Endpoint) -> Vec<Reques
                 if Instant::now() >= deadline {
                     break;
                 }
-                outs.push(exec::execute(&client, &endpoint, token.as_deref(), &retry).await);
+                let outcome = exec::execute(&client, &endpoint, token.as_deref(), &retry).await;
+                crate::event::emit(&events, request_event(&outcome));
+                outs.push(outcome);
             }
             outs
         });
@@ -172,6 +183,21 @@ async fn collect(mut set: JoinSet<RequestOutcome>, hint: usize) -> Vec<RequestOu
         }
     }
     outcomes
+}
+
+/// Classify one outcome for the live UI: a transport failure is reported as
+/// such (it has no meaningful latency), anything that answered is a completion,
+/// including a 500 — the status is what the UI colours on.
+fn request_event(outcome: &RequestOutcome) -> crate::event::BenchmarkEvent {
+    match &outcome.response.error {
+        Some(message) => crate::event::BenchmarkEvent::RequestFailed {
+            message: message.clone(),
+        },
+        None => crate::event::BenchmarkEvent::RequestCompleted {
+            latency_ms: gauntlet_core::ns_to_ms(outcome.response.duration).0,
+            status: outcome.response.status,
+        },
+    }
 }
 
 /// Aggregate per-response validation errors into the endpoint summary. Errors are

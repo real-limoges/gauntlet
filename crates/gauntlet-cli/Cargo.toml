@@ -11,3 +11,20 @@ description = "The gauntlet binary: CLI parsing and command dispatch (M6)."
 [[bin]]
 name = "gauntlet"
 path = "src/main.rs"
+
+[dependencies]
+gauntlet-core.workspace = true
+gauntlet-stats.workspace = true
+gauntlet-engine.workspace = true
+gauntlet-report.workspace = true
+gauntlet-tracing.workspace = true
+gauntlet-tui.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

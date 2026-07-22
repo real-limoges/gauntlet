@@ -1,24 +1,36 @@
-EXE = $(shell cabal list-bin gauntlet-exe)
+BIN = ./target/release/gauntlet
 
-.PHONY: build test clean format repl benchmark help
+.PHONY: build test clean format lint check run help
 
 build:
-	cabal build --enable-optimization=2 gauntlet-exe
+	cargo build --release
 
 test:
-	cabal test --test-show-details=direct
+	cargo test --workspace
 
-clean:
-	cabal clean
+# Format, lint, and test — what CI runs, and what scripts/pre-push enforces.
+check: format-check lint test
 
 format:
-	fourmolu -i src/ test/
+	cargo fmt --all
 
-repl:
-	cabal repl
+format-check:
+	cargo fmt --all --check
 
-benchmark: build
-	$(EXE) benchmark --config config.json
+lint:
+	cargo clippy --workspace --all-targets -- -D warnings
+
+clean:
+	cargo clean
+
+run: build
+	$(BIN) benchmark --config config.json
 
 help:
-	@echo "Available targets: build, test, clean, format, repl, benchmark"
+	@echo "build         cargo build --release"
+	@echo "test          cargo test --workspace"
+	@echo "check         format-check + lint + test (what CI runs)"
+	@echo "format        cargo fmt --all"
+	@echo "lint          cargo clippy, warnings denied"
+	@echo "clean         cargo clean"
+	@echo "run           benchmark against ./config.json"

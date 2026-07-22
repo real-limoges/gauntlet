@@ -36,6 +36,23 @@ http-body-util = "0.1"
 # Mock HTTP server for engine tests + the spike's localhost target.
 axum = "0.7"
 
+# --- M4 report: reporter backends + baselines -------------------------------
+async-trait = "0.1"
+# Native SVG charting; replaces scripts/plot_latency.py and the `uv` shell-out.
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series", "histogram", "area_series"] }
+
+# --- M6 wire-up: the binary ---------------------------------------------------
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+gauntlet-engine = { path = "crates/gauntlet-engine" }
+gauntlet-report = { path = "crates/gauntlet-report" }
+gauntlet-tracing = { path = "crates/gauntlet-tracing" }
+
+# --- M5 TUI: live terminal view ---------------------------------------------
+ratatui = "0.28"
+crossterm = "0.28"
+gauntlet-tui = { path = "crates/gauntlet-tui" }
+
 # Optimize the measurement-critical crates even in dev builds so local
 # benchmarking is representative. The whole point of the port is that this
 # does not cost us minutes of compile time.

@@ -15,7 +15,7 @@ pub mod emd;
 pub mod normal;
 pub mod types;
 
-pub use bayesian::compare_bayesian;
+pub use bayesian::{all_pair_comparisons, compare_bayesian};
 pub use common::{mean, percentile, percentile_sorted, std_dev, variance};
 pub use descriptive::{calculate_stats, compute_histogram, expected_shortfall};
 pub use emd::earth_movers_distance;

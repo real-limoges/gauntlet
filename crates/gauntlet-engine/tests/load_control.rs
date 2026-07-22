@@ -25,7 +25,7 @@ async fn constant_rpm_paces_dispatch() {
     let run = run_benchmark(&cfg, None).await.unwrap();
     let elapsed = t.elapsed().as_secs_f64();
 
-    assert_eq!(run.targets[0].endpoints[0].responses.len(), 6);
+    assert_eq!(run.targets[0].endpoints[0].outcomes.len(), 6);
     assert!(
         elapsed >= 0.040,
         "expected ≥40ms of pacing, got {elapsed:.3}s"
@@ -50,7 +50,7 @@ async fn step_load_runs_for_its_duration() {
     let t = Instant::now();
     let run = run_benchmark(&cfg, None).await.unwrap();
     let elapsed = t.elapsed().as_secs_f64();
-    let n = run.targets[0].endpoints[0].responses.len();
+    let n = run.targets[0].endpoints[0].outcomes.len();
 
     assert!(elapsed >= 0.55, "ran {elapsed:.3}s, expected ~0.6s");
     assert!(elapsed < 1.5, "ran too long: {elapsed:.3}s");
