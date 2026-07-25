@@ -1,14 +1,55 @@
 //! Response validation: status code + dot-path field assertions against the JSON
 //! body. Produces `gauntlet_core::ValidationError`s; the endpoint loop aggregates
 //! them into a `ValidationSummary` (capped at `MAX_VALIDATION_ERRORS`).
+//!
+//! Patterns are compiled once per endpoint into a [`CompiledSpec`], not once per
+//! response per field.
+
+use std::collections::HashMap;
 
 use regex::Regex;
 use serde_json::Value;
 
 use gauntlet_core::{FieldAssertion, ValidationError, ValidationSpec};
 
-/// Check one response against its spec, returning every failed assertion.
-pub fn validate_response(spec: &ValidationSpec, status: u16, body: &[u8]) -> Vec<ValidationError> {
+/// A validation spec with its `matches` patterns already compiled.
+///
+/// The patterns are fixed by the config, so recompiling them for every field of
+/// every response was pure waste in the middle of a benchmark run. Compiling up
+/// front also turns an invalid pattern into a single startup error rather than
+/// one identical validation failure per response.
+#[derive(Clone, Debug)]
+pub struct CompiledSpec {
+    spec: ValidationSpec,
+    patterns: HashMap<String, Regex>,
+}
+
+impl CompiledSpec {
+    /// Compile a spec, failing on the first invalid `matches` pattern.
+    pub fn new(spec: ValidationSpec) -> std::result::Result<Self, String> {
+        let mut patterns = HashMap::new();
+        if let Some(fields) = &spec.fields {
+            for (path, assertion) in fields {
+                if let FieldAssertion::Matches(pattern) = assertion {
+                    if !patterns.contains_key(pattern) {
+                        let re = Regex::new(pattern)
+                            .map_err(|e| format!("{path}: invalid regex /{pattern}/: {e}"))?;
+                        patterns.insert(pattern.clone(), re);
+                    }
+                }
+            }
+        }
+        Ok(CompiledSpec { spec, patterns })
+    }
+}
+
+/// Check one response against its compiled spec, returning every failed assertion.
+pub fn validate_response(
+    compiled: &CompiledSpec,
+    status: u16,
+    body: &[u8],
+) -> Vec<ValidationError> {
+    let spec = &compiled.spec;
     let mut errors = Vec::new();
 
     if let Some(expected) = spec.status {
@@ -24,7 +65,7 @@ pub fn validate_response(spec: &ValidationSpec, status: u16, body: &[u8]) -> Vec
         match serde_json::from_slice::<Value>(body) {
             Ok(json) => {
                 for (path, assertion) in fields {
-                    if let Err(message) = check_field(&json, path, assertion) {
+                    if let Err(message) = check_field(&json, path, assertion, &compiled.patterns) {
                         errors.push(ValidationError {
                             field: path.clone(),
                             message,
@@ -63,6 +104,14 @@ fn lookup<'a>(root: &'a Value, path: &str) -> Option<&'a Value> {
     Some(cur)
 }
 
+/// Render a range for an error message: `[0, 10]`, `[0, ∞)`, `(-∞, 10]`.
+/// An open bound reads better than the `Some(0.0)` a `{:?}` would print.
+fn range_label(min: Option<f64>, max: Option<f64>) -> String {
+    let lower = min.map(|m| format!("[{m}")).unwrap_or("(-∞".to_owned());
+    let upper = max.map(|m| format!("{m}]")).unwrap_or("∞)".to_owned());
+    format!("{lower}, {upper}")
+}
+
 fn type_name(v: &Value) -> &'static str {
     match v {
         Value::Null => "null",
@@ -77,7 +126,12 @@ fn type_name(v: &Value) -> &'static str {
 /// Apply one assertion at `path`. `Ok(())` passes; `Err(msg)` is the failure
 /// reason. `Present`/`Null`/`NotNull` define their own missing-field semantics;
 /// every other assertion treats a missing path as a failure.
-fn check_field(root: &Value, path: &str, assertion: &FieldAssertion) -> Result<(), String> {
+fn check_field(
+    root: &Value,
+    path: &str,
+    assertion: &FieldAssertion,
+    patterns: &HashMap<String, Regex>,
+) -> Result<(), String> {
     let found = lookup(root, path);
 
     match assertion {
@@ -97,13 +151,17 @@ fn check_field(root: &Value, path: &str, assertion: &FieldAssertion) -> Result<(
         },
         _ => {
             let value = found.ok_or_else(|| "field not present".to_owned())?;
-            check_present(value, assertion)
+            check_present(value, assertion, patterns)
         }
     }
 }
 
 /// Assertions that require the field to exist (its presence is handled above).
-fn check_present(value: &Value, assertion: &FieldAssertion) -> Result<(), String> {
+fn check_present(
+    value: &Value,
+    assertion: &FieldAssertion,
+    patterns: &HashMap<String, Regex>,
+) -> Result<(), String> {
     match assertion {
         FieldAssertion::Eq(expected) => {
             if value == expected {
@@ -121,7 +179,10 @@ fn check_present(value: &Value, assertion: &FieldAssertion) -> Result<(), String
             }
         }
         FieldAssertion::Matches(pattern) => {
-            let re = Regex::new(pattern).map_err(|e| format!("invalid regex: {e}"))?;
+            // Present for every pattern in the spec, by construction.
+            let re = patterns
+                .get(pattern)
+                .ok_or_else(|| format!("regex /{pattern}/ was not compiled"))?;
             match value.as_str() {
                 Some(s) if re.is_match(s) => Ok(()),
                 Some(s) => Err(format!("{s:?} does not match /{pattern}/")),
@@ -136,7 +197,7 @@ fn check_present(value: &Value, assertion: &FieldAssertion) -> Result<(), String
                 .as_f64()
                 .ok_or_else(|| format!("expected number, got {}", type_name(value)))?;
             if min.is_some_and(|m| n < m) || max.is_some_and(|m| n > m) {
-                Err(format!("{n} out of range [{min:?}, {max:?}]"))
+                Err(format!("{n} out of range {}", range_label(*min, *max)))
             } else {
                 Ok(())
             }
@@ -176,8 +237,12 @@ mod tests {
         }
     }
 
+    fn compiled(spec: &ValidationSpec) -> CompiledSpec {
+        CompiledSpec::new(spec.clone()).expect("test patterns compile")
+    }
+
     fn errs(spec: &ValidationSpec, body: &str) -> Vec<ValidationError> {
-        validate_response(spec, 200, body.as_bytes())
+        validate_response(&compiled(spec), 200, body.as_bytes())
     }
 
     #[test]
@@ -186,9 +251,46 @@ mod tests {
             status: Some(201),
             fields: None,
         };
-        let e = validate_response(&s, 200, b"");
+        let e = validate_response(&compiled(&s), 200, b"");
         assert_eq!(e.len(), 1);
         assert_eq!(e[0].field, "status");
+    }
+
+    #[test]
+    fn an_invalid_pattern_fails_at_compile_time_naming_the_field() {
+        // Previously this surfaced as an "invalid regex" validation failure on
+        // every single response instead of once, up front.
+        let s = spec(&[("$.x", FieldAssertion::Matches("a(".into()))]);
+        let err = CompiledSpec::new(s).expect_err("a broken pattern is rejected");
+        assert!(err.contains("$.x"), "{err}");
+        assert!(err.contains("a("), "{err}");
+    }
+
+    #[test]
+    fn range_failures_name_their_bounds_readably() {
+        let bounded = spec(&[(
+            "$.x",
+            FieldAssertion::Range {
+                min: Some(0.0),
+                max: Some(10.0),
+            },
+        )]);
+        assert_eq!(
+            errs(&bounded, r#"{"x":99}"#)[0].message,
+            "99 out of range [0, 10]"
+        );
+
+        let open_above = spec(&[(
+            "$.x",
+            FieldAssertion::Range {
+                min: Some(5.0),
+                max: None,
+            },
+        )]);
+        assert_eq!(
+            errs(&open_above, r#"{"x":1}"#)[0].message,
+            "1 out of range [5, ∞)"
+        );
     }
 
     #[test]

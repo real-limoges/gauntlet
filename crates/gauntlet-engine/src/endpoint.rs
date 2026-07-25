@@ -79,6 +79,57 @@ impl LoadGates {
     }
 }
 
+/// How often an open-ended (duration-based) run reports progress, in requests.
+const OPEN_ENDED_LOG_EVERY: usize = 100;
+
+/// Periodic progress logging for one endpoint.
+///
+/// Only active in headless runs. With the live UI attached, the UI *is* the
+/// progress display, and writing to stderr underneath it would corrupt the
+/// frame. A headless run — a CI job, or output piped to a file — otherwise
+/// prints nothing at all between start and finish, which the Haskell did not do.
+#[derive(Clone)]
+struct Progress {
+    done: Option<Arc<std::sync::atomic::AtomicUsize>>,
+    payload: Arc<str>,
+}
+
+impl Progress {
+    fn new(ctx: &RunContext, payload: &str) -> Self {
+        Progress {
+            done: ctx
+                .events
+                .is_none()
+                .then(|| Arc::new(std::sync::atomic::AtomicUsize::new(0))),
+            payload: Arc::from(payload),
+        }
+    }
+
+    /// Count a request in a run of known length, logging at ~10% intervals.
+    fn record_of(&self, total: usize) {
+        let Some(done) = self.count() else { return };
+        let step = (total / 10).max(1);
+        if done % step == 0 || done == total {
+            let pct = done * 100 / total.max(1);
+            gauntlet_core::log::info(format!("[{}] {pct}% ({done}/{total})", self.payload));
+        }
+    }
+
+    /// Count a request in a run with no known length, logging every N.
+    fn record_open_ended(&self) {
+        let Some(done) = self.count() else { return };
+        if done % OPEN_ENDED_LOG_EVERY == 0 {
+            gauntlet_core::log::info(format!("[{}] {done} requests", self.payload));
+        }
+    }
+
+    /// Increment and return the new count, or `None` when logging is off.
+    fn count(&self) -> Option<usize> {
+        use std::sync::atomic::Ordering;
+        Some(self.done.as_ref()?.fetch_add(1, Ordering::Relaxed) + 1)
+    }
+}
+
 /// Warm up an endpoint: fire `n` sequential requests and discard the results, so
 /// connection pools and JIT paths are primed before measurement.
 pub async fn warmup(ctx: &RunContext, endpoint: &Endpoint, n: u32) -> Result<()> {
@@ -103,9 +154,9 @@ pub async fn run_endpoint(
 
     let load_mode = ctx.settings.load_mode.clone();
     let outcomes = if load_mode.is_duration_based() {
-        run_duration_based(&ctx, &gates, &prepared).await
+        run_duration_based(&ctx, &gates, &prepared, &payload_name).await
     } else {
-        run_fixed_count(&ctx, &gates, &prepared).await
+        run_fixed_count(&ctx, &gates, &prepared, &payload_name).await
     };
 
     if let Some(csv) = &ctx.csv {
@@ -143,9 +194,11 @@ async fn run_fixed_count(
     ctx: &RunContext,
     gates: &LoadGates,
     prepared: &Arc<PreparedEndpoint>,
+    payload_name: &str,
 ) -> Vec<RequestOutcome> {
     let settings = &ctx.settings;
     let total = settings.load_mode.total_requests(settings.iterations.get()) as usize;
+    let progress = Progress::new(ctx, payload_name);
 
     let mut set = JoinSet::new();
     for _ in 0..total {
@@ -162,12 +215,14 @@ async fn run_fixed_count(
         let prepared = prepared.clone();
         let retry = settings.retry.clone();
         let events = ctx.events.clone();
+        let progress = progress.clone();
         set.spawn(async move {
             let outcome = exec::execute(&client, &prepared, &retry).await;
             drop(permit);
             // Emitted here, not in `collect`: the UI must see each request as it
             // lands, and `collect` does not run until every task is spawned.
             crate::event::emit(&events, request_event(&outcome));
+            progress.record_of(total);
             outcome
         });
     }
@@ -185,10 +240,12 @@ async fn run_duration_based(
     ctx: &RunContext,
     gates: &LoadGates,
     prepared: &Arc<PreparedEndpoint>,
+    payload_name: &str,
 ) -> Vec<RequestOutcome> {
     let settings = &ctx.settings;
     let concurrency = settings.concurrency.get() as usize;
     let deadline = gates.deadline(settings);
+    let progress = Progress::new(ctx, payload_name);
     let limiter = gates
         .limiter
         .clone()
@@ -202,6 +259,7 @@ async fn run_duration_based(
         let limiter = limiter.clone();
         let sem = gates.sem.clone();
         let events = ctx.events.clone();
+        let progress = progress.clone();
         set.spawn(async move {
             let mut outs = Vec::new();
             loop {
@@ -218,6 +276,7 @@ async fn run_duration_based(
                 let outcome = exec::execute(&client, &prepared, &retry).await;
                 drop(permit);
                 crate::event::emit(&events, request_event(&outcome));
+                progress.record_open_ended();
                 outs.push(outcome);
             }
             outs

@@ -72,6 +72,34 @@ fn rejects_empty_collections() {
     );
 }
 
+/// Names are identities: a target names its baseline file, and a payload is
+/// matched by name when endpoint results are put back into config order. Two
+/// entries sharing a name make one of them unreachable.
+#[test]
+fn rejects_duplicate_target_and_payload_names() {
+    let dup_targets = r#"[{"name":"a","url":"http://x"},{"name":"a","url":"http://y"}]"#;
+    assert_eq!(
+        validation_errors(&base(dup_targets, &settings(""), OK_PAYLOAD)),
+        vec![r#"targets: duplicate name "a""#]
+    );
+
+    let dup_payloads = r#"[{"name":"p","method":"GET","path":"/a"},
+                           {"name":"p","method":"GET","path":"/b"}]"#;
+    assert_eq!(
+        validation_errors(&base(OK_TARGET, &settings(""), dup_payloads)),
+        vec![r#"payloads: duplicate name "p""#]
+    );
+
+    // Reported once per offending name, however many times it repeats.
+    let triple = r#"[{"name":"a","url":"http://x"},
+                     {"name":"a","url":"http://y"},
+                     {"name":"a","url":"http://z"}]"#;
+    assert_eq!(
+        validation_errors(&base(triple, &settings(""), OK_PAYLOAD)).len(),
+        1
+    );
+}
+
 #[test]
 fn rejects_small_backoff_multiplier() {
     let json = base(

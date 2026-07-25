@@ -76,7 +76,7 @@
           "additionalProperties": false
         },
         {
-          "description": "String field matches a POSIX ERE.",
+          "description": "String field matches a regular expression, in Rust `regex` crate syntax. (The Haskell used POSIX ERE; the two agree on ordinary patterns, but neither supports backreferences or lookaround.)",
           "type": "object",
           "required": [
             "matches"

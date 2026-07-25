@@ -29,7 +29,9 @@ pub enum FieldAssertion {
     Eq(serde_json::Value),
     /// JSON type: `"string"`, `"number"`, `"boolean"`, `"array"`, `"object"`, `"null"`.
     Type(String),
-    /// String field matches a POSIX ERE.
+    /// String field matches a regular expression, in Rust `regex` crate syntax.
+    /// (The Haskell used POSIX ERE; the two agree on ordinary patterns, but
+    /// neither supports backreferences or lookaround.)
     Matches(String),
     /// Numeric field within `[min, max]` (both bounds optional).
     Range {

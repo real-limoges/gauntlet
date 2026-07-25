@@ -8,9 +8,10 @@
 use bytes::Bytes;
 use std::time::Duration;
 
-use gauntlet_core::{Endpoint, HttpMethod, Settings, ValidationSpec};
+use gauntlet_core::{Endpoint, HttpMethod, Settings};
 
 use crate::error::{EngineError, Result};
+use crate::validation::CompiledSpec;
 
 /// A completed HTTP exchange. Any status code counts — a 500 is a response, and
 /// is never retried.
@@ -78,8 +79,9 @@ pub struct PreparedEndpoint {
     url: reqwest::Url,
     headers: reqwest::header::HeaderMap,
     body: Option<Bytes>,
-    /// Carried along so the measurement loop has one thing to clone per request.
-    pub validate: Option<ValidationSpec>,
+    /// Carried along so the measurement loop has one thing to clone per request,
+    /// with its `matches` patterns already compiled.
+    pub validate: Option<CompiledSpec>,
 }
 
 /// Resolve an endpoint into a [`PreparedEndpoint`], once, before measuring.
@@ -121,12 +123,19 @@ pub fn prepare(endpoint: &Endpoint, token: Option<&str>) -> Result<PreparedEndpo
         .transpose()
         .map_err(|e| EngineError::Client(format!("could not serialize request body: {e}")))?;
 
+    let validate = endpoint
+        .validate
+        .clone()
+        .map(CompiledSpec::new)
+        .transpose()
+        .map_err(EngineError::Client)?;
+
     Ok(PreparedEndpoint {
         method: method(endpoint.method),
         url,
         headers,
         body,
-        validate: endpoint.validate.clone(),
+        validate,
     })
 }
 

@@ -81,11 +81,11 @@ Charts render in-process via `plotters` and are written as one SVG per target pe
 
 ## Configuration
 
-Full reference in the [User Guide](docs/USER_GUIDE.md). Key fields:
+`gauntlet schema` prints the authoritative reference — it is derived from the config types, so it cannot drift. Key fields:
 
 | Field | Description |
 |-------|-------------|
-| `targets` | Array of `{name, url, branch?, lifecycle?}`. `branch` parses but is currently inert — use `lifecycle.setup` to switch branches |
+| `targets` | Array of `{name, url, branch?, lifecycle?}`. `branch` is checked out with `git switch` before that target's setup hook runs |
 | `settings.iterations` | Requests per endpoint |
 | `settings.concurrency` | Concurrent in-flight request limit |
 | `settings.secrets` | Path to a file holding a bearer token |
@@ -177,7 +177,7 @@ cargo clippy --all-targets
 cargo fmt
 ```
 
-Architecture details and per-milestone decisions in [CLAUDE.md](CLAUDE.md), [docs/RUST_PORT.md](docs/RUST_PORT.md), and the ADRs under [docs/adr/](docs/adr/).
+Architecture notes, the port log, and the ADRs live under `docs/` and in `CLAUDE.md`. Both are gitignored, so they are local to a working copy rather than part of a clone.
 
 ## License
 

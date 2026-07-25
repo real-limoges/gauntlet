@@ -38,6 +38,19 @@ impl BenchmarkConfig {
         if self.payloads.is_empty() {
             errs.push("must define at least one payload".to_owned());
         }
+        // Names are identities downstream: targets name their baselines, payloads
+        // are matched by name when restoring result order. A duplicate silently
+        // makes one of the pair unreachable.
+        duplicates(
+            "targets",
+            self.targets.iter().map(|t| t.name.as_str()),
+            &mut errs,
+        );
+        duplicates(
+            "payloads",
+            self.payloads.iter().map(|p| p.name.as_str()),
+            &mut errs,
+        );
         if self.settings.retry.backoff_multiplier < 1.0 {
             errs.push("settings.retry.backoff_multiplier must be at least 1.0".to_owned());
         }
@@ -50,6 +63,17 @@ impl BenchmarkConfig {
             Ok(())
         } else {
             Err(ConfigErrors(errs))
+        }
+    }
+}
+
+/// Report any name appearing more than once in `names`, in first-seen order.
+fn duplicates<'a>(field: &str, names: impl Iterator<Item = &'a str>, errs: &mut Vec<String>) {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut reported = std::collections::BTreeSet::new();
+    for name in names {
+        if !seen.insert(name) && reported.insert(name) {
+            errs.push(format!("{field}: duplicate name {name:?}"));
         }
     }
 }
