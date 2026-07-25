@@ -121,7 +121,7 @@ async fn with_retry_retries_then_succeeds() {
         backoff_multiplier: 2.0,
     };
     let calls = Cell::new(0);
-    let result = exec::with_retry(&retry, || {
+    let (result, _) = exec::with_retry(&retry, || {
         let n = calls.get() + 1;
         calls.set(n);
         async move {
@@ -144,6 +144,55 @@ async fn with_retry_retries_then_succeeds() {
     assert_eq!(calls.get(), 3, "2 failures + 1 success");
 }
 
+/// The reported latency is the successful attempt's own duration — not the sum
+/// across attempts, and above all not the backoff sleeps between them. A
+/// retried-then-successful request is kept as a latency sample, so counting
+/// backoff here would inject multi-second samples into p99 and expected
+/// shortfall from nothing worse than a transient connection refusal.
+#[tokio::test(start_paused = true)]
+async fn with_retry_reports_only_the_successful_attempts_duration() {
+    use gauntlet_engine::client::{RawResponse, TransportError};
+    use std::cell::Cell;
+    use std::time::Duration;
+
+    // 10s of backoff across two retries, dwarfing the 20ms success.
+    let retry = RetrySettings {
+        max_attempts: 5,
+        initial_delay_ms: NonZeroU32::new(2_000).unwrap(),
+        backoff_multiplier: 4.0,
+    };
+    let calls = Cell::new(0);
+    let (result, elapsed) = exec::with_retry(&retry, || {
+        let n = calls.get() + 1;
+        calls.set(n);
+        async move {
+            if n <= 2 {
+                // Failing attempts take time too, and must not be counted.
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                Err(TransportError {
+                    message: "refused".into(),
+                    retryable: true,
+                })
+            } else {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                Ok(RawResponse {
+                    status: 200,
+                    body: bytes::Bytes::new(),
+                })
+            }
+        }
+    })
+    .await;
+
+    assert!(result.is_ok());
+    assert_eq!(calls.get(), 3);
+    assert!(
+        elapsed < Duration::from_millis(100),
+        "expected ~20ms (the successful attempt), got {elapsed:?} — \
+         backoff or failed attempts are leaking into the latency sample"
+    );
+}
+
 /// A non-retryable transport error is returned immediately, without retry.
 #[tokio::test]
 async fn with_retry_does_not_retry_non_retryable() {
@@ -156,16 +205,17 @@ async fn with_retry_does_not_retry_non_retryable() {
         backoff_multiplier: 2.0,
     };
     let calls = Cell::new(0);
-    let result: std::result::Result<RawResponse, TransportError> = exec::with_retry(&retry, || {
-        calls.set(calls.get() + 1);
-        async {
-            Err(TransportError {
-                message: "nope".into(),
-                retryable: false,
-            })
-        }
-    })
-    .await;
+    let (result, _): (std::result::Result<RawResponse, TransportError>, _) =
+        exec::with_retry(&retry, || {
+            calls.set(calls.get() + 1);
+            async {
+                Err(TransportError {
+                    message: "nope".into(),
+                    retryable: false,
+                })
+            }
+        })
+        .await;
 
     assert!(result.is_err());
     assert_eq!(calls.get(), 1);

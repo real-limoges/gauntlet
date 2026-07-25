@@ -1,6 +1,7 @@
-//! Per-target lifecycle hooks: spawn a setup command, poll a health-check URL
-//! until it's ready, and run a teardown command afterwards. Process spawning is
-//! via `tokio::process`; the shell (`sh -c`) interprets the command string.
+//! Per-target lifecycle: switch git branches, spawn a setup command, poll a
+//! health-check URL until it's ready, and run a teardown command afterwards.
+//! Process spawning is via `tokio::process`; the shell (`sh -c`) interprets the
+//! command string.
 
 use std::time::{Duration, Instant};
 
@@ -9,9 +10,40 @@ use tokio::process::Command;
 
 use crate::error::{EngineError, Result};
 
-const DEFAULT_HEALTH_TIMEOUT_SECS: u64 = 30;
-const DEFAULT_HEALTH_INTERVAL_MS: u64 = 500;
-const DEFAULT_HOOK_TIMEOUT_SECS: u64 = 30;
+// Defaults match the Haskell implementation. They are generous on purpose:
+// a setup hook is usually `docker compose up` or a build, and a health check
+// waits on a service that has just been started.
+const DEFAULT_HEALTH_TIMEOUT_SECS: u64 = 60;
+const DEFAULT_HEALTH_INTERVAL_MS: u64 = 1000;
+const DEFAULT_HOOK_TIMEOUT_SECS: u64 = 300;
+
+/// Check out `branch` before benchmarking a target, via `git switch`.
+///
+/// Targets that name a branch are comparing two revisions of the same service;
+/// without this the run benchmarks whatever happens to be checked out, once per
+/// target, and reports a confident comparison of a build against itself. An
+/// empty branch string is a no-op, matching the Haskell.
+pub async fn switch_branch(target: &str, branch: &str) -> Result<()> {
+    if branch.trim().is_empty() {
+        return Ok(());
+    }
+
+    let output = Command::new("git")
+        .arg("switch")
+        .arg(branch)
+        .output()
+        .await
+        .map_err(|e| lifecycle_err(target, format!("could not run git: {e}")))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Err(lifecycle_err(
+        target,
+        format!("git switch {branch} failed: {}", stderr.trim()),
+    ))
+}
 
 /// Run a setup/teardown command to completion, honoring `working_dir` and an
 /// optional timeout. A non-zero exit or a timeout is an error.

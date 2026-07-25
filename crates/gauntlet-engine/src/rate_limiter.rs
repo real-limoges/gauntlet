@@ -44,17 +44,39 @@ impl RateLimiter {
 
     /// Claim the next slot and sleep until it arrives.
     pub async fn wait_for_slot(&self) {
+        let target = self.claim().await;
+        tokio::time::sleep_until(target.into()).await;
+    }
+
+    /// Claim the next slot and sleep until it arrives — or until `deadline`,
+    /// whichever comes first. Returns whether the slot fell before the deadline,
+    /// i.e. whether the caller should still issue a request.
+    ///
+    /// Duration-based modes need the cap: `next_slot` advances forever, so a
+    /// worker that waits unconditionally sleeps out a slot the deadline has
+    /// already passed. With `concurrency` workers each holding one such slot, a
+    /// low-RPM run overshoots by roughly `concurrency` intervals — at the 6 rpm
+    /// floor with concurrency 10, a 60s ramp would run some 100s long.
+    ///
+    /// Waiting until the deadline rather than returning immediately keeps the run
+    /// occupying its full configured window: a step that ends at 0.6s should take
+    /// 0.6s, not stop at the last slot before it.
+    pub async fn wait_for_slot_before(&self, deadline: Instant) -> bool {
+        let target = self.claim().await;
+        tokio::time::sleep_until(target.min(deadline).into()).await;
+        target < deadline
+    }
+
+    /// Atomically reserve the next slot, advancing the shared clock, and return
+    /// the instant it falls on.
+    async fn claim(&self) -> Instant {
         let claimed = {
             let mut next = self.next_slot.lock().await;
             let claimed = *next;
             *next = claimed + self.interval_at(claimed);
             claimed
         };
-        let target = self.start + Duration::from_secs_f64(claimed.max(0.0));
-        let now = Instant::now();
-        if target > now {
-            tokio::time::sleep(target - now).await;
-        }
+        self.start + Duration::from_secs_f64(claimed.max(0.0))
     }
 
     /// Interval (seconds) until the next request, for a slot scheduled at `t`

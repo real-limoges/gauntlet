@@ -127,7 +127,13 @@ async fn run_target(
     csv: &Option<Arc<Mutex<CsvSink>>>,
     events: &EventSink,
 ) -> Result<TargetResult> {
-    // --- setup + health check ----------------------------------------------
+    // --- branch switch + setup + health check ------------------------------
+    // The branch moves first: a setup hook that builds or restarts the service
+    // has to see the revision it is meant to build.
+    if let Some(branch) = &target.branch {
+        lifecycle::switch_branch(&target.name, branch).await?;
+    }
+
     if let Some(lifecycle) = &target.lifecycle {
         if let Some(setup) = &lifecycle.setup {
             event::emit(
@@ -177,9 +183,14 @@ async fn run_target_endpoints(
     // Warm up the first endpoint, discarding results.
     if config.settings.warmup.iterations > 0 {
         if let Some(first) = endpoints.first() {
-            endpoint::warmup(&ctx, first, config.settings.warmup.iterations).await;
+            endpoint::warmup(&ctx, first, config.settings.warmup.iterations).await?;
         }
     }
+
+    // One set of load gates for the whole target, shared by every endpoint below:
+    // `concurrency` and `target_rpm` describe the load on the target, not on each
+    // payload. Built after warmup so the limiter's clock starts with measurement.
+    let gates = endpoint::LoadGates::for_target(&config.settings);
 
     // Run endpoints concurrently; each pairs with its payload (by build order).
     let mut set = JoinSet::new();
@@ -198,9 +209,16 @@ async fn run_target_endpoints(
             },
         );
         let ctx = ctx.clone();
+        let gates = gates.clone();
         let target_name = target.name.clone();
         let payload_name = payload.name.clone();
-        set.spawn(endpoint::run_endpoint(ctx, target_name, payload_name, ep));
+        set.spawn(endpoint::run_endpoint(
+            ctx,
+            gates,
+            target_name,
+            payload_name,
+            ep,
+        ));
     }
 
     // Collect, then restore payload order (concurrent completion is unordered).

@@ -27,4 +27,6 @@ hyper.workspace = true
 hyper-util.workspace = true
 http-body-util.workspace = true
 axum.workspace = true
-tokio = { workspace = true, features = ["full"] }
+# `test-util` is not part of `full`; it provides the paused clock the retry
+# timing tests need so they assert on scheduling rather than on wall time.
+tokio = { workspace = true, features = ["full", "test-util"] }
