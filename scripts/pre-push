@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
+# Pre-push gate: the same checks CI runs, in the order that fails fastest.
+# Mirror of `make check` and .github/workflows/ci.yml; keep the three in step.
 set -euo pipefail
 
-echo "==> hlint"
-hlint src app test
-
-echo "==> fourmolu"
-fourmolu -i src app test
-if ! git diff --quiet; then
-    echo "fourmolu modified files — re-stage and retry"
-    git diff --name-only
+echo "==> cargo fmt --check"
+if ! cargo fmt --all --check; then
+    echo "formatting differs — run 'make format', re-stage, and retry"
     exit 1
 fi
 
-echo "==> cabal clean"
-cabal clean
+echo "==> cargo clippy (warnings denied)"
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
-echo "==> cabal build"
-cabal build
+echo "==> cargo doc (broken intra-doc links denied)"
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 
-echo "==> cabal test"
-cabal test --test-show-details=direct
+echo "==> cargo test"
+cargo test --workspace --all-features --locked

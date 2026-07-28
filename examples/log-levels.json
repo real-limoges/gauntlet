@@ -1,11 +1,14 @@
 {
   "targets": [
-    { "name": "api", "url": "http://api.example.com" }
+    {
+      "name": "api",
+      "url": "http://api.example.com"
+    }
   ],
   "settings": {
     "iterations": 500,
     "concurrency": 10,
-    "logLevel": "info"
+    "log_level": "info"
   },
   "payloads": [
     {

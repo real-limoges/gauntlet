@@ -1,17 +1,37 @@
-dist-newstyle/build/**/*
-dist-newstyle/
-src/.DS_Store
+# Build output
+target/
+
+# Editor / OS noise
 .idea/
-docker-compose-dev.yml
-*.json
-!examples/*.json
-!schema/*.json
+.DS_Store
+
+# Secrets. `settings.secrets` points at a bearer-token file, and the env loader
+# resolves `.env.local` > `.env` > process env. Note the split, which
+# docs/USER_GUIDE.md documents: `.env` is committable for non-secret defaults,
+# `.env.local` is the local-overrides-and-secrets file and stays out. The
+# tracked template is examples/.secrets.template.
 secrets.txt
 .secrets/
 .env.local
-gauntlet-exe
-.DS_Store
+
+# Local run artifacts: benchmark configs, saved baselines, latency CSVs, charts.
+# The `*.json` rule is deliberately broad because a config file is the most
+# likely place for a URL or token to leak. It also covers baselines/ and any
+# generated schema dump. Anything genuinely part of the repo has to be unignored
+# here (or added with `git add -f`), which is the intended friction.
+*.json
+!examples/*.json
+!schema/*.json
 *.log
 *.csv
 *.png
+docker-compose-dev.yml
+
+# Local-only working notes, kept out of the repo on purpose. Note that `docs/`
+# itself is NOT ignored: docs/USER_GUIDE.md is public and README.md links to it.
+# Only docs/private/ is held back, so anything dropped in there is private by
+# default and anything else under docs/ is public by default. Ignoring `docs/`
+# wholesale would not work anyway; git does not descend into an excluded
+# directory, so a `!docs/USER_GUIDE.md` negation under it never takes effect.
 CLAUDE.md
+docs/private/

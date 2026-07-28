@@ -3,42 +3,78 @@ name: CI
 on:
   push:
     branches: [main]
+  # Any PR, whatever its base. A branch that never opens a PR is a branch whose
+  # CI nobody is reading, and pinning specific branch names here is how
+  # `cutover-to-rust` ended up in the trigger list long after it mattered.
   pull_request:
-    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Weekly, so a newly-published advisory against a pinned dependency surfaces
+    # on its own rather than waiting for someone to happen to push.
+    - cron: "0 6 * * 1"
+
+# A new push to the same branch makes the in-flight run obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  build-and-test:
-    name: Build & Test (GHC 9.12.2)
+  check:
+    name: Build & Test (stable)
     runs-on: ubuntu-latest
-    container: haskell:9.12.2
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show cabal paths
-        run: cabal path
-
-      - name: Cache cabal store
-        uses: actions/cache@v4
+      - name: Install Rust (stable + rustfmt + clippy)
+        uses: dtolnay/rust-toolchain@stable
         with:
-          path: |
-            /github/home/.local/state/cabal
-            /github/home/.cache/cabal/packages
-          key: ${{ runner.os }}-ghc-9.12.2-store-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'cabal.project') }}
-          restore-keys: |
-            ${{ runner.os }}-ghc-9.12.2-store-
+          components: rustfmt, clippy
 
-      - name: Cache build artifacts
-        uses: actions/cache@v4
-        with:
-          path: dist-newstyle
-          key: ${{ runner.os }}-ghc-9.12.2-dist-${{ hashFiles('cabal.project.freeze', 'gauntlet.cabal', 'src/**/*.hs', 'test/**/*.hs') }}
+      - name: Cache cargo + target
+        uses: Swatinem/rust-cache@v2
 
-      - name: Update cabal index
-        run: cabal update
+      - name: Format check
+        run: cargo fmt --all --check
 
-      - name: Build
-        run: cabal build all --enable-optimization=2
+      # `--locked` fails if Cargo.lock is stale rather than silently updating
+      # it, so CI builds exactly the dependency set that was reviewed.
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
       - name: Test
-        run: cabal test --test-show-details=direct
+        run: cargo test --workspace --all-features --locked
+
+      # Broken intra-doc links are a real defect that only rustdoc sees; the
+      # rest of the build is perfectly happy with a [`Type`] that resolves to
+      # nothing.
+      - name: Docs (deny broken links)
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
+
+      # The release profile is what people actually benchmark with, and it
+      # differs from dev in ways that matter (optimization level, and the
+      # overflow checks this workspace turns on). Building it here stops a
+      # release-only compile error from reaching a user.
+      - name: Release build
+        run: cargo build --workspace --release --locked
+
+      # Renders every artifact for a synthetic run. Cheap smoke test: it catches
+      # panics in the chart and HTML paths that unit tests on well-formed input
+      # do not reach.
+      - name: Render artifacts smoke test
+        run: cargo run -p gauntlet-report --example artifacts --release --locked -- "${RUNNER_TEMP}/artifacts"
+
+  audit:
+    name: Security advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

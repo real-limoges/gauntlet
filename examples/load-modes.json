@@ -1,20 +1,38 @@
 {
   "targets": [
-    { "name": "primary", "url": "http://api.example.com" },
-    { "name": "candidate", "url": "http://api-new.example.com" }
+    {
+      "name": "primary",
+      "url": "http://api.example.com"
+    },
+    {
+      "name": "candidate",
+      "url": "http://api-new.example.com"
+    }
   ],
   "settings": {
     "iterations": 1000,
     "concurrency": 20,
     "secrets": ".secrets/token.txt",
-    "logLevel": "info",
-    "loadMode": {
-      "mode": "stepLoad",
+    "log_level": "info",
+    "load_mode": {
+      "mode": "step_load",
       "steps": [
-        { "rpm": 600,  "durationSecs": 30 },
-        { "rpm": 3000, "durationSecs": 60 },
-        { "rpm": 6000, "durationSecs": 60 },
-        { "rpm": 3000, "durationSecs": 30 }
+        {
+          "rpm": 600,
+          "duration_secs": 30
+        },
+        {
+          "rpm": 3000,
+          "duration_secs": 60
+        },
+        {
+          "rpm": 6000,
+          "duration_secs": 60
+        },
+        {
+          "rpm": 3000,
+          "duration_secs": 30
+        }
       ]
     }
   },

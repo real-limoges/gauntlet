@@ -1,0 +1,15 @@
+[package]
+name = "gauntlet-stats"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Pure statistical core: descriptive stats, Bayesian comparison, EMD."
+
+# Pure and dependency-light by design — this is the most correctness-critical
+# and fastest-to-iterate crate. `libm` only, for a high-accuracy `erfc`.
+[dependencies]
+libm.workspace = true
+
+[lints]
+workspace = true

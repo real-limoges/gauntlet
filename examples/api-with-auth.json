@@ -1,22 +1,28 @@
 {
   "targets": [
-    { "name": "production", "url": "https://api.production.com" },
-    { "name": "staging", "url": "https://api.staging.com" }
+    {
+      "name": "production",
+      "url": "https://api.production.com"
+    },
+    {
+      "name": "staging",
+      "url": "https://api.staging.com"
+    }
   ],
   "settings": {
     "iterations": 2000,
     "concurrency": 25,
     "secrets": ".secrets/api-token.txt",
-    "maxConnections": 50,
-    "requestTimeout": 45,
-    "logLevel": "info",
+    "max_connections": 50,
+    "request_timeout_secs": 45,
+    "log_level": "info",
     "warmup": {
-      "warmupIterations": 5
+      "iterations": 5
     },
     "retry": {
-      "retryMaxAttempts": 5,
-      "retryInitialDelayMs": 500,
-      "retryBackoffMultiplier": 1.5
+      "max_attempts": 5,
+      "initial_delay_ms": 500,
+      "backoff_multiplier": 1.5
     }
   },
   "payloads": [
@@ -41,7 +47,13 @@
       "body": {
         "timestamp": "2026-02-16T10:00:00Z",
         "data": {
-          "metrics": [1, 2, 3, 4, 5]
+          "metrics": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
         }
       }
     }

@@ -4,9 +4,9 @@
       "name": "api-v1",
       "url": "http://api-v1.example.com",
       "lifecycle": {
-        "healthCheck": {
+        "health_check": {
           "url": "http://api-v1.example.com/health",
-          "timeoutSecs": 30
+          "timeout_secs": 30
         }
       }
     },
@@ -14,9 +14,9 @@
       "name": "api-v2",
       "url": "http://api-v2.example.com",
       "lifecycle": {
-        "healthCheck": {
+        "health_check": {
           "url": "http://api-v2.example.com/health",
-          "timeoutSecs": 30
+          "timeout_secs": 30
         }
       }
     }
@@ -25,15 +25,15 @@
     "iterations": 5000,
     "concurrency": 50,
     "secrets": ".secrets/token.txt",
-    "requestTimeout": 60,
-    "logLevel": "info",
+    "request_timeout_secs": 60,
+    "log_level": "info",
     "warmup": {
-      "warmupIterations": 10
+      "iterations": 10
     },
     "retry": {
-      "retryMaxAttempts": 3,
-      "retryInitialDelayMs": 1000,
-      "retryBackoffMultiplier": 2.0
+      "max_attempts": 3,
+      "initial_delay_ms": 1000,
+      "backoff_multiplier": 2.0
     }
   },
   "payloads": [

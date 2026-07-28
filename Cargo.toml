@@ -1,0 +1,117 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Real Limoges <b.real.limoges@gmail.com>"]
+description = "Statistically rigorous HTTP performance benchmarking"
+
+# Lint policy, shared by every crate via `[lints] workspace = true`.
+#
+# The rule of thumb: deny the lints that catch *bugs*, not the ones that enforce
+# a house style. Blanket `clippy::pedantic` was measured at ~1,200 hits across
+# the workspace, the large majority of them `cast_precision_loss` on the
+# `usize -> f64` conversions that a statistics crate is made of, so adopting it
+# wholesale would have meant ~1,200 `#[allow]`s and no new bugs found.
+#
+# Deliberately NOT denied, with the reason, so nobody re-litigates this blind:
+#   - clippy::indexing_slicing (57 production sites) - almost all are slices of
+#     a just-sorted vector whose bounds are established two lines above. Fixing
+#     them means threading `get()` + `?` through the percentile math and making
+#     the correctness-critical code harder to read, not safer.
+#   - clippy::string_slice (8 sites, all in config/env.rs) - every index comes
+#     from `str::find`, which returns a char boundary, so the panic it warns
+#     about cannot happen here.
+#   - clippy::cast_possible_truncation / cast_sign_loss (44 sites) - a real bug
+#     class worth a dedicated pass, but each site needs an individual judgment
+#     (clamp vs `try_from` vs genuinely-fine), which is not a mechanical change.
+#   - clippy::expect_used (12 sites) - see the per-crate `deny` block below;
+#     `unwrap` is denied, `expect` is not, because an `expect` at least carries
+#     a written justification at the call site.
+[workspace.lints.rust]
+# There is no unsafe in this tree and no reason for any to appear.
+unsafe_code = "forbid"
+future_incompatible = { level = "deny", priority = -1 }
+rust_2018_idioms = { level = "deny", priority = -1 }
+missing_debug_implementations = "deny"
+trivial_numeric_casts = "deny"
+unused_import_braces = "deny"
+unused_lifetimes = "deny"
+unused_qualifications = "deny"
+
+[workspace.lints.clippy]
+# All of these are at zero across the workspace today; denying them is free and
+# keeps them at zero.
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+mem_forget = "deny"
+same_name_method = "deny"
+verbose_file_reads = "deny"
+lossy_float_literal = "deny"
+cast_possible_wrap = "deny"
+# `Instant - Duration` panics when the instant is less than the duration past
+# the monotonic clock's origin. This fired once, in the TUI's frame pacing.
+unchecked_time_subtraction = "deny"
+
+# Shared dependency versions. Crates opt in with `dep.workspace = true`.
+[workspace.dependencies]
+libm = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "0.8"
+thiserror = "1"
+gauntlet-core = { path = "crates/gauntlet-core" }
+gauntlet-stats = { path = "crates/gauntlet-stats" }
+
+# --- M3 engine: async measurement loop -------------------------------------
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "process"] }
+bytes = "1"
+rand = "0.8"
+rand_distr = "0.4"
+regex = "1"
+csv = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Both HTTP clients live here for the M3-A spike; the loser is dropped from the
+# engine once the overhead measurement picks a winner.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["client", "client-legacy", "http1", "tokio"] }
+http-body-util = "0.1"
+# Mock HTTP server for engine tests + the spike's localhost target.
+axum = "0.7"
+
+# --- M4 report: reporter backends + baselines -------------------------------
+async-trait = "0.1"
+# Native SVG charting; replaces scripts/plot_latency.py and the `uv` shell-out.
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series", "histogram", "area_series"] }
+
+# --- M6 wire-up: the binary ---------------------------------------------------
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+gauntlet-engine = { path = "crates/gauntlet-engine" }
+gauntlet-report = { path = "crates/gauntlet-report" }
+gauntlet-tracing = { path = "crates/gauntlet-tracing" }
+
+# --- M5 TUI: live terminal view ---------------------------------------------
+ratatui = "0.30"
+crossterm = "0.29"
+gauntlet-tui = { path = "crates/gauntlet-tui" }
+
+# Optimize the measurement-critical crates even in dev builds so local
+# benchmarking is representative. The whole point of the port is that this
+# does not cost us minutes of compile time.
+[profile.dev.package.gauntlet-stats]
+opt-level = 2
+
+# Integer overflow panics in dev and wraps silently in release, which means the
+# release binary (the one people actually benchmark with) is the one that would
+# quietly corrupt a latency total rather than say so. Turn the checks back on:
+# the measurement loop is dominated by network I/O, and the numerics run after
+# measurement is over, so neither the reported latencies nor their variance can
+# be affected by the extra branch.
+[profile.release]
+overflow-checks = true

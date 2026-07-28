@@ -2,7 +2,7 @@
 
 ## What Gauntlet Does
 
-Gauntlet is an HTTP performance benchmarking tool. It sends real HTTP requests to your services, measures latency at nanosecond precision, and uses Bayesian statistics to give you direct probability answers like "there is a 94% chance the candidate is faster." No more squinting at averages and hoping the difference is real.
+Gauntlet is an HTTP performance benchmarking tool. It sends real HTTP requests to your services, measures latency at nanosecond precision on a monotonic clock, and uses Bayesian statistics to give you direct probability answers like "there is a 94% chance the candidate is faster." No more squinting at averages and hoping the difference is real.
 
 The single `benchmark` command handles any number of targets: one target with optional baseline comparison, two targets with A/B analysis, or 2+ targets with all-pairs statistical comparison. The mode is determined automatically from the config.
 
@@ -12,10 +12,10 @@ Create a config file (`config.json`):
 
 ```json
 {
-  "targets": {
-    "primary": "http://api.example.com",
-    "candidate": "http://api-new.example.com"
-  },
+  "targets": [
+    { "name": "primary", "url": "http://api.example.com" },
+    { "name": "candidate", "url": "http://api-new.example.com" }
+  ],
   "settings": {
     "iterations": 100,
     "concurrency": 10,
@@ -37,11 +37,33 @@ Then run:
 gauntlet benchmark --config config.json
 ```
 
+(From a source checkout: `cargo run -p gauntlet-cli --bin gauntlet -- benchmark --config config.json`, or `cargo build --release` once and use `./target/release/gauntlet`.)
+
 That's it. The rest of this guide explains every config option and what the output means.
 
 ## Understanding the Config File
 
-The config has three top-level keys: `targets`, `settings`, and `payloads`.
+The config has three top-level keys: `targets`, `settings`, and `payloads`. All three are required.
+
+Field names are **snake_case** and map 1:1 onto the tool's internal types — there is no renaming layer, which is why `gauntlet schema` can derive the JSON schema straight from the types and can never drift from what the loader accepts:
+
+```bash
+gauntlet schema              # print to stdout
+gauntlet schema --out schema/config-schema.json
+```
+
+Unknown keys are an error, not a silent no-op. A typo like `"iteration": 100` fails at load with the offending key named, rather than quietly running with the default.
+
+To check a config without sending any traffic:
+
+```bash
+gauntlet validate --config config.json
+gauntlet validate --config config.json --check-endpoints   # also GETs each target's health URL
+```
+
+`validate` parses, expands `${VAR}` references, runs every validation rule, and prints a summary of what would run. With `--check-endpoints` it additionally issues one GET per target — the configured `lifecycle.health_check.url`, or `<url>/health` if none is set — and exits 2 if any target is unreachable.
+
+Validation accumulates: every problem in the file is reported in one pass, not just the first.
 
 ### Environment Variable Expansion
 
@@ -52,14 +74,14 @@ Any config value can contain `${VAR}` references. Variables are expanded in the 
 2. `.env` — can be committed for non-secret defaults
 3. Process environment
 
-Missing variables fail fast with a clear error naming the undefined variable.
+Missing variables fail fast with a clear error naming the undefined variable. Only the bare `${VAR}` form is supported — there is no `${VAR:-default}`. An unclosed `${` is left as a literal.
 
 ```json
 {
-  "targets": {
-    "primary": "${PRIMARY_URL}",
-    "candidate": "${CANDIDATE_URL}"
-  },
+  "targets": [
+    { "name": "primary", "url": "${PRIMARY_URL}" },
+    { "name": "candidate", "url": "${CANDIDATE_URL}" }
+  ],
   "settings": {
     "secrets": "${TOKEN_PATH}",
     "iterations": 1000,
@@ -72,20 +94,7 @@ This keeps secrets and environment-specific URLs out of committed config files w
 
 ### `targets` — What you're testing
 
-The structure depends on which mode you're using.
-
-**A/B mode** (`benchmark` with two targets):
-
-```json
-"targets": {
-  "primary": "http://api-v1.example.com",
-  "candidate": "http://api-v2.example.com"
-}
-```
-
-The "primary" is your baseline — production, the current version, whatever you consider the reference. The "candidate" is what you're evaluating. This asymmetry matters because statistical results are framed as "probability candidate is faster than primary."
-
-**Multi-target mode** (`benchmark` with 2+ targets):
+An array of named targets. One is enough; two or more get automatic pairwise comparison.
 
 ```json
 "targets": [
@@ -95,15 +104,27 @@ The "primary" is your baseline — production, the current version, whatever you
 ]
 ```
 
-An array of named targets. At least 2 required. Every pair is compared, so with 3 targets you get 3 pairwise comparisons; with 4 you get 6.
+Every pair is compared, so with 3 targets you get 3 pairwise comparisons; with 4 you get 6. Targets run **sequentially** — they are not benchmarked at the same time, so they do not contend for the client machine during measurement.
 
-Why `name`? Reports rank targets by mean latency and show pairwise comparisons — names like "prod" and "staging" make this readable instead of showing raw URLs.
+Why `name`? Reports rank targets by mean latency and show pairwise comparisons — names like "prod" and "staging" make this readable instead of showing raw URLs. The name is also what qualifies a baseline and what slugs a chart's filename.
+
+Comparisons are framed as "probability B is faster than A", where A and B are two targets in config order. If you are evaluating a change, put the reference (production, the current version) first and the candidate second.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Label used in reports, baselines, and chart filenames |
+| `url` | string | yes | Base URL; payload `path`s are appended verbatim |
+| `lifecycle` | object | no | Setup/teardown hooks and health-check polling |
+
+> **`branch` was removed.** Earlier versions accepted a `branch` field on each target. Nothing ever acted on it: the Haskell build used it only to decide whether to print a "Setting up..." message, and the Rust port never read it at all. Because the config rejects unknown fields, a config that still sets `branch` now fails to load with a clear parse error. Move the switch into `lifecycle.setup` (`"cmd": "git switch my-branch && ..."`), which actually runs, and which the `lifecycle` section below documents.
 
 ### `settings` — How the benchmark runs
 
 #### `iterations` (required)
 
-Number of requests per endpoint. More iterations produce tighter credible intervals on your statistical comparisons. 100 is fine for a quick sanity check; 1,000-10,000 for production decisions where you need high confidence.
+Number of requests per endpoint. Must be at least 1. More iterations produce tighter credible intervals on your statistical comparisons. 100 is fine for a quick sanity check; 1,000-10,000 for production decisions where you need high confidence.
+
+Duration-based load modes (`ramp_up`, `step_load`) derive their own request count from the schedule and ignore this field.
 
 #### `concurrency` (required)
 
@@ -111,102 +132,141 @@ Maximum simultaneous in-flight requests. This simulates realistic load. Too low 
 
 #### `secrets` (optional)
 
-Path to a file containing a Bearer token. When set, the token is read once at startup and injected as `Authorization: Bearer <token>` on every request. Omit this field entirely for public or internal APIs that don't require authentication. When present, keep the secrets file in your `.gitignore`.
+Path to a file containing a bearer token. When set, the file is read once at startup and the token is sent as `Authorization: Bearer <token>` on every request that does not already carry its own `Authorization` header. Surrounding whitespace is trimmed, because token files routinely end in a newline and sending that as part of the credential is a maddening bug. An empty or whitespace-only file means no auth rather than an empty credential.
 
-#### `requestTimeout` (default: 30s)
+Omit this field entirely for public or internal APIs that don't require authentication. When present, keep the secrets file in your `.gitignore` — the point of the indirection is that the token never lands in a committed JSON file.
+
+#### `request_timeout_secs` (default: 30)
 
 Per-request timeout in seconds. Prevents hung requests from stalling the entire benchmark. If your endpoints are legitimately slow (e.g., complex analytics queries), increase this.
 
-#### `maxConnections`
+#### `max_connections` (optional)
 
-HTTP connection pool size cap. Gauntlet reuses connections via HTTP keep-alive for realistic performance. Defaults are usually fine unless your concurrency is very high, in which case you may want `maxConnections` >= `concurrency`.
+HTTP connection pool size cap. Gauntlet reuses connections via HTTP keep-alive for realistic performance. The default is usually fine unless your concurrency is very high, in which case you may want `max_connections` >= `concurrency`.
 
-#### `logLevel` (default: `"info"`)
+#### `log_level` (default: `"info"`)
 
-Verbosity: `"debug"`, `"info"`, `"warning"`, `"error"`. Use `"debug"` when troubleshooting config or connectivity issues — it logs individual request details. Use `"warning"` or `"error"` in CI where you only want to see problems.
+Accepted values: `"debug"`, `"info"`, `"warning"`, `"error"`.
 
-#### `warmup`
+Sets the threshold for gauntlet's own diagnostics. Note the deliberate split: the level filters *diagnostic* output on stderr and never suppresses the benchmark report on stdout, so `"error"` gives you a quiet run that still prints its results in full. There is no command-line override; the config field is the only control.
+
+#### `warmup` (default: `{"iterations": 1}`)
 
 ```json
 "warmup": {
-  "warmupIterations": 10
+  "iterations": 10
 }
 ```
 
-Sends N requests before timing begins. This lets the server warm up JIT compilers, fill caches, and establish connection pools so your measurements reflect steady-state performance, not cold-start latency. Without warmup, the first few requests are often significantly slower, skewing your statistics.
+Sends N requests against the target's **first** endpoint before timing begins, and discards them. This lets the server warm up JIT compilers, fill caches, and establish connection pools so your measurements reflect steady-state performance, not cold-start latency. Without warmup, the first few requests are often significantly slower, skewing your statistics. Set `0` to disable.
 
 #### `retry`
 
 ```json
 "retry": {
-  "retryMaxAttempts": 3,
-  "retryInitialDelayMs": 1000,
-  "retryBackoffMultiplier": 2.0
+  "max_attempts": 3,
+  "initial_delay_ms": 1000,
+  "backoff_multiplier": 2.0
 }
 ```
 
-Retries transient failures with exponential backoff (1s, 2s, 4s with the defaults above). Prevents a single network hiccup from registering as a failed request. Keep attempts low — excessive retries mask real problems. If you're seeing many retries, the service likely has a genuine issue.
+Retries **transport** failures — connection refused, DNS failure, timeout — with exponential backoff (1s, 2s, 4s with the defaults above). `max_attempts` counts retries, so `0` disables them; `backoff_multiplier` must be at least 1.0.
 
-#### `loadMode`
+An HTTP status code is a *response*, not a transport failure: a 500 is recorded as a 500 and never retried. Retrying it would quietly turn a broken service into a slow-looking healthy one.
 
-Controls the rate at which requests are sent. Defaults to `unthrottled` (as fast as concurrency allows).
+A request that exhausts its retries is recorded as a failure (status 0) and excluded from the latency statistics, but still counted in the success/total ratio and still charted by the error-rate and status charts.
 
-**Unthrottled** (default) — no rate limiting, requests sent as fast as possible:
+Keep attempts low — excessive retries mask real problems. If you're seeing many retries, the service likely has a genuine issue.
+
+#### `load_mode` (default: `unthrottled`)
+
+Controls the rate at which requests are dispatched. The limiter paces request *starts*; `concurrency` independently caps how many are in flight, so the two compose without double-counting.
+
+The rate is **per target, not per payload**. All of a target's payloads share one limiter, so `target_rpm` is the load the target actually receives however many payloads you configure. A run with three payloads at `target_rpm: 6000` sends 6,000 requests per minute in total (roughly 2,000 per payload), and takes about three times as long as the same rate with one payload. `concurrency`, by contrast, is per endpoint.
+
+**Unthrottled** (default) — no rate limiting, requests sent as fast as concurrency allows:
 ```json
-"loadMode": {"mode": "unthrottled"}
+"load_mode": {"mode": "unthrottled"}
 ```
 
 **Constant RPM** — steady request rate:
 ```json
-"loadMode": {"mode": "constantRpm", "targetRpm": 100}
+"load_mode": {"mode": "constant_rpm", "target_rpm": 6000}
 ```
 
-**Ramp Up** — linearly increasing rate over a duration:
+**Ramp up** — linearly increasing rate over a duration:
 ```json
-"loadMode": {"mode": "rampUp", "startRpm": 10, "endRpm": 200, "durationSecs": 60}
+"load_mode": {"mode": "ramp_up", "start_rpm": 60, "end_rpm": 6000, "duration_secs": 60}
 ```
 
-**Step Load** — discrete rate steps:
+**Step load** — discrete rate steps:
 ```json
-"loadMode": {
-  "mode": "stepLoad",
+"load_mode": {
+  "mode": "step_load",
   "steps": [
-    {"rpm": 50, "durationSecs": 30},
-    {"rpm": 100, "durationSecs": 30},
-    {"rpm": 200, "durationSecs": 30}
+    {"rpm": 600, "duration_secs": 30},
+    {"rpm": 3000, "duration_secs": 60},
+    {"rpm": 6000, "duration_secs": 60}
   ]
 }
 ```
 
-**Poisson RPM** — random inter-arrival times following a Poisson process (more realistic traffic simulation):
+**Poisson RPM** — random inter-arrival times following a Poisson process, which is a more realistic model of organic traffic than a metronome:
 ```json
-"loadMode": {"mode": "poissonRpm", "targetRpm": 100}
+"load_mode": {"mode": "poisson_rpm", "target_rpm": 6000}
 ```
 
-When using `constantRpm`, `rampUp`, `stepLoad`, or `poissonRpm`, the `iterations` setting controls how many total requests are sent — the benchmark ends when either the iteration count is reached or the load duration expires, whichever comes first.
+All rates and durations must be greater than zero. Time-varying modes floor at 6 RPM, so a ramp that starts near zero still makes progress instead of stalling.
 
-#### `healthCheckPath` / `healthCheckTimeout`
+`unthrottled`, `constant_rpm`, and `poisson_rpm` are **iteration-based**: they send `settings.iterations` requests per endpoint. `ramp_up` and `step_load` are **duration-based**: the run ends when the schedule does, and `iterations` is ignored.
 
-After environment setup (git switch + docker-compose, if configured), gauntlet polls `<target-url><healthCheckPath>` every second until it gets HTTP 200, up to `healthCheckTimeout` seconds. This ensures the service is fully ready before benchmarking begins, so you don't measure startup time as request latency.
-
-Defaults: `healthCheckPath` = `"/health"`, `healthCheckTimeout` = `60` seconds.
-
-#### `tempo`
+#### `tempo` (optional)
 
 ```json
 "tempo": {
-  "tempoUrl": "http://tempo:3200",
-  "tempoServiceName": "my-service",
-  "tempoEnabled": true,
-  "tempoAuthToken": "optional-tempo-bearer-token"
+  "url": "http://tempo:3200",
+  "service_name": "my-service",
+  "enabled": true,
+  "auth_token": "optional-tempo-bearer-token"
 }
 ```
 
-Optional Grafana Tempo integration. When enabled, gauntlet fetches distributed traces from the benchmark time window after benchmarking completes and aggregates span-level statistics. See [Distributed Tracing](#distributed-tracing-grafana-tempo) for details.
+Optional Grafana Tempo integration. `enabled` defaults to true when the section is present. See [Distributed Tracing](#distributed-tracing-grafana-tempo).
+
+### `lifecycle` — Preparing a target
+
+Per-target hooks, run around that target's benchmark phase:
+
+```json
+{
+  "name": "candidate",
+  "url": "http://localhost:8080",
+  "lifecycle": {
+    "setup": {
+      "cmd": "git switch feat/candidate && docker-compose up -d --build",
+      "timeout_secs": 120,
+      "working_dir": "../service"
+    },
+    "teardown": { "cmd": "docker-compose down" },
+    "health_check": {
+      "url": "http://localhost:8080/health",
+      "timeout_secs": 60,
+      "interval_ms": 1000
+    }
+  }
+}
+```
+
+The sequence per target is: **setup → health check → warmup → benchmark → teardown.**
+
+- `setup` / `teardown` run through `sh -c`, so shell syntax works. `working_dir` is optional; `timeout_secs` defaults to 30. A non-zero exit or a timeout in `setup` aborts before any request is sent — benchmarking a service that failed to come up produces numbers that mean nothing. `teardown` is best-effort.
+- `health_check` polls `url` until it answers 200. `timeout_secs` defaults to 30, `interval_ms` to 500. This is what stops you from measuring startup time as request latency.
+
+This is also where the deploy-benchmark-compare workflow lives: give each target a `setup` that switches branch and brings the service up, and gauntlet will do the whole sequence for every target in turn.
 
 ### `payloads` — What requests to send
 
-Each entry defines one HTTP endpoint to benchmark. All payloads are sent to every target.
+Each entry defines one HTTP endpoint to benchmark. **All payloads are sent to every target**, which is what makes the comparison apples-to-apples. Within a target, the endpoints run concurrently, each with its own concurrency semaphore; they share the target's single load limiter, so `load_mode` bounds the aggregate rate rather than each payload's.
 
 ```json
 "payloads": [
@@ -225,7 +285,7 @@ Each entry defines one HTTP endpoint to benchmark. All payloads are sent to ever
     "validate": {
       "status": 200,
       "fields": {
-        "$.results": { "present": true }
+        "$.results": "present"
       }
     }
   }
@@ -235,10 +295,10 @@ Each entry defines one HTTP endpoint to benchmark. All payloads are sent to ever
 | Field | Description |
 |---|---|
 | `name` | Appears in reports and CSV output. Make it descriptive. |
-| `method` | `GET`, `POST`, `PUT`, `DELETE`, `PATCH` |
-| `path` | Appended to target URL. Can include query strings (e.g., `/api/users?limit=10`). |
+| `method` | `GET`, `POST`, `PUT`, `DELETE`, `PATCH` (uppercase; anything else fails to parse) |
+| `path` | Appended to the target URL verbatim. Can include query strings (e.g., `/api/users?limit=10`). |
 | `body` | JSON request body. Used with `POST`, `PUT`, `PATCH`. |
-| `headers` | Custom HTTP headers as key-value pairs. `Content-Type: application/json` is injected automatically unless you override it. |
+| `headers` | Custom HTTP headers as key-value pairs. `Content-Type: application/json` is injected automatically unless you set your own. |
 | `validate` | Optional per-response validation (see below). |
 
 ### Validation
@@ -249,35 +309,39 @@ The `validate` block lets you assert properties of every response during the ben
 "validate": {
   "status": 201,
   "fields": {
-    "$.user.id":    { "present": true },
+    "$.user.id":    "present",
     "$.user.email": { "eq": "john@example.com" },
     "$.score":      { "range": { "min": 0, "max": 100 } },
-    "$.tags":       { "arrayLength": 3 }
+    "$.tags":       { "array_length": 3 }
   }
 }
 ```
 
-Field paths use dot-notation with `$.` prefix (e.g., `$.user.email` navigates into a nested `user` object). Array indices are also supported (e.g., `$.items.0.name`).
+Field paths use dot-notation with a `$.` prefix (e.g., `$.user.email` navigates into a nested `user` object). Array indices are also supported (e.g., `$.items.0.name`).
 
 #### Assertion types
 
+Assertions that carry no data are written as bare strings; the rest are single-key objects.
+
 | Assertion | Example | Meaning |
 |---|---|---|
-| `present` | `{ "present": true }` | Field exists (any value, including null) |
+| `present` | `"present"` | Field exists (any value, including null) |
+| `null` | `"null"` | Field is explicitly `null` |
+| `not_null` | `"not_null"` | Field exists and is not `null` |
 | `eq` | `{ "eq": "value" }` | Exact value match (strings, numbers, booleans) |
-| `null` | `{ "null": true }` | Field is explicitly `null` |
-| `notNull` | `{ "notNull": true }` | Field exists and is not `null` |
 | `type` | `{ "type": "string" }` | JSON type: `"string"`, `"number"`, `"boolean"`, `"array"`, `"object"`, `"null"` |
-| `matches` | `{ "matches": "^[A-Z]{3}$" }` | String matches regex (POSIX ERE) |
+| `matches` | `{ "matches": "^[A-Z]{3}$" }` | String matches a regex (Rust `regex` crate syntax) |
 | `range` | `{ "range": { "min": 0, "max": 100 } }` | Numeric value within bounds (both optional) |
-| `arrayLength` | `{ "arrayLength": 5 }` | Array has exactly N elements |
-| `arrayContains` | `{ "arrayContains": "admin" }` | Value is present in the array |
+| `array_length` | `{ "array_length": 5 }` | Array has exactly N elements |
+| `array_contains` | `{ "array_contains": "admin" }` | Value is present in the array |
+
+Validation failures are counted per endpoint and surfaced in the reports. Retained detail is capped at 50 failing responses per endpoint (and 10 unique messages when printed), so a wholly-broken run produces a readable summary instead of megabytes of identical errors.
 
 ## Understanding the Output
 
 ### Per-target statistics
 
-For each target and payload, gauntlet reports:
+For each target, gauntlet reports:
 
 | Metric | What it tells you |
 |---|---|
@@ -290,37 +354,86 @@ For each target and payload, gauntlet reports:
 | **Min / Max** | Fastest and slowest observed request. |
 | **Success / Total** | Request success rate. Failed requests are excluded from latency statistics. |
 
+Latency is measured on a monotonic clock, spanning all retry attempts of a request. Absolute numbers include the HTTP client's own overhead floor (on the order of tens of microseconds); it cancels out of A/B comparisons and regression deltas, but keep it in mind before quoting an absolute single-request figure for a very fast endpoint.
+
 ### Bayesian comparison
 
 For each pair of targets, gauntlet reports:
 
-**"Probability Candidate is Faster (means)"** — This is the headline number. It's P(population mean of B < population mean of A), computed from the sampling distributions using a conjugate normal model. It answers: "if we ran this benchmark again with fresh samples, how confident are we that B's average would still be lower?"
+**"Probability B is faster (means)"** — This is the headline number. It's P(population mean of B < population mean of A), computed from the sampling distributions using a conjugate normal model. It answers: "if we ran this benchmark again with fresh samples, how confident are we that B's average would still be lower?"
 
-**"Probability Single Request Faster"** — P(a random individual request to B is faster than a random individual request to A). This is always closer to 50% than the means comparison because individual requests have high variance.
+**"Probability single request faster"** — P(a random individual request to B is faster than a random individual request to A). This is always closer to 50% than the means comparison because individual requests have high variance.
 
 Why report both? The first tells you about the *system* — is one version fundamentally faster? The second tells you about the *user experience* — for any given user request, what's the chance they'd actually notice a difference? A service can have a clearly faster mean (95% probability) but high variance, meaning individual users still often get slow responses (60% probability).
 
-**Mean Difference + 95% Credible Interval** — The estimated difference in average latency with a Bayesian credible interval. Unlike a frequentist confidence interval, this directly means "there is a 95% probability the true difference lies in this range."
+**"Probability B less jittery"** — P(sigma_B < sigma_A), via a log-variance approximation. Consistency is its own quality; a service with the same mean and half the spread is a better service.
+
+**Mean difference + 95% credible interval** — The estimated difference in average latency with a Bayesian credible interval. Unlike a frequentist confidence interval, this directly means "there is a 95% probability the true difference lies in this range."
 
 **Cohen's d** — Effect size. Measures the difference in means relative to pooled standard deviation. Small (<0.2), medium (0.2-0.8), large (>0.8). Useful for judging practical significance — a statistically clear difference can still be too small to matter.
 
-**Tail analysis** — Comparison of p95 and p99 percentiles between targets, with Maritz-Jarrett standard errors. This tells you whether the tail behavior differs, not just the averages.
+**Tail analysis** — Comparison of p95 and p99 between targets, with Maritz-Jarrett standard errors. This tells you whether the tail behavior differs, not just the averages.
+
+**Earth Mover's Distance** — The 1-Wasserstein distance between the two latency distributions: how much probability mass has to move, and how far, to turn one distribution into the other. It is the one figure computed from the raw sample vectors rather than summary statistics, which is why `gauntlet compare` (which reads saved summaries) cannot report it.
 
 ### Ranking table
 
-In multi-target mode, targets are ranked by mean latency with pairwise comparisons for every pair. This gives you a quick leaderboard plus detailed statistical evidence for each ranking.
+With more than one target, targets are ranked by mean latency with pairwise comparisons for every pair. This gives you a quick leaderboard plus detailed statistical evidence for each ranking.
 
 ### CSV output
 
-Raw latency data is written to `results/latencies-<timestamp>.csv` with one row per request and nanosecond precision. Use this for post-hoc analysis, custom visualizations, or feeding into other tools.
+Raw latency data is written to `<results-dir>/latencies-<timestamp>.csv`, one row per request:
 
-### Markdown reports
-
-```bash
-gauntlet benchmark --config config.json --output markdown --report-path results/report.md
+```
+target_name,payload_id,url,method,status_code,latency_ms,timestamp_iso
 ```
 
-Produces the same content as terminal output but in markdown, suitable for CI artifacts, PR comments, or archival.
+Use this for post-hoc analysis, custom visualizations, or feeding into other tools. `--results-dir DIR` relocates it; `--no-csv` skips it entirely. The directory is created if it does not exist.
+
+Note that charts do **not** go through this file — they render from the in-memory samples. The CSV exists for you, not for the tool.
+
+### Reports and charts
+
+```bash
+gauntlet benchmark --config config.json \
+  --markdown-report results/report.md \
+  --html-report results/report.html \
+  --junit-report results/junit.xml \
+  --prometheus-file results/metrics.prom \
+  --charts cdf,tail,throughput --charts-dir results/charts
+```
+
+Every output is opt-in and they compose; the terminal output is always produced.
+
+- **Markdown** — the same content as terminal output, suitable for CI artifacts, PR comments, or archival.
+- **HTML** — one self-contained document. The stylesheet and the SVG charts (histogram and CDF) are inlined, so the file renders correctly when opened straight from a file manager over `file://` — a report that needs a web server to look right is a report nobody looks at.
+- **JUnit XML** — latency metrics encoded as properties on synthetic test cases, for test-framework integrations.
+- **Prometheus** — exposition text. `--prometheus-file` writes it, `--prometheus-pushgateway URL` pushes it (`--prometheus-job NAME`, default `gauntlet`), and specifying both does both.
+- **Charts** — one SVG per target per kind, named `<target-slug>-<kind>.svg`.
+
+Chart kinds, rendered natively in-process (there is no Python involved and no external tooling to install):
+
+| Kind | Aliases | What it shows |
+|---|---|---|
+| `histogram` | | Binned frequency of latencies |
+| `cdf` | | Empirical CDF — what fraction of requests came in under X ms |
+| `tail` | | The top decile plotted percentile-against-latency, where p99-and-beyond behaviour is actually visible; p95 and p99 are marked |
+| `timeline` | | Latency against request ordinal, which exposes warmup effects and drift |
+| `rolling_pct` | `rolling` | Trailing-window p50/p95/p99 — separates a tail that was always there from one that appeared as load built |
+| `boxplot` | `box` | Quartiles, 1.5-IQR whiskers, and outliers |
+| `throughput` | | Completed requests per second over the run (failures included — a service that is fast because it is refusing everything has a throughput) |
+| `error_rate` | `errors` | Share of requests that failed, over the run, on a fixed 0-100% axis |
+| `status` | | Response counts grouped by status class |
+
+Hyphens and underscores are interchangeable. An unknown kind is rejected when the arguments are parsed, with the valid list — not after the benchmark has already run.
+
+Charts that need latency are skipped for a target where every request failed; `error_rate` and `status` still render, because those are the charts you actually want in that situation. Charts that need a time span are skipped for a run with no measurable duration.
+
+### The live view
+
+When stdout is an interactive terminal and no CI environment is detected, `benchmark` runs under a live TUI showing progress and rolling statistics. `--no-tui` forces the headless view, which is what CI gets automatically.
+
+`q`, `Esc`, or `Ctrl-C` cancels. A cancelled run exits 2 and writes no baseline: an interrupted run has no trustworthy measurements, and recording it as a result would poison every later comparison.
 
 ## Baselines and Regression Detection
 
@@ -337,7 +450,9 @@ gauntlet benchmark --config config.json --compare-baseline v1.0
 gauntlet benchmark --config config.json --save-baseline v1.1 --compare-baseline v1.0
 ```
 
-Baselines are stored as JSON files in `baselines/<name>.json`. When comparing, gauntlet checks mean, p50, p95, and p99 against regression thresholds:
+Baselines are stored as JSON in `baselines/<name>.json`; `--baseline-dir DIR` relocates the directory. A run with more than one target writes one baseline per target, named `<name>--<target>`, since the targets are different systems and must not overwrite each other's history. A single-target run keeps the bare name.
+
+When comparing, gauntlet checks mean, p50, p95, and p99 against regression thresholds:
 
 | Metric | Default Threshold |
 |---|---|
@@ -346,53 +461,59 @@ Baselines are stored as JSON files in `baselines/<name>.json`. When comparing, g
 | p95 | 10% |
 | p99 | 15% |
 
-If any metric exceeds its threshold, the tool exits with code 1.
+If any metric on any target exceeds its threshold, the tool exits with code 1.
 
 Why is the p99 threshold higher? Tail latencies are inherently noisier — small sample variations cause larger swings in p99. A 10% threshold on p99 would produce too many false positives in CI, causing alert fatigue without actionable signal.
 
-## Git and Docker Integration
+### Baseline file format
 
-When `git` is configured, gauntlet automates the deploy-benchmark-compare workflow:
+The file is versioned and self-describing:
 
 ```json
 {
-  "git": {
-    "primary": "main",
-    "candidate": "feature/optimization"
-  }
+  "schema_version": 1,
+  "name": "v1.0",
+  "created_at": "2026-07-21T10:00:00Z",
+  "stats": { "mean_ms": 12.5, "p50_ms": 11.9, "...": "..." }
 }
 ```
 
-The sequence is:
+Only the compared metrics plus context are stored; the histogram is dropped, since nothing reads it back and it dominates the file size.
 
-1. Switch to the candidate branch (`git switch feature/optimization`)
-2. Run `docker-compose up` (if configured)
-3. Poll the health endpoint until the service is ready
-4. Run the benchmark against the candidate
-5. Switch to the primary branch (`git switch main`)
-6. Repeat steps 2-4 for the primary
-7. Compare results
+**Baselines written by the previous Haskell build cannot be read.** That format was a different encoding of a different record, and carrying a compatibility shim would pin this format to that record layout forever. Loading one reports an unsupported-format error telling you to regenerate. Re-baselining costs one benchmark run:
 
-This eliminates the manual process of deploying each version separately. The health check polling ensures you're not benchmarking a service that's still starting up.
+```bash
+gauntlet benchmark --config config.json --save-baseline v1.0
+```
 
-In multi-target mode, an optional `branch` field per target triggers a git switch for that target's benchmark phase.
+### Comparing saved results offline
+
+```bash
+gauntlet compare baselines/before.json baselines/after.json
+```
+
+Takes two file paths — a saved baseline or a bare stats snapshot, either shape — and prints the full Bayesian comparison without sending a single request. Useful for diffing two runs after the fact, or comparing results captured on different machines. Earth Mover's Distance is unavailable here: both formats store summary statistics, not the raw samples it needs.
 
 ## CI/CD Integration
 
-Gauntlet auto-detects CI environments via the `GITLAB_CI` and `GITHUB_ACTIONS` environment variables.
+Gauntlet auto-detects CI environments via the `GITLAB_CI` and `GITHUB_ACTIONS` environment variables (GitLab is checked first, since a GitLab job can shell out in ways that leave `GITHUB_ACTIONS` set). The live TUI is disabled automatically in CI, so nothing writes escape sequences into your job log.
 
-**GitLab CI**: Outputs collapsible CI sections with ANSI-colored regression status, making results easy to scan in job logs.
+**GitLab CI**: collapsible CI sections with ANSI-coloured regression status, making results easy to scan in job logs.
 
-**GitHub Actions**: Produces a plain-text regression summary and writes to `$GITHUB_STEP_SUMMARY` for the job summary UI.
+**GitHub Actions**: plain-text regression output, plus the report appended to `$GITHUB_STEP_SUMMARY` for the job summary UI.
 
-Exit code 1 on regression naturally fails CI pipelines. Combine with `--output markdown` to produce artifact reports that can be attached to merge/pull requests.
+Either way a markdown regression artifact is written into `--results-dir` (default `results/`). Exit code 1 on regression naturally fails the pipeline.
 
 Example CI usage:
 
 ```yaml
 # GitHub Actions
 - name: Run performance benchmark
-  run: gauntlet benchmark --config bench.json --compare-baseline main --output markdown --report-path results/report.md
+  run: |
+    gauntlet benchmark \
+      --config bench.json \
+      --compare-baseline main \
+      --markdown-report results/report.md
 
 - name: Upload report
   if: always()
@@ -404,49 +525,64 @@ Example CI usage:
 
 ## Distributed Tracing (Grafana Tempo)
 
-When `tempo` is configured in settings, gauntlet fetches distributed traces from the benchmark time window after benchmarking completes. It queries Grafana Tempo using TraceQL, retrieves traces that were generated during the benchmark, and aggregates span-level statistics.
+When `tempo` is configured in settings, gauntlet queries Grafana Tempo for traces from the benchmark's time window after the run completes and aggregates span-level statistics.
 
-The trace report shows per-span-name statistics: count, mean duration, p50, p95, and p99. This helps you identify which internal service or operation is the bottleneck — for example, you might see that your API endpoint is slow because a downstream database query has high p99 latency.
+Spans are grouped by **(service, span name)**, not span name alone. The moment a trace crosses services, a `handle` in the gateway and a `handle` in the backend are different operations, and collapsing them gives you one row with a bimodal, meaningless distribution.
+
+The trace report shows per-group count, error count, mean, stddev, min/max, p50, p95, and p99. This helps you identify which internal service or operation is the bottleneck — for example, your API endpoint may be slow because a downstream database query has a high p99.
 
 ```json
 "tempo": {
-  "tempoUrl": "http://tempo:3200",
-  "tempoServiceName": "my-service",
-  "tempoEnabled": true,
-  "tempoAuthToken": "optional-tempo-bearer-token"
+  "url": "http://tempo:3200",
+  "service_name": "my-service",
+  "enabled": true,
+  "auth_token": "optional-tempo-bearer-token"
 }
 ```
 
+Trace analysis is a **diagnostic and never fails the run**. A Tempo endpoint that is down, slow, or has not yet ingested the run's spans logs a warning and omits the section — turning a clean benchmark into a failure because a separate service was unavailable would be indefensible. A window that legitimately contains no traces still produces a report, an empty one, so "not configured" and "configured, but Tempo had nothing" stay distinguishable.
+
 ## Example Configs
+
+The `examples/` directory holds eight working configs, all of which parse and validate:
+
+| File | What it demonstrates |
+|---|---|
+| `minimal.json` | The smallest useful config: two targets, one endpoint |
+| `simple-benchmark.json` | Single target, several REST endpoints |
+| `comparison.json` | Three targets, all-pairs comparison |
+| `ab-comparison.json` | A/B with warmup, retry, and per-target health checks |
+| `api-with-auth.json` | Bearer token file plus custom per-payload headers |
+| `load-modes.json` | Step-load profile (duration-based) |
+| `log-levels.json` | Log verbosity |
+| `advanced-config.json` | Everything: lifecycle hooks, connection tuning, Tempo, constant RPM |
+
+Run one with:
+
+```bash
+gauntlet validate --config examples/advanced-config.json
+gauntlet benchmark --config examples/minimal.json
+```
 
 ### Minimal
 
-The simplest possible config — two targets, 100 requests, 10 concurrent:
-
 ```json
 {
-  "targets": {
-    "primary": "http://api.example.com",
-    "candidate": "http://api-new.example.com"
-  },
+  "targets": [
+    { "name": "primary", "url": "http://api.example.com" },
+    { "name": "candidate", "url": "http://api-new.example.com" }
+  ],
   "settings": {
     "iterations": 100,
-    "concurrency": 10,
-    "secrets": ".secrets/token.txt"
+    "concurrency": 10
   },
   "payloads": [
-    {
-      "name": "health-check",
-      "method": "GET",
-      "path": "/health"
-    }
+    { "name": "health-check", "method": "GET", "path": "/health" }
   ]
 }
 ```
 
 ### Multi-target comparison
-
-Compare three environments against each other:
 
 ```json
 {
@@ -461,11 +597,7 @@ Compare three environments against each other:
     "secrets": "secrets.txt"
   },
   "payloads": [
-    {
-      "name": "get-users",
-      "method": "GET",
-      "path": "/api/users"
-    },
+    { "name": "get-users", "method": "GET", "path": "/api/users" },
     {
       "name": "create-user",
       "method": "POST",
@@ -476,29 +608,37 @@ Compare three environments against each other:
 }
 ```
 
-### A/B comparison with warmup and retry
-
-Production-grade config with warmup and retry:
+### A/B comparison with warmup, retry, and health checks
 
 ```json
 {
-  "targets": {
-    "primary": "http://api-v1.example.com",
-    "candidate": "http://api-v2.example.com"
-  },
+  "targets": [
+    {
+      "name": "api-v1",
+      "url": "http://api-v1.example.com",
+      "lifecycle": {
+        "health_check": { "url": "http://api-v1.example.com/health", "timeout_secs": 30 }
+      }
+    },
+    {
+      "name": "api-v2",
+      "url": "http://api-v2.example.com",
+      "lifecycle": {
+        "health_check": { "url": "http://api-v2.example.com/health", "timeout_secs": 30 }
+      }
+    }
+  ],
   "settings": {
     "iterations": 5000,
     "concurrency": 50,
     "secrets": ".secrets/token.txt",
-    "requestTimeout": 60,
-    "logLevel": "info",
-    "warmup": {
-      "warmupIterations": 10
-    },
+    "request_timeout_secs": 60,
+    "log_level": "info",
+    "warmup": { "iterations": 10 },
     "retry": {
-      "retryMaxAttempts": 3,
-      "retryInitialDelayMs": 1000,
-      "retryBackoffMultiplier": 2.0
+      "max_attempts": 3,
+      "initial_delay_ms": 1000,
+      "backoff_multiplier": 2.0
     }
   },
   "payloads": [
@@ -508,11 +648,7 @@ Production-grade config with warmup and retry:
       "path": "/api/search",
       "body": {
         "query": "laptop",
-        "filters": {
-          "priceMin": 500,
-          "priceMax": 2000,
-          "category": "electronics"
-        },
+        "filters": { "priceMin": 500, "priceMax": 2000, "category": "electronics" },
         "limit": 50
       }
     },
@@ -525,41 +661,54 @@ Production-grade config with warmup and retry:
 }
 ```
 
-### Advanced config (all features)
-
-Everything enabled — high iteration count, connection pool tuning, debug logging, distributed tracing:
+### Advanced (lifecycle hooks, tracing, rate limiting)
 
 ```json
 {
-  "targets": {
-    "primary": "http://primary-service.internal:8080",
-    "candidate": "http://candidate-service.internal:8080"
-  },
+  "targets": [
+    {
+      "name": "primary",
+      "url": "http://primary-service.internal:8080",
+      "lifecycle": {
+        "setup": { "cmd": "docker-compose --profile testing up -d --build", "timeout_secs": 120 },
+        "teardown": { "cmd": "docker-compose down" },
+        "health_check": {
+          "url": "http://primary-service.internal:8080/health",
+          "timeout_secs": 60,
+          "interval_ms": 1000
+        }
+      }
+    },
+    {
+      "name": "candidate",
+      "url": "http://candidate-service.internal:8080",
+      "lifecycle": {
+        "setup": { "cmd": "docker-compose --profile testing up -d --build", "timeout_secs": 120 },
+        "teardown": { "cmd": "docker-compose down" },
+        "health_check": {
+          "url": "http://candidate-service.internal:8080/health",
+          "timeout_secs": 60,
+          "interval_ms": 1000
+        }
+      }
+    }
+  ],
   "settings": {
     "iterations": 10000,
     "concurrency": 100,
     "secrets": ".secrets/service-token.txt",
-    "maxConnections": 200,
-    "requestTimeout": 120,
-    "logLevel": "debug",
-    "warmup": {
-      "warmupIterations": 20
-    },
-    "retry": {
-      "retryMaxAttempts": 10,
-      "retryInitialDelayMs": 2000,
-      "retryBackoffMultiplier": 2.5
-    },
+    "max_connections": 200,
+    "request_timeout_secs": 120,
+    "log_level": "debug",
+    "warmup": { "iterations": 20 },
+    "retry": { "max_attempts": 10, "initial_delay_ms": 2000, "backoff_multiplier": 2.5 },
     "tempo": {
-      "tempoUrl": "http://tempo:3200",
-      "tempoServiceName": "my-service",
-      "tempoEnabled": true,
-      "tempoAuthToken": "optional-tempo-bearer-token"
+      "url": "http://tempo:3200",
+      "service_name": "my-service",
+      "enabled": true,
+      "auth_token": "optional-tempo-bearer-token"
     },
-    "loadMode": {
-      "mode": "constantRpm",
-      "targetRpm": 100
-    }
+    "load_mode": { "mode": "constant_rpm", "target_rpm": 6000 }
   },
   "payloads": [
     {
@@ -568,45 +717,18 @@ Everything enabled — high iteration count, connection pool tuning, debug loggi
       "path": "/api/v3/analytics/query",
       "headers": {
         "X-Trace-ID": "benchmark-trace",
-        "X-Priority": "high",
-        "Content-Type": "application/json",
         "Accept": "application/json"
       },
       "body": {
-        "timeRange": {
-          "start": "2026-02-01T00:00:00Z",
-          "end": "2026-02-16T23:59:59Z"
-        },
-        "aggregations": [
-          { "field": "revenue", "function": "sum" },
-          { "field": "orders", "function": "count" }
-        ],
-        "groupBy": ["region", "category"],
-        "filters": {
-          "status": "completed",
-          "paymentMethod": ["credit_card", "paypal"]
-        }
-      }
-    },
-    {
-      "name": "batch-operation",
-      "method": "PUT",
-      "path": "/api/v3/batch/update",
-      "headers": {
-        "X-Batch-Size": "1000",
-        "X-Idempotency-Key": "benchmark-batch-001"
-      },
-      "body": {
-        "operations": [
-          { "id": 1, "action": "update", "data": { "status": "processed" } },
-          { "id": 2, "action": "update", "data": { "status": "processed" } },
-          { "id": 3, "action": "delete" }
-        ]
+        "timeRange": { "start": "2026-02-01T00:00:00Z", "end": "2026-02-16T23:59:59Z" },
+        "groupBy": ["region", "category"]
       }
     }
   ]
 }
 ```
+
+The full version of this config is `examples/advanced-config.json`.
 
 ## Exit Codes
 
@@ -614,4 +736,6 @@ Everything enabled — high iteration count, connection pool tuning, debug loggi
 |---|---|
 | 0 | Success — benchmark completed, no regressions detected |
 | 1 | Regression detected (baseline comparison) |
-| 2 | Error — bad config, environment setup failure, connectivity issue, etc. |
+| 2 | Error — bad config, setup-hook failure, unreachable endpoint under `--check-endpoints`, cancelled run, etc. |
+
+With multiple targets, *any* target regressing fails the run.
