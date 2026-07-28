@@ -97,8 +97,8 @@ gauntlet-report = { path = "crates/gauntlet-report" }
 gauntlet-tracing = { path = "crates/gauntlet-tracing" }
 
 # --- M5 TUI: live terminal view ---------------------------------------------
-ratatui = "0.28"
-crossterm = "0.28"
+ratatui = "0.30"
+crossterm = "0.29"
 gauntlet-tui = { path = "crates/gauntlet-tui" }
 
 # Optimize the measurement-critical crates even in dev builds so local
