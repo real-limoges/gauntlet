@@ -1,19 +1,7 @@
 //! Chart rendering, and the reporter that writes the SVGs to a directory.
 //!
-//! This replaces the whole Python path: `scripts/plot_latency.py`, the `uv`
-//! subprocess, and the free-text `types` list in the charts config. Charts are
-//! drawn in-process with `plotters` straight from [`TargetReport::samples`] —
-//! the CSV round-trip existed only because the Python script needed a file to
-//! read. See ADR `M4-report` §7.
-//!
-//! Every kind reads [`Sample`]s rather than a bare `Vec<f64>`: throughput, error
-//! rate, and the status mix are charts *about the outcomes*, and a latency
-//! vector has already thrown those away. The kinds that only care about latency
-//! ([`TargetReport::latencies`]) simply ignore the rest of each sample.
-//!
-//! The rendering entry point is [`render`], a pure `String` producer: it hands
-//! back the SVG document rather than writing it, so the HTML reporter can embed
-//! the same bytes inline instead of linking an external asset.
+//! See the crate docs for the design of the individual kinds and for why
+//! [`render`] returns a `String` rather than writing a file.
 
 use std::cmp::Ordering;
 use std::fmt;
@@ -29,11 +17,8 @@ use crate::markdown::write_new;
 use crate::model::{BenchmarkReport, Sample, TargetReport};
 use crate::Reporter;
 
-/// The chart kinds the tool can render.
-///
-/// An enum rather than a string: an unknown chart kind is now a config error
-/// caught by [`ChartKind::from_str`], not a Python traceback at report time,
-/// after the benchmark has already been paid for.
+/// The chart kinds the tool can render. An enum, so an unknown kind is a config
+/// error at parse time rather than a failure after the run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChartKind {
     /// Frequency of latencies, binned.
@@ -172,23 +157,9 @@ const PALETTE: [RGBColor; 4] = [
 /// 4xx/5xx bars of the status chart and the error-rate line.
 const ALARM: RGBColor = RGBColor(239, 68, 68);
 
-/// Render one chart as a standalone SVG document.
-///
-/// `series` picks a colour from the palette so that, in a multi-target report,
-/// each target keeps one identity across all of its charts.
-///
-/// Returns `Ok(None)` when there is nothing to plot, and an empty pair of axes
-/// is worse than no chart at all. That covers three cases:
-///
-/// * no samples at all;
-/// * no *successful* samples, for the kinds that plot latency — an all-failed
-///   target still charts its error rate and status mix, which is the point of
-///   keeping failures in the model;
-/// * a run with no measurable duration (one sample, or every sample stamped at
-///   the same offset), for the kinds that plot against time — "requests per
-///   second" over a zero-second window is not a number.
-///
-/// Non-finite values are dropped first, so a single NaN cannot collapse an axis.
+/// Render one chart as a standalone SVG document, or `Ok(None)` when there is
+/// nothing to plot. `series` picks a palette colour, so a target keeps one
+/// identity across all of its charts. See the crate docs for the empty cases.
 pub fn render(
     kind: ChartKind,
     label: &str,
@@ -240,11 +211,9 @@ pub fn render(
     Ok(Some(svg))
 }
 
-/// Writes one `.svg` per target per chart kind into a directory.
-///
-/// Filenames are `<target-slug>-<kind>.svg`. The slug is sanitized rather than
-/// interpolated, so a target named `../../etc/passwd` cannot escape the
-/// directory it was told to write into.
+/// Writes one `.svg` per target per chart kind, named `<target-slug>-<kind>.svg`.
+/// The slug is sanitized, not interpolated — see the crate docs.
+#[derive(Debug)]
 pub struct ChartReporter {
     dir: PathBuf,
     kinds: Vec<ChartKind>,
@@ -287,10 +256,8 @@ impl Reporter for ChartReporter {
         Ok(())
     }
 
-    // `on_regression` is deliberately not implemented. A regression result is
-    // summary statistics compared against a stored baseline — it carries no
-    // sample vectors, so there is nothing to plot that the tables do not already
-    // say. The defaulted no-op is the honest answer.
+    // `on_regression` is deliberately left as the defaulted no-op; see the
+    // crate docs.
 }
 
 // --- rendering: latency ------------------------------------------------------
@@ -347,13 +314,8 @@ fn cdf(caption: &str, sorted: &[f64], colour: RGBColor) -> Result<String> {
     })
 }
 
-/// The tail of the distribution, plotted as percentile against latency.
-///
-/// The Python script drew this as a CDF filtered to the top decile, which spends
-/// the whole x-axis on the handful of slowest samples and squashes the
-/// percentile axis into a sliver at the top. Transposing it — percentile across,
-/// latency up — puts p90…p100 on an even footing, which is the comparison
-/// anyone opening a tail chart is actually making.
+/// The tail of the distribution: percentile across, latency up. See the crate
+/// docs for why it is transposed rather than a filtered CDF.
 fn tail(caption: &str, sorted: &[f64], colour: RGBColor) -> Result<String> {
     const FROM: f64 = 90.0;
     const STEPS: usize = 100;
@@ -405,11 +367,8 @@ fn timeline(caption: &str, values: &[f64], colour: RGBColor) -> Result<String> {
     })
 }
 
-/// A box plot drawn from primitives.
-///
-/// `plotters`' own `Boxplot` element sits behind the `boxplot` feature, which
-/// this crate does not enable; a box is five line segments and a rectangle, so
-/// hand-drawing it is cheaper than pulling in the feature.
+/// A box plot drawn from primitives — five line segments and a rectangle, which
+/// is cheaper than enabling `plotters`' `boxplot` feature for it.
 fn box_plot(caption: &str, sorted: &[f64], colour: RGBColor) -> Result<String> {
     let q1 = quantile(sorted, 0.25);
     let median = quantile(sorted, 0.50);
@@ -476,10 +435,8 @@ fn box_plot(caption: &str, sorted: &[f64], colour: RGBColor) -> Result<String> {
 
 // --- rendering: time series --------------------------------------------------
 
-/// Completed requests per second, binned by [`Sample::offset_s`].
-///
-/// Failures count: a target that answers fast because it is refusing everything
-/// has a throughput, and hiding it here would flatter it.
+/// Completed requests per second, binned by [`Sample::offset_s`]. Failures count
+/// — see the crate docs.
 fn throughput(
     caption: &str,
     points: &[Sample],
@@ -513,10 +470,8 @@ fn throughput(
     })
 }
 
-/// Share of requests that failed, binned by [`Sample::offset_s`].
-///
-/// The y-axis is pinned to 0–100% rather than scaled to the data: a chart whose
-/// axis silently rescales makes a 0.2% error rate look like an outage.
+/// Share of requests that failed, binned by [`Sample::offset_s`]. The y-axis is
+/// pinned to 0–100% — see the crate docs.
 fn error_rate(caption: &str, points: &[Sample], (lo, hi): (f64, f64)) -> Result<String> {
     let bins = bin_count(points.len(), 4, 60);
     let width = (hi - lo) / bins as f64;
@@ -562,11 +517,8 @@ fn error_rate(caption: &str, points: &[Sample], (lo, hi): (f64, f64)) -> Result<
     })
 }
 
-/// Trailing-window p50/p95/p99 across the run.
-///
-/// The window is a tenth of the run rather than a wall-clock constant: a 30
-/// second window is a reasonable default for a ten minute soak and swallows a
-/// twenty second smoke test whole.
+/// Trailing-window p50/p95/p99 across the run, over a window of a tenth of the
+/// run — see the crate docs.
 fn rolling_pct(
     caption: &str,
     points: &[Sample],
@@ -595,10 +547,8 @@ fn rolling_pct(
         })
         .filter(|(_, vals)| !vals.is_empty())
         .collect();
-    // A run whose only success landed before the first window closes leaves
-    // nothing to draw. That is a shape of data, not a failure, so it is the same
-    // `None` every other empty case returns rather than an error that would sink
-    // the whole report.
+    // Nothing to draw is a shape of data, not a failure: the same `None` every
+    // other empty case returns.
     if windows.is_empty() {
         return Ok(None);
     }
@@ -654,13 +604,8 @@ fn rolling_pct(
     .map(Some)
 }
 
-/// Response counts per status class.
-///
-/// Grouped by class rather than by exact code: a run that returns 200 and 204 is
-/// not telling you two different things, and one bar per distinct code turns a
-/// noisy run into an unreadable comb. Colour is semantic here — the 4xx and 5xx
-/// bars are red whichever target this is — because "which target" is already the
-/// chart's caption and "did it fail" is the question being asked.
+/// Response counts per status class, with semantic rather than per-target
+/// colour. See the crate docs.
 fn status(caption: &str, points: &[Sample]) -> Result<String> {
     const CLASSES: [&str; 7] = ["0", "1xx", "2xx", "3xx", "4xx", "5xx", "other"];
 
@@ -753,10 +698,7 @@ type Coord = plotters::coord::types::RangedCoordf64;
 type Chart<'a, 'b> = ChartContext<'b, SVGBackend<'a>, Cartesian2d<Coord, Coord>>;
 
 /// Run a drawing closure against a fresh SVG canvas and return the document.
-///
-/// The backend writes into a local `String`, so nothing touches the filesystem
-/// here — the caller decides whether the bytes become a file or an inline
-/// `<svg>` in the HTML report.
+/// Nothing touches the filesystem here; the caller decides what the bytes become.
 fn draw<F>(body: F) -> Result<String>
 where
     F: for<'a, 'b> FnOnce(&'b Canvas<'a, 'b>) -> Result<()>,
@@ -770,10 +712,8 @@ where
     Ok(buf)
 }
 
-/// The captioned, margined chart frame shared by every kind.
-///
-/// The canvas is left unfilled on purpose: a transparent background lets the
-/// embedded SVG inherit the page's light or dark surface.
+/// The captioned, margined chart frame shared by every kind. The canvas is left
+/// unfilled on purpose — see the crate docs.
 fn frame<'a, 'b>(
     root: &'b Canvas<'a, 'b>,
     caption: &str,

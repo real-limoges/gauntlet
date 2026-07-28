@@ -1,11 +1,6 @@
-//! Response-validation config and the runtime response record.
-//!
-//! `FieldAssertion` is a plain externally-tagged serde enum: unit checks
-//! serialize as bare strings (`"present"`, `"not_null"`), data checks as
-//! single-key objects (`{"eq": <value>}`). The validation *results*
-//! (`ValidationError`/`ValidationSummary`) live here as shared vocabulary (so
-//! reporters can read them without depending on the engine); the engine owns the
-//! checking *logic* that produces them.
+//! Response-validation config and the runtime response record. [`FieldAssertion`]
+//! is externally tagged: unit checks are bare strings, data checks single-key
+//! objects.
 
 use std::collections::BTreeMap;
 
@@ -67,9 +62,8 @@ pub struct Endpoint {
     pub validate: Option<ValidationSpec>,
 }
 
-/// The result of a single benchmarked HTTP request. Constructed by the engine
-/// (M3); a runtime type. A `Some(error)` marks a failed request — excluded from
-/// latency math.
+/// The result of a single benchmarked HTTP request, constructed by the engine.
+/// A `Some(error)` marks a transport failure, excluded from latency math.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TestingResponse {
     pub duration: Nanoseconds,
@@ -107,9 +101,8 @@ pub struct ValidationError {
     pub message: String,
 }
 
-/// Aggregate validation outcome for one endpoint: how many responses were
-/// checked, how many failed, and the collected errors (capped — see
-/// `MAX_VALIDATION_ERRORS`).
+/// Aggregate validation outcome for one endpoint. Errors are capped at
+/// [`MAX_VALIDATION_ERRORS`].
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ValidationSummary {
     pub total: usize,
@@ -117,6 +110,6 @@ pub struct ValidationSummary {
     pub errors: Vec<ValidationError>,
 }
 
-/// Cap on retained validation errors per endpoint, so a fully-failing run can't
-/// accumulate unbounded detail. Matches the Haskell 50-error cap.
+/// Cap on retained validation errors per endpoint, so a fully-failing run cannot
+/// accumulate unbounded detail.
 pub const MAX_VALIDATION_ERRORS: usize = 50;

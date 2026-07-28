@@ -1,11 +1,5 @@
-//! Parsed benchmark configuration.
-//!
-//! The JSON contract is snake_case and Rust-native: field names map 1:1 with no
-//! serde renaming. Invalid states are made unrepresentable at the boundary where
-//! it's cheap — `NonZeroU32` for counts/delays, an `HttpMethod` enum for methods,
-//! real defaults instead of `Option` — so `validate` (see `super::super::config`)
-//! is left to check only the cross-field and float-range rules the type system
-//! can't express. `deny_unknown_fields` rejects typos.
+//! Parsed benchmark configuration. See the crate docs for how these types split
+//! the work with `validate`.
 
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
@@ -31,9 +25,6 @@ pub struct BenchmarkConfig {
 pub struct NamedTarget {
     pub name: String,
     pub url: String,
-    /// Optional git branch to switch to before benchmarking this target.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub branch: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lifecycle: Option<LifecycleHooks>,
 }
@@ -230,9 +221,8 @@ pub struct LoadStep {
     pub duration_secs: f64,
 }
 
-/// Load control mode for pacing request dispatch. Tagged on `mode`. Positivity
-/// of the rate/duration fields is checked in `validate` (floats have no cheap
-/// nonzero type).
+/// Load control mode for pacing request dispatch, tagged on `mode`. Positivity
+/// of the float fields is checked in `validate`.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum LoadMode {

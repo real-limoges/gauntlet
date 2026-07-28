@@ -1,28 +1,7 @@
 //! Prometheus exposition rendering, and the reporter that writes or pushes it.
 //!
-//! A benchmark is a one-shot job, not a long-lived process, so there is no
-//! registry and no scrape endpoint here: we format the values we already have
-//! into exposition text and either drop it in a file (for a node exporter's
-//! textfile collector) or PUT it to a pushgateway. That is why ADR M4-report §8
-//! rejects the `prometheus` crates — they model a live process exporting its own
-//! metrics.
-//!
-//! This is also the one backend that justifies the `Reporter` trait being async:
-//! the pushgateway call is real network I/O.
-//!
-//! Two deliberate departures from the Haskell reporter:
-//!
-//! 1. **Target names move from metric names into labels.** Haskell emitted
-//!    `gauntlet_<target>_mean_ms`, which makes every target a distinct metric
-//!    family — you cannot graph or aggregate across targets, and a new target
-//!    silently creates a new name. Here it is
-//!    `gauntlet_latency_milliseconds{target="…",stat="mean"}`, which is the
-//!    shape Prometheus expects. Label values are escaped, so a target name with
-//!    a quote or a backslash cannot break the line.
-//! 2. **`# HELP` is emitted, and `# TYPE` exactly once per family.** Haskell
-//!    emitted a `# TYPE` line per *sample* — repeating it for every metric in a
-//!    group — and no `# HELP` at all. Repeated `# TYPE` lines for the same
-//!    family are a parse error in strict parsers.
+//! See the crate docs for the metric-naming, `# TYPE`, and PUT-versus-POST rules
+//! this module implements.
 
 use std::path::PathBuf;
 
@@ -91,9 +70,8 @@ pub fn benchmark_metrics(report: &BenchmarkReport) -> String {
 }
 
 /// The exposition text for a baseline regression check.
-///
-/// `gauntlet_regression_passed` is the one metric worth alerting on; the
-/// per-metric series exist so a dashboard can show *which* metric moved.
+/// `gauntlet_regression_passed` is the series to alert on; the per-metric ones
+/// show *which* metric moved.
 pub fn regression_metrics(result: &RegressionResult) -> String {
     let mut out = family(
         "gauntlet_regression_passed",
@@ -152,12 +130,8 @@ fn sample(labels: &[(&str, &str)], value: f64) -> Sample {
     }
 }
 
-/// Render one metric family: `# HELP`, one `# TYPE`, then its samples.
-///
-/// Every metric here is a gauge — these are measured values for a completed
-/// run, not monotonically increasing counters. `gauntlet_requests` is a gauge
-/// too, despite counting things, because each push replaces the previous run's
-/// value rather than adding to it.
+/// Render one metric family: `# HELP`, one `# TYPE`, then its samples. Every
+/// family is a gauge — see the crate docs.
 fn family(name: &str, help: &str, samples: Vec<Sample>) -> String {
     let mut out = format!(
         "# HELP {name} {}\n# TYPE {name} gauge\n",
@@ -243,9 +217,8 @@ struct PushTarget {
 
 impl PushTarget {
     /// `<url>/metrics/job/<job>`. The job name is sanitized rather than
-    /// percent-encoded: it becomes both a URL path segment and a Prometheus
-    /// label, and a name that survives both unchanged is the only one worth
-    /// accepting.
+    /// percent-encoded: it is both a URL path segment and a Prometheus label,
+    /// and only a name that survives both unchanged is worth accepting.
     fn endpoint(&self) -> String {
         format!(
             "{}/metrics/job/{}",
@@ -255,11 +228,9 @@ impl PushTarget {
     }
 }
 
-/// Writes exposition text to a file, pushes it to a pushgateway, or both.
-///
-/// The Haskell reporter could only push, and logged a warning on a non-2xx
-/// response — so a misconfigured gateway looked identical to a successful run.
-/// Here a failed push is an `Error::Push` that `MultiReporter` surfaces.
+/// Writes exposition text to a file, pushes it to a pushgateway, or both. A
+/// failed push is an `Error::Push`, never a swallowed warning.
+#[derive(Debug)]
 pub struct PrometheusReporter {
     path: Option<PathBuf>,
     push: Option<PushTarget>,
@@ -310,18 +281,25 @@ impl PrometheusReporter {
             }
         }
         if let Some(target) = &self.push {
-            self.push_to(target, body).await?;
+            self.push_to(target, body, fresh).await?;
         }
         Ok(())
     }
 
-    async fn push_to(&self, target: &PushTarget, body: &str) -> Result<()> {
+    /// `fresh` picks the verb: PUT to replace the grouping key, POST to add to
+    /// it. See the crate docs for why using PUT for both loses data.
+    async fn push_to(&self, target: &PushTarget, body: &str, fresh: bool) -> Result<()> {
         let endpoint = target.endpoint();
         // The client is built per push rather than held in the struct: this
         // fires once or twice per process, and building it lazily keeps the
         // reporter constructible outside a tokio runtime.
-        let response = reqwest::Client::new()
-            .put(&endpoint)
+        let client = reqwest::Client::new();
+        let request = if fresh {
+            client.put(&endpoint)
+        } else {
+            client.post(&endpoint)
+        };
+        let response = request
             .header("Content-Type", EXPOSITION_CONTENT_TYPE)
             .body(body.to_string())
             .send()

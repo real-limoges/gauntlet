@@ -1,13 +1,5 @@
-//! Request pacing for every load mode, via atomic slot reservation.
-//!
-//! One mechanism covers all modes (the Haskell `MVar`-based limiter), rather than
-//! reaching for `governor` (constant-rate only). A shared `next_slot` clock is
-//! advanced atomically per request; the caller sleeps until its claimed slot. The
-//! interval is recomputed at each claim, so time-varying modes (ramp/step) and
-//! stochastic ones (Poisson) fall out naturally.
-//!
-//! This composes with the concurrency `Semaphore` without double-counting: the
-//! limiter paces request *starts*, the semaphore caps *in-flight* requests.
+//! Request pacing for every load mode, via atomic slot reservation. See the
+//! crate docs for the mechanism and the deadline ordering it must respect.
 
 use std::time::{Duration, Instant};
 
@@ -16,11 +8,12 @@ use tokio::sync::Mutex;
 
 use gauntlet_core::{LoadMode, LoadStep};
 
-/// Minimum RPM for time-varying modes, mirroring the Haskell `max 6.0` floor.
+/// Minimum RPM for time-varying modes, so a ramp starting near zero still moves.
 const MIN_RPM: f64 = 6.0;
 
 /// Paces request dispatch for a single endpoint run. `Unthrottled` has no limiter
 /// (`new` returns `None`); all other modes reserve slots off a shared clock.
+#[derive(Debug)]
 pub struct RateLimiter {
     mode: LoadMode,
     start: Instant,
@@ -44,13 +37,34 @@ impl RateLimiter {
 
     /// Claim the next slot and sleep until it arrives.
     pub async fn wait_for_slot(&self) {
+        let target = self.claim().await;
+        Self::sleep_until(target).await;
+    }
+
+    /// As [`wait_for_slot`](Self::wait_for_slot), but abandons the slot and
+    /// returns `false` when it falls at or after `deadline`, checking *before*
+    /// sleeping. See the crate docs for why that ordering matters.
+    pub async fn wait_for_slot_before(&self, deadline: Instant) -> bool {
+        let target = self.claim().await;
+        if target >= deadline {
+            return false;
+        }
+        Self::sleep_until(target).await;
+        true
+    }
+
+    /// Reserve the next slot, returning the instant it falls at.
+    async fn claim(&self) -> Instant {
         let claimed = {
             let mut next = self.next_slot.lock().await;
             let claimed = *next;
             *next = claimed + self.interval_at(claimed);
             claimed
         };
-        let target = self.start + Duration::from_secs_f64(claimed.max(0.0));
+        self.start + Duration::from_secs_f64(claimed.max(0.0))
+    }
+
+    async fn sleep_until(target: Instant) {
         let now = Instant::now();
         if target > now {
             tokio::time::sleep(target - now).await;
@@ -85,14 +99,20 @@ impl RateLimiter {
 /// RPM of the step active at elapsed time `t`; past the last step, the last
 /// step's RPM holds.
 fn step_rpm(steps: &[LoadStep], t: f64) -> f64 {
+    step_at(steps, t).map_or(MIN_RPM, |(_, rpm)| rpm)
+}
+
+/// The step active at elapsed time `t`, as a 1-based index and its RPM. Past the
+/// last step, the last step holds. Exposed for the live view's step readout.
+pub fn step_at(steps: &[LoadStep], t: f64) -> Option<(usize, f64)> {
     let mut cum = 0.0;
-    for step in steps {
+    for (index, step) in steps.iter().enumerate() {
         cum += step.duration_secs;
         if t < cum {
-            return step.rpm;
+            return Some((index + 1, step.rpm));
         }
     }
-    steps.last().map(|s| s.rpm).unwrap_or(MIN_RPM)
+    steps.last().map(|s| (steps.len(), s.rpm))
 }
 
 #[cfg(test)]
@@ -153,6 +173,42 @@ mod tests {
     #[test]
     fn unthrottled_has_no_limiter() {
         assert!(RateLimiter::new(LoadMode::Unthrottled, Instant::now()).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_slot_past_the_deadline_is_abandoned_rather_than_slept_to() {
+        // 60 rpm → 1s spacing. Ten workers claim slots at 0s..9s up front; with a
+        // deadline 2s out, only the slots before it may be used, and the rest
+        // must return immediately instead of sleeping out the full 9 seconds.
+        //
+        // The limiter is built with an explicit `start` so the deadline is exact
+        // relative to slot 0 — anchoring it off a later `Instant::now()` would
+        // pull the 2.0s slot just inside the window.
+        let start = Instant::now();
+        let l = RateLimiter {
+            mode: LoadMode::ConstantRpm { target_rpm: 60.0 },
+            start,
+            next_slot: Mutex::new(0.0),
+        };
+        let deadline = start + Duration::from_secs(2);
+
+        let started = Instant::now();
+        let mut used = 0;
+        for _ in 0..10 {
+            if l.wait_for_slot_before(deadline).await {
+                used += 1;
+            }
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(
+            used, 2,
+            "only the slots at 0s and 1s fall before the deadline"
+        );
+        assert!(
+            elapsed < Duration::from_secs(3),
+            "abandoned slots must not be slept to; took {elapsed:?}"
+        );
     }
 
     #[tokio::test]

@@ -1,20 +1,13 @@
-//! Bearer-token resolution.
-//!
-//! `settings.secrets` points at a file holding a bearer token, read once at
-//! startup and applied to every request that does not carry its own
-//! `Authorization` header (see `client::send`). Keeping it in a file rather
-//! than the config means the token never lands in a committed JSON file.
+//! Bearer-token resolution. `settings.secrets` names a file rather than holding
+//! the token, so a credential never lands in a committed config.
 
 use std::path::Path;
 
 use crate::error::{EngineError, Result};
 
-/// Read a bearer token from `path`, trimming surrounding whitespace — token
-/// files routinely end with a trailing newline, which would otherwise be sent
-/// as part of the credential.
-///
-/// An empty or whitespace-only file yields `None` rather than an empty bearer
-/// header, matching the Haskell `addAuth` no-op on an empty token.
+/// Read a bearer token, trimming whitespace — token files routinely end with a
+/// newline that would otherwise be sent as part of the credential. A blank file
+/// yields `None`, not an empty bearer header.
 pub fn read_token(path: impl AsRef<Path>) -> Result<Option<String>> {
     let path = path.as_ref();
     let raw = std::fs::read_to_string(path).map_err(|source| EngineError::TokenRead {

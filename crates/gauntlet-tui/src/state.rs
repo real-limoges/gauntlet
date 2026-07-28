@@ -1,10 +1,5 @@
-//! The UI's state and its reducer.
-//!
-//! Pure data and a pure-ish transition function (it takes `now` rather than
-//! reading the clock), exactly as the Haskell `updateState` was. All the logic
-//! worth testing — rolling windows, counters, percentile recomputation — lives
-//! here and is tested with no terminal involved. Rendering only ever reads a
-//! `&State`.
+//! The UI's state and its reducer: pure data and a pure transition function. See
+//! the crate docs.
 
 use std::collections::VecDeque;
 use std::time::Instant;
@@ -89,10 +84,8 @@ impl Default for State {
 }
 
 impl State {
-    /// Fraction of expected requests completed, clamped to `0.0..=1.0`.
-    ///
-    /// Duration-based load modes have no meaningful total up front, so this
-    /// reports 0 rather than a ratio against a number that means nothing.
+    /// Fraction of expected requests completed, clamped to `0.0..=1.0`. Reports
+    /// 0 for duration-based modes, which have no meaningful total up front.
     pub fn progress(&self) -> f64 {
         if self.total_requests == 0 {
             0.0
@@ -119,10 +112,7 @@ impl State {
         }
     }
 
-    /// Apply one event.
-    ///
-    /// `now` is passed in rather than read here so the reducer stays
-    /// deterministic under test.
+    /// Apply one event. `now` is passed in, not read, so this stays deterministic.
     pub fn reduce(&mut self, now: Instant, event: BenchmarkEvent) {
         match event {
             BenchmarkEvent::TargetStarted {
@@ -200,10 +190,8 @@ fn push_bounded<T>(queue: &mut VecDeque<T>, item: T, capacity: usize) {
     queue.push_back(item);
 }
 
-/// Descriptive statistics over the rolling window.
-///
-/// Sorts a copy each time: the window is 100 items, so this is cheaper than
-/// maintaining an incremental structure and impossible to get subtly wrong.
+/// Descriptive statistics over the rolling window. Sorts a copy each time: at a
+/// 100-item window that beats an incremental structure on both cost and risk.
 fn rolling_stats(latencies: &VecDeque<f64>) -> RollingStats {
     if latencies.is_empty() {
         return RollingStats::default();

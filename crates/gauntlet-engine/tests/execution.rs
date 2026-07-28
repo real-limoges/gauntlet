@@ -156,7 +156,7 @@ async fn with_retry_does_not_retry_non_retryable() {
         backoff_multiplier: 2.0,
     };
     let calls = Cell::new(0);
-    let result: std::result::Result<RawResponse, TransportError> = exec::with_retry(&retry, || {
+    let result: Result<RawResponse, TransportError> = exec::with_retry(&retry, || {
         calls.set(calls.get() + 1);
         async {
             Err(TransportError {

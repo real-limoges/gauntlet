@@ -1,12 +1,5 @@
-//! The post-run terminal summary.
-//!
-//! This is the *headless* printer that runs after measurement finishes — not
-//! the live view, which is the TUI's job (M5).
-//!
-//! Rendering is a pure `String` producer with colour passed in, so the output
-//! is testable without capturing stdout and so colour can be switched off for
-//! pipes and CI. The Haskell version hard-coded ANSI escapes into every
-//! `printf`, which meant redirected output was full of escape sequences.
+//! The post-run terminal summary — the headless printer, not the live view,
+//! which is `gauntlet-tui`'s job.
 
 use std::io::{IsTerminal, Write};
 
@@ -237,11 +230,8 @@ fn histogram(bins: &[(f64, usize)]) -> String {
     out
 }
 
-/// Decimal places that keep adjacent bin labels distinct.
-///
-/// A fixed single decimal renders sub-millisecond runs as several identical
-/// rows ("0.6 ms" three times), which reads as a rendering bug. Scale the
-/// precision to the bin width instead, capped so wide-range runs stay tidy.
+/// Decimal places that keep adjacent bin labels distinct: a fixed single decimal
+/// renders a sub-millisecond run as several identical rows, which reads as a bug.
 fn label_decimals(bins: &[(f64, usize)]) -> usize {
     let width = bins
         .windows(2)
@@ -345,6 +335,7 @@ fn truncate(text: &str, width: usize) -> String {
 }
 
 /// Prints the run summary to stdout.
+#[derive(Debug)]
 pub struct TerminalReporter {
     style: Style,
 }

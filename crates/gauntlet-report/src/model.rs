@@ -1,20 +1,11 @@
-//! The data model every reporter renders.
-//!
-//! One owned struct replaces the Haskell `reportSingle`/`reportBenchmark` split:
-//! a single-target run is just a report with one target and no comparisons.
-//! Targets are held in *run* order; ranking is a presentation concern, so
-//! renderers that want it call [`BenchmarkReport::ranked`].
+//! The data model every reporter renders. A single-target run is just a report
+//! with one target and no comparisons. See the crate docs.
 
 use gauntlet_core::ValidationSummary;
 use gauntlet_stats::{BayesianComparison, BenchmarkStats};
 
-/// One measured request, as charts need to see it.
-///
-/// This is deliberately richer than a bare latency: charts of throughput, error
-/// rate, and status mix are all *time series over outcomes*, and collapsing a
-/// run to `Vec<f64>` throws away everything but the successful latencies. That
-/// loss is what forced the old pipeline to round-trip through a CSV so a Python
-/// script could read the columns back.
+/// One measured request, as charts need to see it — deliberately richer than a
+/// bare latency. See the crate docs.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Sample {
     /// Latency in milliseconds, or `None` when the request failed. Failed
@@ -31,15 +22,8 @@ pub struct Sample {
 
 impl Sample {
     /// True when the request completed without a transport error and returned a
-    /// non-error status.
-    ///
-    /// Note this is deliberately **not** the same predicate as
-    /// `latency_ms.is_some()`. A 500 is a *response*: it was served, it took a
-    /// measurable time, and that time belongs in the latency distribution. Only
-    /// transport failures — nothing came back — have no latency. So a 5xx counts
-    /// as an error here while still feeding the latency charts and statistics.
-    /// That split is intentional and matches the engine, which retries transport
-    /// failures but captures a 500 as a normal result.
+    /// non-error status. Deliberately **not** the same predicate as
+    /// `latency_ms.is_some()` — see the crate docs.
     pub fn is_success(&self) -> bool {
         self.latency_ms.is_some() && self.status < 400
     }
@@ -133,9 +117,8 @@ impl BenchmarkReport {
         self.targets.iter().find(|t| t.name == name)
     }
 
-    /// Stats for a named target, or zeroes when the name is unknown. Mirrors
-    /// the Haskell `lookupStats` fallback so a malformed pair list degrades to
-    /// an empty row rather than panicking mid-render.
+    /// Stats for a named target, or zeroes when the name is unknown, so a
+    /// malformed pair list degrades to an empty row rather than panicking.
     pub fn stats_for(&self, name: &str) -> BenchmarkStats {
         self.target(name)
             .map(|t| t.stats.clone())

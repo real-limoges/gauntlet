@@ -116,8 +116,11 @@ printed to stdout.
 |-------|------|----------|-------------|
 | `name` | string | yes | Human-readable label for this target |
 | `url` | string | yes | Base URL (payloads paths are appended) |
-| `branch` | string | no | Git branch to switch to before benchmarking |
 | `lifecycle` | object | no | Setup/teardown hooks and health check config |
+
+To benchmark two git branches against each other, give each target a `lifecycle.setup`
+that switches and rebuilds; see `advanced-config.json`. (A `branch` field used to be
+accepted here; nothing ever acted on it, and configs that still set it now fail to load.)
 
 ### Optional Settings
 
@@ -275,4 +278,5 @@ $GAUNTLET validate --config examples/advanced-config.json
 
 ## See Also
 
-- [CLAUDE.md](../CLAUDE.md) - Architecture and development guide
+- [docs/USER_GUIDE.md](../docs/USER_GUIDE.md) - The full configuration reference
+- [README.md](../README.md) - Overview and getting started

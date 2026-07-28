@@ -1,11 +1,5 @@
-//! The live event stream the TUI renders.
-//!
-//! The engine emits these as it works; nothing in the measurement path reads
-//! them back. The channel is **unbounded and every send is fire-and-forget**
-//! (ADR M5-tui §1): a bounded queue would let a slow terminal apply
-//! backpressure to the request loop and widen the very latencies being
-//! measured, and a closed receiver just means the operator quit the UI while
-//! the benchmark ran on.
+//! The live event stream the TUI renders. Nothing in the measurement path reads
+//! these back; see the crate docs for why the channel is unbounded.
 
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -44,10 +38,8 @@ pub enum BenchmarkEvent {
 /// every emit site goes through [`emit`] rather than touching a sender.
 pub type EventSink = Option<UnboundedSender<BenchmarkEvent>>;
 
-/// Send an event if anyone is listening, ignoring a closed channel.
-///
-/// Errors are deliberately dropped: a UI that has gone away must never fail a
-/// benchmark that is otherwise fine.
+/// Send an event if anyone is listening. A closed channel is ignored: a UI that
+/// went away must never fail a benchmark that is otherwise fine.
 pub fn emit(sink: &EventSink, event: BenchmarkEvent) {
     if let Some(tx) = sink {
         let _ = tx.send(event);

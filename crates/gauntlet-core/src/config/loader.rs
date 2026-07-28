@@ -1,10 +1,5 @@
-//! Config loading, validation, and endpoint expansion.
-//!
-//! Loading is `read → ${VAR} interpolate → parse`. Validation is a method on
-//! `BenchmarkConfig` that *accumulates* every problem (rather than failing on the
-//! first) and reports them together — the type system already rejects bad
-//! methods, zero counts, and zero delays at parse time, so this checks only the
-//! float-range, non-empty-collection, and non-empty-string rules left over.
+//! Config loading, validation, and endpoint expansion. See the crate docs for
+//! the load pipeline and what validation is and is not responsible for.
 
 use std::path::Path;
 
@@ -13,8 +8,8 @@ use crate::error::{ConfigErrors, Error, Result};
 use crate::types::config::{BenchmarkConfig, LoadMode, NamedTarget, PayloadSpec};
 use crate::types::response::Endpoint;
 
-/// Load a benchmark config from a JSON file: read → `${VAR}` interpolate → parse.
-/// Does not validate — call [`BenchmarkConfig::validate`] separately.
+/// Load a config from a JSON file. Does not validate — call
+/// [`BenchmarkConfig::validate`] separately.
 pub fn load_benchmark_config<P: AsRef<Path>>(path: P) -> Result<BenchmarkConfig> {
     let path = path.as_ref();
     let content = std::fs::read_to_string(path).map_err(|source| Error::ReadConfig {
@@ -27,8 +22,8 @@ pub fn load_benchmark_config<P: AsRef<Path>>(path: P) -> Result<BenchmarkConfig>
 }
 
 impl BenchmarkConfig {
-    /// Validate the config, accumulating *all* problems. The type system already
-    /// guarantees positive counts/delays and valid methods at parse time.
+    /// Validate the config, accumulating *all* problems rather than stopping at
+    /// the first.
     pub fn validate(&self) -> std::result::Result<(), ConfigErrors> {
         let mut errs = Vec::new();
 
@@ -112,9 +107,8 @@ fn validate_target_lifecycle(idx: usize, target: &NamedTarget, errs: &mut Vec<St
     }
 }
 
-/// Expand a base URL and payload specs into concrete endpoints: `url = base_url +
-/// path`, and a default `Content-Type: application/json` is prepended unless a
-/// custom Content-Type header is present.
+/// Expand a base URL and payload specs into concrete endpoints, prepending a
+/// default `Content-Type: application/json` unless the payload sets one.
 pub fn build_endpoints(base_url: &str, payloads: &[PayloadSpec]) -> Vec<Endpoint> {
     payloads
         .iter()
@@ -125,7 +119,11 @@ pub fn build_endpoints(base_url: &str, payloads: &[PayloadSpec]) -> Vec<Endpoint
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
-            let has_content_type = custom.iter().any(|(k, _)| k == "Content-Type");
+            // Case-insensitive: reqwest appends rather than replaces, so a
+            // lowercase spelling here would ship two conflicting headers.
+            let has_content_type = custom
+                .iter()
+                .any(|(k, _)| k.eq_ignore_ascii_case("content-type"));
             let mut headers = Vec::with_capacity(custom.len() + 1);
             if !has_content_type {
                 headers.push(("Content-Type".to_owned(), "application/json".to_owned()));

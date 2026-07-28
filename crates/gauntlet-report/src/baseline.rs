@@ -1,16 +1,5 @@
-//! Baseline persistence and regression detection.
-//!
-//! A baseline is a named snapshot of one target's statistics, saved to
-//! `baselines/<name>.json`. A later run compares against it metric by metric;
-//! any metric exceeding its threshold fails the run, which is what drives the
-//! exit-code contract ([`RunOutcome`]).
-//!
-//! The on-disk shape is [`StatsSnapshot`] — a deliberate mirror of
-//! `BenchmarkStats` rather than a serde derive on the stats type itself, for two
-//! reasons: `gauntlet-stats` is dependency-light by design (libm only), and the
-//! file format should be free to evolve separately from the in-memory type.
-//! Only the four compared metrics plus context are stored; the histogram is
-//! dropped, since nothing reads it back and it dominates the file size.
+//! Baseline persistence and regression detection. See the crate docs for the
+//! on-disk shape and the name-sanitization rule.
 
 use std::path::{Path, PathBuf};
 
@@ -70,11 +59,8 @@ pub struct Baseline {
 }
 
 impl Baseline {
-    /// Capture `stats` as a baseline named `name`, stamped `created_at`.
-    ///
-    /// The timestamp is passed in rather than read from the clock so the
-    /// function stays pure and testable; the CLI supplies the run's timestamp,
-    /// which also keeps a baseline's stamp consistent with its run's artifacts.
+    /// Capture `stats` as a baseline named `name`. The timestamp is passed in,
+    /// not read from the clock, so this stays pure and matches the run's stamp.
     pub fn capture(
         name: impl Into<String>,
         created_at: impl Into<String>,
@@ -191,10 +177,8 @@ pub fn compare_to_baseline(
     }
 }
 
-/// Relative change for one metric, and whether it exceeds the threshold.
-///
-/// A zero baseline can't produce a ratio: zero-to-zero is no change, and
-/// zero-to-anything is treated as a 100% regression rather than infinity.
+/// Relative change for one metric, and whether it exceeds the threshold. See the
+/// crate docs for the zero-baseline case.
 fn check_metric(name: &str, threshold: f64, baseline: f64, current: f64) -> MetricRegression {
     let change = if baseline == 0.0 {
         if current == 0.0 {
@@ -213,6 +197,29 @@ fn check_metric(name: &str, threshold: f64, baseline: f64, current: f64) -> Metr
         change,
         threshold,
         regressed: change > threshold,
+    }
+}
+
+/// Reduce a CLI-supplied baseline name to one safe filename component: anything
+/// outside `[A-Za-z0-9._-]` becomes `_`, and a run of dots is broken up so `..`
+/// cannot survive. See the crate docs for why this is not optional.
+fn sanitize_name(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut prev_dot = false;
+    for ch in name.chars() {
+        let safe = match ch {
+            '.' if prev_dot => '_',
+            '.' => '.',
+            c if c.is_ascii_alphanumeric() || c == '-' || c == '_' => c,
+            _ => '_',
+        };
+        prev_dot = safe == '.';
+        out.push(safe);
+    }
+    if out.is_empty() {
+        "baseline".to_string()
+    } else {
+        out
     }
 }
 
@@ -238,7 +245,7 @@ impl BaselineStore {
     }
 
     fn path_for(&self, name: &str) -> PathBuf {
-        self.dir.join(format!("{name}.json"))
+        self.dir.join(format!("{}.json", sanitize_name(name)))
     }
 
     /// Write a baseline, creating the directory if needed. Returns its path.
@@ -250,11 +257,8 @@ impl BaselineStore {
         Ok(path)
     }
 
-    /// Read a named baseline.
-    ///
-    /// A file written by the Haskell implementation is detected and reported as
-    /// an unsupported format, so the operator sees an actionable message rather
-    /// than a field-level deserialization error.
+    /// Read a named baseline. A file in the older, unsupported format is
+    /// detected and named as such, rather than failing field by field.
     pub fn load(&self, name: &str) -> Result<Baseline> {
         let path = self.path_for(name);
         if !path.exists() {
@@ -323,6 +327,47 @@ mod tests {
 
     fn baseline_of(stats: &BenchmarkStats) -> Baseline {
         Baseline::capture("main", "2026-07-21T12:00:00Z", stats)
+    }
+
+    #[test]
+    fn ordinary_baseline_names_are_left_alone() {
+        for name in ["main", "v1.2.3", "release-2026", "main--staging", "a_b"] {
+            assert_eq!(sanitize_name(name), name);
+        }
+    }
+
+    #[test]
+    fn a_name_cannot_escape_the_baseline_directory() {
+        let store = BaselineStore::new("baselines");
+
+        for hostile in [
+            "../../../etc/cron.d/x",
+            "..",
+            "../secrets",
+            "/etc/passwd",
+            "a/../../b",
+        ] {
+            let path = store.path_for(hostile);
+            let components: Vec<_> = path.components().collect();
+
+            assert!(
+                !components
+                    .iter()
+                    .any(|c| matches!(c, std::path::Component::ParentDir)),
+                "{hostile} produced a traversing path: {}",
+                path.display()
+            );
+            assert_eq!(
+                path.parent(),
+                Some(store.dir()),
+                "{hostile} escaped the store directory"
+            );
+        }
+    }
+
+    #[test]
+    fn a_name_that_sanitizes_away_entirely_still_names_a_file() {
+        assert_eq!(sanitize_name(""), "baseline");
     }
 
     #[test]

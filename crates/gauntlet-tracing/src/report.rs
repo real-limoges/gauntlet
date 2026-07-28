@@ -1,21 +1,12 @@
-//! Rendering the trace analysis, and dumping the raw traces.
-//!
-//! Both renderers are pure `String` producers, following the house style in
-//! `gauntlet-report`: the caller decides where the text goes, which is what
-//! makes them golden-testable and lets the markdown section be embedded in the
-//! markdown report, the HTML report, and a CI step summary without three
-//! copies of the layout.
-//!
-//! The tables are capped. A busy service produces hundreds of distinct span
-//! names, and a report nobody scrolls to the bottom of is a report nobody
-//! reads — the interesting rows are the slow ones, which sort to the top.
+//! Rendering the trace analysis, and dumping the raw traces. The tables are
+//! capped; the interesting rows are the slow ones, which sort to the top.
 
 use std::path::{Path, PathBuf};
 
 use crate::analysis::{SpanAggregation, TraceAnalysis};
 use crate::error::{Error, Result};
 
-/// Rows shown in either rendering. Matches the Haskell `take 20`.
+/// Rows shown in either rendering, slowest first.
 const MAX_ROWS: usize = 20;
 
 /// Column width for the service name in the fixed-width terminal table.
@@ -125,9 +116,7 @@ pub fn render_markdown(analysis: &TraceAnalysis) -> String {
     out
 }
 
-/// Write the fetched traces to a JSON file for later inspection — the Rust
-/// equivalent of the Haskell `writeRawTraces`, which the runner pointed at
-/// `results/traces-<timestamp>.json`.
+/// Write the fetched traces to a JSON file for later inspection.
 pub fn write_raw_traces(path: impl AsRef<Path>, analysis: &TraceAnalysis) -> Result<()> {
     let path = path.as_ref();
     let json = serde_json::to_vec_pretty(&analysis.traces).map_err(|source| Error::Decode {

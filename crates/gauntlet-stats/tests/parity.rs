@@ -5,9 +5,9 @@
 //! exact hand-computable arithmetic (Cohen's d, credible intervals) — plus
 //! structural properties (antisymmetry, unit-interval bounds, edge guards).
 //!
-//! The full *binary-to-binary* golden-vector harness (run identical inputs
-//! through the Haskell binary, diff to 1e-9) is milestone **M1**'s parity gate;
-//! see `docs/RUST_PORT.md`. These anchors are what we lock in first.
+//! A binary-to-binary golden-vector harness against the Haskell was considered
+//! and deliberately not built: the port was a clean break, so there is no
+//! oracle. These closed-form anchors are what correctness rests on instead.
 
 use gauntlet_stats::{
     compare_bayesian, earth_movers_distance, standard_normal_cdf, BenchmarkStats,

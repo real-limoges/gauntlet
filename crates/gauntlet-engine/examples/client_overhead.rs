@@ -1,4 +1,5 @@
-//! M3-A spike: reqwest vs hyper client-side overhead.
+//! reqwest vs hyper client-side overhead — the measurement behind the engine's
+//! choice of client, kept so it can be rechecked rather than taken on faith.
 //!
 //! For a *measurement* tool, client-side overhead and (worse) its jitter are
 //! measurement error. This harness isolates client overhead by firing many
@@ -7,7 +8,8 @@
 //! both sequential and at a fixed concurrency.
 //!
 //! Run: `cargo run -p gauntlet-engine --example client_overhead`
-//! The numbers + verdict are recorded in `docs/adr/M3-A-client.md`.
+//! Verdict when this last decided anything: reqwest, on ergonomics, its
+//! overhead being both small and stable relative to the latencies measured.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -41,7 +43,7 @@ async fn main() {
     let rq = reqwest::Client::builder().build().unwrap();
     let hy: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
 
-    println!("M3-A client-overhead spike");
+    println!("client-overhead comparison");
     println!("  target   : {url}");
     println!("  warmup   : {WARMUP}");
     println!("  requests : {N}  (sequential and at concurrency {CONCURRENCY})\n");

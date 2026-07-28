@@ -24,8 +24,13 @@ async fn run_produces_consumable_stats_and_csv() {
     let run = run_benchmark(&cfg, Some(&csv_path)).await.unwrap();
 
     // --- stats are finite, ordered, and reflect the sample ------------------
+    // Computed here from the raw outcomes, the way the CLI's adapter does it:
+    // the engine deliberately does not carry per-endpoint stats, since nothing
+    // downstream consumed them.
     let ep = &run.targets[0].endpoints[0];
-    let s = &ep.stats;
+    let responses: Vec<_> = ep.outcomes.iter().map(|o| o.response.clone()).collect();
+    let durations = gauntlet_core::extract_durations(&responses);
+    let s = gauntlet_stats::calculate_stats(ep.outcomes.len(), &durations);
     assert_eq!(s.total_requests, 20);
     assert_eq!(s.count_success, 20);
     assert_eq!(s.count_failure, 0);

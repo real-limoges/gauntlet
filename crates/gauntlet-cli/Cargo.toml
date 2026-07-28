@@ -6,8 +6,6 @@ license.workspace = true
 authors.workspace = true
 description = "The gauntlet binary: CLI parsing and command dispatch (M6)."
 
-# Claim the eventual `gauntlet` binary name now. The Haskell build still emits
-# `gauntlet-exe`, so the two coexist without clobbering during the migration.
 [[bin]]
 name = "gauntlet"
 path = "src/main.rs"
@@ -28,3 +26,9 @@ serde_json.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+# Implementing `Reporter` in tests needs the same attribute the trait is
+# declared with; the binary itself only ever calls reporters.
+async-trait.workspace = true
+
+[lints]
+workspace = true

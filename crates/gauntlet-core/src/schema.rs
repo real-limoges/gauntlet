@@ -1,8 +1,5 @@
-//! The config JSON schema, derived from the types via `schemars`.
-//!
-//! Deriving means the schema can never drift from the structs it describes. The
-//! `schema` subcommand (M6) prints [`config_schema_string`]; the committed
-//! `schema/config-schema.json` is regenerated from this same source.
+//! The config JSON schema, derived from the types via `schemars` so it cannot
+//! drift. See the crate docs.
 
 use schemars::schema::RootSchema;
 use schemars::schema_for;

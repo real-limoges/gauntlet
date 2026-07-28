@@ -1,24 +1,5 @@
-//! JUnit XML rendering, and the reporter that writes it to a file.
-//!
-//! CI systems display JUnit XML natively, so this is how a run shows up in a
-//! pipeline's test tab. Latency numbers have no natural home in the schema —
-//! there is no "metric" element — so they ride along as `<property>` entries on
-//! one synthetic `<testcase>` per target (ADR M4-report §8). Only things that
-//! can genuinely pass or fail (validation, regression) emit `<failure>`.
-//!
-//! Three things the Haskell version got wrong are fixed here:
-//!
-//! 1. **No escaping.** Attribute values were concatenated raw, so a target named
-//!    `a&b` produced a document no parser would accept. Everything interpolated
-//!    now goes through [`xml_escape`].
-//! 2. **Values were dropped.** `statsTestCases` bound the metric value to `_val`
-//!    and never used it, so the XML contained test-case names and no numbers at
-//!    all. The report was decorative.
-//! 3. **Regression appended a second document.** `reportRegression` appended a
-//!    fresh `<?xml …?>` prolog and a second `<testsuites>` root to the same
-//!    file, which is not well-formed XML. The reporter here accumulates suites
-//!    and rewrites one document, so a run that also checks a baseline still
-//!    yields a single parseable file.
+//! JUnit XML rendering, and the reporter that writes it to a file. See the crate
+//! docs for how statistics map onto the schema.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -111,8 +92,8 @@ fn stats_case(name: &str, s: &BenchmarkStats) -> TestCase {
     }
 }
 
-/// One pairwise comparison. The Haskell suite name read `A vs B` while every
-/// other renderer (and the comparison itself) reads "B versus A"; corrected.
+/// One pairwise comparison. The suite is named "B versus A", matching the
+/// direction the comparison itself reads in and every other renderer.
 fn comparison_case(a: &str, b: &str, c: &BayesianComparison) -> TestCase {
     let mut properties = vec![
         (
@@ -256,11 +237,9 @@ fn render_case(case: &TestCase) -> String {
     out
 }
 
-/// Writes a single JUnit XML document describing the whole run.
-///
-/// Suites accumulate across events and the file is rewritten each time, because
-/// XML has exactly one root: appending a regression document to a benchmark
-/// document (what the Haskell reporter did) yields a file no parser accepts.
+/// Writes a single JUnit XML document describing the whole run. Suites
+/// accumulate and the file is rewritten each time, because XML has one root.
+#[derive(Debug)]
 pub struct JUnitReporter {
     path: PathBuf,
     suites: Mutex<Vec<String>>,

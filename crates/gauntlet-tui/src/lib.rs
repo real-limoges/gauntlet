@@ -1,11 +1,55 @@
 //! `gauntlet-tui` — the live terminal view over the engine's event stream.
 //!
 //! The benchmark runs as a task and streams [`BenchmarkEvent`]s; this crate
-//! renders whatever arrives. The measurement never waits on the UI (ADR M5-tui
-//! §1), and the UI going away never disturbs the measurement.
+//! renders whatever arrives. The measurement never waits on the UI, and the UI
+//! going away never disturbs the measurement.
 //!
-//! [`run`] owns the terminal: raw mode, alternate screen, and — importantly —
-//! restoring both even if a render panics (§3).
+//! # The split
+//!
+//! [`state::State`] is pure data with a pure reducer — it takes `now` rather than
+//! reading the clock, so it is deterministic under test. Everything worth testing
+//! (rolling windows, counters, percentile recomputation) lives there and is
+//! tested with no terminal involved. [`ui`] only ever reads a `&State`.
+//!
+//! The layout is a stack of horizontal bands assembled at draw time, because two
+//! of them — load control and recent errors — only exist for some runs. A band
+//! with nothing to say is omitted rather than drawn empty, so a short terminal
+//! spends its rows on sections that carry information. The bands are modelled as
+//! data so the conditional ones can be filtered out *before* the layout is
+//! solved; nested layouts with zero-height placeholders still consume rows on a
+//! 10-row terminal.
+//!
+//! # Nothing in the render path may panic
+//!
+//! [`run`] owns the terminal — raw mode and the alternate screen — and installs a
+//! panic hook that gives it back, because a panic while in raw mode otherwise
+//! leaves the operator with no echo and no prompt. That hook is a safety net, not
+//! a licence. So in `ui`: no indexing, no unchecked slicing, no `Gauge::ratio`
+//! with a value that has not been forced into `0.0..=1.0` (it asserts), and no
+//! assumption that a band received the height it asked for.
+//!
+//! # Rendering choices
+//!
+//! Timeline glyphs are distinct *shapes*, not just distinct colours, so the strip
+//! stays readable piped, screenshotted in monochrome, or read by someone who
+//! cannot separate red from green. Widgets that show a window of samples keep the
+//! **tail** rather than the head: what just happened is what the operator is
+//! watching for.
+
+// Production code must not panic: an unwrap that fires mid-run destroys the
+// whole measurement, and a benchmark that dies is worse than one reporting a
+// clean error. `cfg(not(test))` scopes this to real code; inside `#[cfg(test)]`
+// modules, panicking assertions and exact float comparisons are the point.
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::panic_in_result_fn,
+        clippy::float_cmp
+    )
+)]
 
 pub mod state;
 pub mod ui;
@@ -39,9 +83,8 @@ pub enum Exit {
 const FRAME: Duration = Duration::from_millis(50);
 
 /// Drive the live view until the benchmark finishes or the operator quits.
-///
-/// Returns [`Exit::Cancelled`] if the operator interrupted, which the caller
-/// must treat as a failed run — interrupted measurements are not results.
+/// [`Exit::Cancelled`] must be treated as a failed run by the caller: an
+/// interrupted measurement is not a result.
 pub async fn run(mut events: UnboundedReceiver<BenchmarkEvent>) -> io::Result<Exit> {
     let mut terminal = enter()?;
     let outcome = event_loop(&mut terminal, &mut events).await;
@@ -54,7 +97,10 @@ async fn event_loop(
     events: &mut UnboundedReceiver<BenchmarkEvent>,
 ) -> io::Result<Exit> {
     let mut state = State::default();
-    let mut last_draw = Instant::now() - FRAME;
+    // `None` until the first frame lands, forcing an immediate first draw. The
+    // obvious `Instant::now() - FRAME` panics where the monotonic clock's origin
+    // is less than one frame in the past.
+    let mut last_draw: Option<Instant> = None;
 
     loop {
         // Drain everything queued before drawing: at high request rates many
@@ -76,9 +122,9 @@ async fn event_loop(
             return Ok(Exit::Cancelled);
         }
 
-        if last_draw.elapsed() >= FRAME {
+        if last_draw.is_none_or(|t| t.elapsed() >= FRAME) {
             terminal.draw(|f| ui::draw(f, &state))?;
-            last_draw = Instant::now();
+            last_draw = Some(Instant::now());
         }
 
         // Yield to the runtime so the benchmark tasks make progress; this loop
@@ -112,10 +158,8 @@ fn quit_requested() -> io::Result<bool> {
     })
 }
 
-/// Take over the terminal, installing a panic hook that gives it back.
-///
-/// Without the hook, a panic while in raw mode on the alternate screen leaves
-/// the operator with a terminal that has no echo and no prompt.
+/// Take over the terminal, installing a panic hook that gives it back. See the
+/// crate docs.
 fn enter() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();

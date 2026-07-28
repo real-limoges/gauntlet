@@ -1,12 +1,5 @@
-//! Shared rendering helpers: number formatting and the escaping functions every
-//! markup backend is required to route untrusted strings through.
-//!
-//! Target names, URLs, and validation messages come from config and from server
-//! responses — none of it is trusted to be markup-safe. The Haskell JUnit
-//! reporter concatenated these straight into XML, so a target named `a&b`
-//! produced a document no parser would accept. Backends here must use
-//! [`xml_escape`] / [`html_escape`] / [`prom_label_escape`] instead of
-//! interpolating directly.
+//! Number formatting, and the escaping functions every markup backend is
+//! required to route untrusted strings through. See the crate docs.
 
 /// Latency in milliseconds, two decimals: `12.34`.
 pub fn ms(value: f64) -> String {

@@ -1,7 +1,5 @@
-//! Builds the active reporter set from CLI flags.
-//!
-//! This is the whole "add an output format" seam: implement `Reporter`, add a
-//! flag, push it here. Nothing else in the pipeline changes.
+//! Builds the active reporter set from CLI flags — the "add an output format"
+//! seam. See the crate root.
 
 use gauntlet_report::{
     ChartReporter, CiReporter, HtmlReporter, JUnitReporter, MarkdownReporter, MultiReporter,
@@ -11,10 +9,6 @@ use gauntlet_report::{
 use crate::cli::BenchmarkArgs;
 
 /// Assemble the reporters a benchmark run should fan out to.
-///
-/// The terminal reporter is unconditional — a run that printed nothing would
-/// look like a run that did nothing. Everything else is opt-in, except the CI
-/// reporter, which activates on its own when it detects a CI environment.
 pub fn for_benchmark(args: &BenchmarkArgs) -> MultiReporter {
     let mut reporters: Vec<Box<dyn Reporter>> = vec![Box::new(TerminalReporter::auto())];
 
@@ -25,7 +19,13 @@ pub fn for_benchmark(args: &BenchmarkArgs) -> MultiReporter {
         reporters.push(Box::new(JUnitReporter::new(path)));
     }
     if let Some(path) = &args.html_report {
-        reporters.push(Box::new(HtmlReporter::new(path)));
+        // `--charts` selects kinds for every renderer that draws, not just the
+        // standalone files. Unset, the HTML keeps its histogram + CDF default.
+        reporters.push(Box::new(if args.charts.is_empty() {
+            HtmlReporter::new(path)
+        } else {
+            HtmlReporter::with_charts(path, args.charts.clone())
+        }));
     }
     if let Some(prometheus) = prometheus_reporter(args) {
         reporters.push(Box::new(prometheus));

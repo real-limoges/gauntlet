@@ -1,17 +1,6 @@
 //! Aggregation: turning a pile of spans into the numbers a report shows.
-//!
-//! The Haskell version grouped spans by name alone. That is wrong the moment a
-//! trace crosses services — `handle` in the gateway and `handle` in the backend
-//! collapsed into one row with a bimodal, meaningless distribution. Here the
-//! grouping key is **(service, span name)**, which is the granularity anyone
-//! reading the table is actually reasoning about.
-//!
-//! [`analyze`] is the whole subsystem's entry point. Its contract is narrow on
-//! purpose (ADR M6-A §7): `Ok(None)` means *tracing is switched off*, and
-//! nothing else does. A window that legitimately contains no traces still
-//! returns an analysis — an empty one — so the caller can distinguish "not
-//! configured" from "configured, but Tempo had nothing", which are very
-//! different things to be told at 2am.
+//! [`analyze`] is the subsystem's entry point; see the crate docs for its
+//! contract and the grouping key.
 
 use std::collections::BTreeMap;
 
@@ -52,8 +41,8 @@ pub struct TraceAnalysis {
     /// Per-(service, span) statistics, sorted by P95 descending — the slowest
     /// thing is what the reader came for, so it goes first.
     pub spans: Vec<SpanAggregation>,
-    /// The traces as fetched, retained so the caller can dump them alongside
-    /// the run's other artifacts (`traces-<timestamp>.json` in the Haskell tree).
+    /// The traces as fetched, retained so the caller can dump them alongside the
+    /// run's other artifacts.
     pub traces: Vec<Trace>,
 }
 
@@ -65,20 +54,14 @@ impl TraceAnalysis {
     }
 }
 
-/// Whether the `tempo` section switches trace analysis on.
-///
-/// `enabled` is `Option<bool>` and documented as defaulting to **true**: a
-/// config author who bothered to write a `tempo` block wants tracing, and
-/// should not have to also write `"enabled": true`.
+/// Whether the `tempo` section switches trace analysis on. Absent means **on**:
+/// someone who wrote a `tempo` block wants tracing.
 pub fn is_enabled(settings: &TempoSettings) -> bool {
     settings.enabled.unwrap_or(true)
 }
 
-/// Fetch and analyze traces for the run's window.
-///
-/// Returns `Ok(None)` when tracing is disabled in settings. Errors are the
-/// caller's to *log*, never to fail on: trace analysis is a diagnostic, and a
-/// Tempo outage must not turn a clean benchmark into a failed run.
+/// Fetch and analyze traces for the run's window. `Ok(None)` means tracing is
+/// disabled; errors are the caller's to log, never to fail on.
 pub async fn analyze(
     settings: &TempoSettings,
     window: TraceWindow,
@@ -115,10 +98,8 @@ pub fn build_analysis(
     }
 }
 
-/// Group spans by (service, name) and compute each group's duration statistics.
-///
-/// The result is sorted by P95 descending, with the group key as a tiebreaker
-/// so equal-latency rows do not reshuffle between runs.
+/// Group spans by (service, name) and compute each group's duration statistics,
+/// sorted by P95 descending.
 pub fn aggregate_spans(spans: &[&Span]) -> Vec<SpanAggregation> {
     let mut groups: BTreeMap<(&str, &str), Vec<&Span>> = BTreeMap::new();
     for span in spans {

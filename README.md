@@ -85,7 +85,7 @@ Full reference in the [User Guide](docs/USER_GUIDE.md). Key fields:
 
 | Field | Description |
 |-------|-------------|
-| `targets` | Array of `{name, url, branch?, lifecycle?}`. `branch` parses but is currently inert — use `lifecycle.setup` to switch branches |
+| `targets` | Array of `{name, url, lifecycle?}`. To benchmark across git branches, put the `git switch` in `lifecycle.setup` |
 | `settings.iterations` | Requests per endpoint |
 | `settings.concurrency` | Concurrent in-flight request limit |
 | `settings.secrets` | Path to a file holding a bearer token |
@@ -171,13 +171,21 @@ Requires a stable Rust toolchain. The repo is a Cargo workspace of seven crates:
 The graph is acyclic — `core` at the root, `stats`/`engine`/`report`/`tracing` above it, `cli` (plus `tui`) on top — so editing a TUI widget does not recompile the numerics.
 
 ```bash
-cargo build --release
-cargo test
-cargo clippy --all-targets
-cargo fmt
+make build      # cargo build --release
+make test       # cargo test --workspace --all-features --locked
+make check      # format-check + clippy + doc + test; exactly what CI runs
+make format     # cargo fmt --all; run before committing
+make schema     # regenerate schema/config-schema.json from the config types
 ```
 
-Architecture details and per-milestone decisions in [CLAUDE.md](CLAUDE.md), [docs/RUST_PORT.md](docs/RUST_PORT.md), and the ADRs under [docs/adr/](docs/adr/).
+Lint policy lives in the `[workspace.lints]` table in the root `Cargo.toml`, with
+the reasoning for each choice next to it. Warnings are errors: `unsafe` is
+forbidden workspace-wide, and production code (everything outside `#[cfg(test)]`)
+additionally denies `unwrap`, `panic!`, `unreachable!`, and exact float
+comparison, because a benchmark that panics mid-run loses the measurement it was
+paid to take.
+
+The full configuration reference is in the [User Guide](docs/USER_GUIDE.md).
 
 ## License
 

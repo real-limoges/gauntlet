@@ -3,10 +3,9 @@
     {
       "name": "primary",
       "url": "http://primary-service.internal:8080",
-      "branch": "main",
       "lifecycle": {
         "setup": {
-          "cmd": "docker-compose --profile testing up -d --build",
+          "cmd": "git switch main && docker-compose --profile testing up -d --build",
           "timeout_secs": 120
         },
         "teardown": {
@@ -22,10 +21,9 @@
     {
       "name": "candidate",
       "url": "http://candidate-service.internal:8080",
-      "branch": "feat/candidate",
       "lifecycle": {
         "setup": {
-          "cmd": "docker-compose --profile testing up -d --build",
+          "cmd": "git switch feat/candidate && docker-compose --profile testing up -d --build",
           "timeout_secs": 120
         },
         "teardown": {

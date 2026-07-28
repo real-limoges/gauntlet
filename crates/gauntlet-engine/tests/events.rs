@@ -86,8 +86,8 @@ async fn an_unreachable_target_emits_transport_failures() {
 /// which made its elapsed time ~0 and its throughput nonsense.
 #[tokio::test]
 async fn events_arrive_while_the_run_is_still_going() {
-    // 8 requests, one at a time, 60ms each: the run takes ~half a second, so an
-    // event that arrives promptly is unambiguously mid-run.
+    // 8 requests, one at a time, 60ms each: long enough that the run is still
+    // going when the first completion lands.
     let mock = support::start(200, serde_json::json!({"ok": true}), 60).await;
     let cfg = support::parse_config(&format!(
         r#"{{
@@ -99,27 +99,34 @@ async fn events_arrive_while_the_run_is_still_going() {
     ));
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-    let started = std::time::Instant::now();
-    let run = tokio::spawn(async move { run_benchmark_with_events(&cfg, None, Some(tx)).await });
+    let mut run =
+        tokio::spawn(async move { run_benchmark_with_events(&cfg, None, Some(tx)).await });
 
-    // Wait for the first *request* event, ignoring the lifecycle ones.
-    let mut first_request_at = None;
-    while let Some(event) = rx.recv().await {
-        if matches!(event, BenchmarkEvent::RequestCompleted { .. }) {
-            first_request_at = Some(started.elapsed());
-            break;
+    // Raced against the run itself rather than compared to a fraction of the
+    // elapsed time. The wall-clock form ("first event before the halfway mark")
+    // was flaky: the first request also pays connection setup, which on a short
+    // run is a large enough share of the total to push it past halfway with no
+    // batching bug present at all.
+    let arrived_mid_run = loop {
+        tokio::select! {
+            biased;
+            event = rx.recv() => match event {
+                Some(BenchmarkEvent::RequestCompleted { .. }) => break true,
+                // Lifecycle and status events say nothing about batching.
+                Some(_) => continue,
+                None => break false,
+            },
+            finished = &mut run => {
+                finished.expect("task joins").expect("benchmark runs");
+                break false;
+            }
         }
-    }
-
-    let first = first_request_at.expect("a request event arrived");
-    let total = {
-        run.await.expect("task joins").expect("benchmark runs");
-        started.elapsed()
     };
 
     assert!(
-        first < total / 2,
-        "first event at {first:?} should land well before the run ended at {total:?}"
+        arrived_mid_run,
+        "a request event must reach the UI while the benchmark is still running, \
+         not as a batch once it has finished"
     );
 }
 

@@ -1,9 +1,5 @@
-//! HTTP request execution — the single point that touches the network client.
-//!
-//! Per ADR `M3-A-client`, the client is `reqwest` (rustls). This module is the
-//! only place that knows that: it builds the pooled client and issues one request,
-//! returning either a [`RawResponse`] (any HTTP status — 4xx/5xx are *responses*,
-//! not failures) or a [`TransportError`] classified for retry.
+//! The single point that touches the network client: it builds the pooled client
+//! and issues one request. See the crate docs for which client and why.
 
 use bytes::Bytes;
 use std::time::Duration;
@@ -20,8 +16,8 @@ pub struct RawResponse {
     pub body: Bytes,
 }
 
-/// A transport-level failure (no HTTP response). `retryable` mirrors the Haskell
-/// policy: connection refusals and timeouts are retried; everything else is not.
+/// A transport-level failure — no HTTP response at all. Only connection refusals
+/// and timeouts are `retryable`.
 #[derive(Clone, Debug)]
 pub struct TransportError {
     pub message: String,

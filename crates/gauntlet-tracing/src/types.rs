@@ -1,14 +1,6 @@
 //! The domain model: what a trace, a span, and a query window are once the
-//! Tempo/OTLP wire format has been decoded.
-//!
-//! These types are deliberately *not* the wire types. Tempo's JSON is OTLP
-//! shaped — nested `batches → scopeSpans → spans`, timestamps as decimal
-//! strings because they exceed JSON's safe integer range, attributes as
-//! `{key, value: {stringValue: ...}}` triples. Decoding that shape lives in
-//! [`crate::client`]; everything downstream works with the flat, already-typed
-//! [`Span`] below. The Haskell port made the same split (`Tracing.Types` vs the
-//! ad-hoc parsers in `Tracing.Client`), only there the domain type carried
-//! `FromJSON` instances it never actually used.
+//! Tempo/OTLP wire format has been decoded. Deliberately *not* the wire types —
+//! see the crate docs.
 
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -65,8 +57,8 @@ pub struct TraceQuery {
     pub limit: u32,
 }
 
-/// Tempo's `limit` for a benchmark-window search. Matches the Haskell client;
-/// large enough that a normal run is never truncated.
+/// Tempo's `limit` for a benchmark-window search — large enough that a normal
+/// run is never truncated.
 pub const DEFAULT_SEARCH_LIMIT: u32 = 10_000;
 
 impl TraceQuery {
@@ -82,10 +74,8 @@ impl TraceQuery {
         }
     }
 
-    /// Render the TraceQL selector, e.g. `{resource.service.name="api" && name="GET /x"}`.
-    ///
-    /// Values are quoted and backslash/quote escaped — a service name is config
-    /// text, and an unescaped quote would silently change the query's meaning
+    /// Render the TraceQL selector, e.g. `{resource.service.name="api"}`. Values
+    /// are escaped: an unescaped quote would change the query's meaning silently
     /// rather than fail.
     pub fn to_traceql(&self) -> String {
         let mut conditions = vec![format!(

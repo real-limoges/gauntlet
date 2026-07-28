@@ -1,13 +1,5 @@
-//! Adapts the engine's measurements into the report model.
-//!
-//! This glue lives in the binary on purpose (ADR M4-report §3): it lets
-//! `gauntlet-report` stay free of an engine dependency, so a change to the
-//! measurement loop does not recompile every renderer.
-//!
-//! Two things happen here that the engine and the stats crate cannot each do
-//! alone: a target's endpoints are flattened into one latency population, and
-//! Earth Mover's Distance is attached to every pairwise comparison — EMD needs
-//! the raw duration vectors, which `compare_bayesian` never sees.
+//! Adapts the engine's measurements into the report model. See the crate root
+//! for why this glue lives in the binary.
 
 use std::time::SystemTime;
 
@@ -131,7 +123,6 @@ mod tests {
             name: name.into(),
             url: format!("https://example.test/{name}"),
             method: HttpMethod::Get,
-            stats: Default::default(),
             validation: ValidationSummary::default(),
             outcomes,
         }

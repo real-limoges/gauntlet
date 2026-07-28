@@ -1,8 +1,5 @@
-//! Type-safe time-unit newtypes, ported from `Benchmark.Types.Units`.
-//!
-//! `Nanoseconds` wraps the raw clock delta; `Milliseconds` is what the stats
-//! core consumes. Both are serde-transparent so they (de)serialize as bare
-//! numbers, matching the Haskell `deriving newtype (FromJSON, ToJSON)`.
+//! Time-unit newtypes. `Nanoseconds` wraps the raw clock delta, `Milliseconds`
+//! is what the stats core consumes; both serialize as bare numbers.
 
 use serde::{Deserialize, Serialize};
 
@@ -16,10 +13,7 @@ pub struct Nanoseconds(pub u64);
 #[serde(transparent)]
 pub struct Milliseconds(pub f64);
 
-/// Convert nanoseconds to milliseconds.
-///
-/// Mirrors the Haskell `nsToMs (Nanoseconds ns) = Milliseconds (fromIntegral ns / 1_000_000)`
-/// — exact `/ 1e6` divisor, no rounding.
+/// Convert nanoseconds to milliseconds: an exact `/ 1e6`, with no rounding.
 pub fn ns_to_ms(ns: Nanoseconds) -> Milliseconds {
     Milliseconds(ns.0 as f64 / 1_000_000.0)
 }

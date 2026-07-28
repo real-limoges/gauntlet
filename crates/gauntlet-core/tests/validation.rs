@@ -58,6 +58,21 @@ fn type_system_rejects_bad_states_at_parse_time() {
     )));
 }
 
+#[test]
+fn the_removed_branch_field_is_rejected_rather_than_silently_ignored() {
+    // `targets[].branch` was accepted for the whole life of the tool and never
+    // did anything: the Haskell only used it to pick a log message and the Rust
+    // port never read it. It is gone now, and because NamedTarget denies unknown
+    // fields, a stale config fails loudly at parse time instead of leaving the
+    // author believing a branch switch happened. The replacement is
+    // `lifecycle.setup`, which actually runs.
+    assert!(!parses(&base(
+        r#"[{"name":"a","url":"http://a","branch":"main"}]"#,
+        &settings(""),
+        OK_PAYLOAD
+    )));
+}
+
 // ---- accumulating semantic validation -------------------------------------
 
 #[test]
@@ -184,6 +199,33 @@ fn build_endpoints_adds_default_content_type_and_joins_url() {
         eps[0].headers,
         vec![("Content-Type".to_owned(), "application/json".to_owned())]
     );
+}
+
+/// Header names are case-insensitive. A lowercase spelling used to miss the
+/// exact-match check, so the default got prepended as well and the request went
+/// out with two conflicting Content-Type headers (reqwest appends, it does not
+/// replace).
+#[test]
+fn build_endpoints_respects_a_custom_content_type_in_any_case() {
+    for spelling in ["content-type", "CONTENT-TYPE", "Content-Type"] {
+        let payloads: Vec<PayloadSpec> = serde_json::from_str(&format!(
+            r#"[{{"name":"p","method":"POST","path":"/","headers":{{"{spelling}":"application/xml"}}}}]"#
+        ))
+        .unwrap();
+        let eps = build_endpoints("http://host", &payloads);
+
+        let content_types: Vec<&str> = eps[0]
+            .headers
+            .iter()
+            .filter(|(k, _)| k.eq_ignore_ascii_case("content-type"))
+            .map(|(_, v)| v.as_str())
+            .collect();
+        assert_eq!(
+            content_types,
+            ["application/xml"],
+            "{spelling} must not also get the default prepended"
+        );
+    }
 }
 
 #[test]

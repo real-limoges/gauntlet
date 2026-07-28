@@ -1,8 +1,4 @@
-//! Reporting errors.
-//!
-//! Reporters are fallible on purpose: the Haskell callbacks were `IO ()` and a
-//! failed artifact write vanished silently, which in CI looks identical to a
-//! clean run that produced no report.
+//! Reporting errors. See the crate docs for why reporters are fallible.
 
 use std::path::{Path, PathBuf};
 

@@ -1,9 +1,5 @@
-//! CI integration: regression output shaped for the detected CI provider, plus
-//! the markdown artifact those providers collect.
-//!
-//! Only regressions are reported here. A CI run's job is to answer "did this
-//! change make things slower"; the full benchmark detail belongs in the
-//! markdown/HTML artifacts.
+//! CI integration: regression output for the detected provider, plus the markdown
+//! artifact it collects. Only regressions — the full detail is in the artifacts.
 
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -23,9 +19,7 @@ pub enum CiMode {
     None,
 }
 
-/// Detect the CI provider from the environment.
-///
-/// GitLab is checked first: a GitLab job can shell out in ways that leave
+/// Detect the CI provider. GitLab is checked first: a GitLab job can leave
 /// `GITHUB_ACTIONS` set, but not the reverse.
 pub fn detect_ci() -> CiMode {
     let is_true = |var: &str| std::env::var(var).map(|v| v == "true").unwrap_or(false);
@@ -39,10 +33,8 @@ pub fn detect_ci() -> CiMode {
     }
 }
 
-/// Render the regression check for a CI job log.
-///
-/// GitLab gets collapsible section markers and colour; GitHub Actions renders
-/// its own log formatting and gets plain text.
+/// Render the regression check for a CI job log: collapsible sections and colour
+/// for GitLab, plain text for GitHub Actions, which formats its own.
 pub fn ci_log(mode: CiMode, result: &RegressionResult, epoch_secs: u64) -> String {
     /// Wraps a status word in colour, or leaves it alone.
     type Colorize = fn(&str) -> String;
@@ -101,6 +93,7 @@ pub fn ci_log(mode: CiMode, result: &RegressionResult, epoch_secs: u64) -> Strin
 
 /// Emits CI-shaped regression output, writes a markdown artifact, and on GitHub
 /// appends to the job's Step Summary. A no-op outside CI.
+#[derive(Debug)]
 pub struct CiReporter {
     mode: CiMode,
     artifact_dir: PathBuf,

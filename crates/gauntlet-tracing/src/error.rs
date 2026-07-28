@@ -1,10 +1,5 @@
-//! Errors from talking to Tempo.
-//!
-//! Every variant here is *advisory*. Trace analysis is a diagnostic bolted onto
-//! a benchmark: a Tempo that is down, slow, or has not yet ingested the run's
-//! spans must never turn a clean benchmark into a failed one (ADR M6-A §7). The
-//! caller logs these and omits the section — so the messages are written to be
-//! read by a human debugging their Tempo setup, and always name the URL.
+//! Errors from talking to Tempo. Every variant is *advisory* — see the crate
+//! docs.
 
 use std::path::PathBuf;
 

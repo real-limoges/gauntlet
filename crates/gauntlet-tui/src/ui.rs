@@ -1,20 +1,7 @@
-//! Rendering for the live view.
+//! Rendering for the live view: every function is a pure read of [`State`], with
+//! no clock, no mutation, and no I/O.
 //!
-//! Every function here is a pure read of [`State`] (ADR M5-tui §2): no clock,
-//! no mutation, no I/O. That keeps the frame budget honest and makes the whole
-//! module testable against a `TestBackend` buffer.
-//!
-//! The layout is a stack of horizontal bands assembled at draw time, because
-//! two of them — load control and recent errors — only exist for some runs. A
-//! band that has nothing to say is omitted rather than drawn empty, so a short
-//! terminal spends its rows on the sections that carry information.
-//!
-//! **Nothing in here may panic.** A panic mid-render happens in raw mode on the
-//! alternate screen, and the operator gets their terminal back only because of
-//! the hook in `lib.rs` — which is a safety net, not a licence. So: no
-//! indexing, no unchecked slicing, no `Gauge::ratio` with a value that has not
-//! been forced into `0.0..=1.0` (it asserts), and no assumption that any band
-//! received the height it asked for.
+//! **Nothing in here may panic** — see the crate docs for what that rules out.
 
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -24,18 +11,13 @@ use ratatui::Frame;
 
 use crate::state::State;
 
-/// Glyphs for one request on the timeline strip. Distinct shapes, not just
-/// distinct colours: the strip has to stay readable when it is piped, screen-
-/// shotted in monochrome, or read by someone who cannot separate red from
-/// green.
+/// Glyphs for one request on the timeline strip — distinct shapes, not just
+/// distinct colours. See the crate docs.
 const MARK_OK: &str = "▪";
 const MARK_ERR: &str = "▫";
 
-/// The bands of the vertical stack, in draw order.
-///
-/// Modelled as data so the conditional bands can be filtered out before the
-/// layout is solved — the alternative, nested layouts with zero-height
-/// placeholders, still consumes rows on a 10-row terminal.
+/// The bands of the vertical stack, in draw order. Data rather than nested
+/// layouts, so conditional bands are filtered before solving — see the crate docs.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Band {
     Header,
@@ -76,7 +58,7 @@ impl Band {
 }
 
 /// Draw one frame.
-pub fn draw(frame: &mut Frame, state: &State) {
+pub fn draw(frame: &mut Frame<'_>, state: &State) {
     let bands: Vec<Band> = [
         Band::Header,
         Band::Error,
@@ -124,7 +106,7 @@ pub fn draw(frame: &mut Frame, state: &State) {
 }
 
 /// Target, endpoint, elapsed time, and the status line.
-fn header(frame: &mut Frame, state: &State, area: Rect) {
+fn header(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let target = if state.target.is_empty() {
         "gauntlet"
     } else {
@@ -170,7 +152,7 @@ fn header(frame: &mut Frame, state: &State, area: Rect) {
 }
 
 /// The fatal error, given its own line at the top where it cannot be missed.
-fn error_banner(frame: &mut Frame, state: &State, area: Rect) {
+fn error_banner(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let Some(message) = state.error.as_deref() else {
         return;
     };
@@ -185,7 +167,7 @@ fn error_banner(frame: &mut Frame, state: &State, area: Rect) {
 
 /// Completion gauge. Duration-based modes report a 0 ratio (see
 /// `State::progress`), which draws an empty bar rather than a fake one.
-fn progress(frame: &mut Frame, state: &State, area: Rect) {
+fn progress(frame: &mut Frame<'_>, state: &State, area: Rect) {
     // `Gauge::ratio` asserts on anything outside 0..=1, NaN included.
     let ratio = state.progress();
     let ratio = if ratio.is_finite() {
@@ -216,7 +198,7 @@ fn progress(frame: &mut Frame, state: &State, area: Rect) {
 }
 
 /// Rolling latency percentiles, or a placeholder before the first response.
-fn stats(frame: &mut Frame, state: &State, area: Rect) {
+fn stats(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let Some(rolling) = state.rolling else {
         // A table of zeroes reads as a measurement; this reads as "not yet".
         frame.render_widget(
@@ -258,7 +240,7 @@ fn stats(frame: &mut Frame, state: &State, area: Rect) {
 }
 
 /// Throughput and error rate — the two numbers that are not percentiles.
-fn metrics(frame: &mut Frame, state: &State, area: Rect) {
+fn metrics(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let error_rate = state.error_rate();
     // Red only once something has actually failed; a 0% rate in red would
     // train the operator to ignore the colour.
@@ -288,7 +270,7 @@ fn has_load_control(state: &State) -> bool {
 }
 
 /// Rate-limited runs only: where the load generator currently is.
-fn load_control(frame: &mut Frame, state: &State, area: Rect) {
+fn load_control(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let mut parts = Vec::new();
     if let Some(step) = state.current_step {
         parts.push(format!("step {step}"));
@@ -310,7 +292,7 @@ fn load_control(frame: &mut Frame, state: &State, area: Rect) {
 }
 
 /// Sparkline over the rolling latency window.
-fn latency_trend(frame: &mut Frame, state: &State, area: Rect) {
+fn latency_trend(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(" latency trend ");
@@ -322,10 +304,8 @@ fn latency_trend(frame: &mut Frame, state: &State, area: Rect) {
         return;
     }
 
-    // The sparkline draws its data left-to-right and would otherwise show the
-    // *oldest* samples when the window is wider than the pane, so keep the
-    // tail ourselves. Non-finite samples become 0 — a NaN would otherwise
-    // poison the max used for bar scaling.
+    // The sparkline draws left-to-right, so keep the tail ourselves. Non-finite
+    // samples become 0: a NaN would poison the max used for bar scaling.
     let width = inner.width as usize;
     let skip = state.recent_latencies.len().saturating_sub(width);
     let data: Vec<u64> = state
@@ -352,15 +332,11 @@ fn latency_trend(frame: &mut Frame, state: &State, area: Rect) {
 }
 
 /// The per-request success/failure strip — the one widget ratatui has no
-/// equivalent for (ADR M5-tui §6).
-///
-/// The deque is oldest-first and holds more marks than a narrow terminal can
-/// show, so this keeps the tail: what just happened is what the operator is
-/// watching for.
-fn timeline(frame: &mut Frame, state: &State, area: Rect) {
+/// equivalent for. Keeps the tail of the deque; see the crate docs.
+fn timeline(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let width = area.width as usize;
     let skip = state.timeline.len().saturating_sub(width);
-    let marks: Vec<Span> = state
+    let marks: Vec<Span<'_>> = state
         .timeline
         .iter()
         .skip(skip)
@@ -377,7 +353,7 @@ fn timeline(frame: &mut Frame, state: &State, area: Rect) {
 }
 
 /// The last few failure messages, newest last.
-fn errors(frame: &mut Frame, state: &State, area: Rect) {
+fn errors(frame: &mut Frame<'_>, state: &State, area: Rect) {
     let width = area.width as usize;
     let mut lines = vec![Line::from(Span::styled(
         "recent errors",
@@ -393,7 +369,7 @@ fn errors(frame: &mut Frame, state: &State, area: Rect) {
     frame.render_widget(Paragraph::new(lines), area);
 }
 
-fn footer(frame: &mut Frame, area: Rect) {
+fn footer(frame: &mut Frame<'_>, area: Rect) {
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
             "q / Esc / Ctrl-C to cancel",
@@ -420,8 +396,7 @@ fn truncate(text: &str, width: usize) -> String {
         .collect()
 }
 
-/// Milliseconds at a scale a human reads without counting zeroes, matching the
-/// Haskell `formatDuration`.
+/// Milliseconds at a scale a human reads without counting zeroes.
 fn format_ms(ms: f64) -> String {
     if !ms.is_finite() {
         "-".to_string()
@@ -434,7 +409,7 @@ fn format_ms(ms: f64) -> String {
     }
 }
 
-/// Requests per minute, matching the Haskell `formatRPM`.
+/// Requests per minute, with a floor rather than a misleading `0.4 rpm`.
 fn format_rpm(rpm: f64) -> String {
     if !rpm.is_finite() {
         "-".to_string()
@@ -447,8 +422,7 @@ fn format_rpm(rpm: f64) -> String {
     }
 }
 
-/// Elapsed seconds as `MM:SS`, or `HH:MM:SS` past an hour — the Haskell
-/// `formatElapsed`.
+/// Elapsed seconds as `MM:SS`, or `HH:MM:SS` past an hour.
 fn format_elapsed(seconds: f64) -> String {
     if !seconds.is_finite() || seconds < 0.0 {
         return "00:00".to_string();

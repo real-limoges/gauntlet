@@ -1,8 +1,5 @@
-//! The four subcommands.
-//!
-//! Every command returns a [`RunOutcome`], which owns the 0/1/2 exit-code
-//! contract CI depends on (ADR M4-report §6). Nothing here calls
-//! `std::process::exit` — `main` does that once, with the returned outcome.
+//! The four subcommands. Every one returns a [`RunOutcome`] rather than exiting;
+//! see the crate root for the exit-code contract.
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -10,7 +7,7 @@ use std::time::SystemTime;
 use anyhow::{Context, Result};
 use gauntlet_core::{load_benchmark_config, BenchmarkConfig, NamedTarget};
 use gauntlet_report::{
-    compare_to_baseline, Baseline, BaselineStore, BenchmarkReport, MetricRegression,
+    compare_to_baseline, Baseline, BaselineStore, BenchmarkReport, MetricRegression, MultiReporter,
     RegressionResult, RegressionThresholds, Reporter, RunOutcome, StatsSnapshot, TargetReport,
     TerminalReporter,
 };
@@ -39,7 +36,7 @@ pub async fn benchmark(args: &BenchmarkArgs) -> Result<RunOutcome> {
             Some(run) => run,
             // The operator cancelled. An interrupted run has no trustworthy
             // measurements, so it reports an error rather than a clean result
-            // and no baseline is written (ADR M5-tui §4).
+            // and no baseline is written.
             None => {
                 gauntlet_core::log::warn("benchmark cancelled");
                 return Ok(RunOutcome::Error);
@@ -51,21 +48,21 @@ pub async fn benchmark(args: &BenchmarkArgs) -> Result<RunOutcome> {
     let finished = SystemTime::now();
 
     let report = adapter::to_report(&run);
-    reporters::for_benchmark(args).on_benchmark(&report).await?;
+
+    // Built once and kept, so the regression pass below fans out to the same
+    // set. See the crate root.
+    let reporters = reporters::for_benchmark(args);
+    reporters.on_benchmark(&report).await?;
 
     // Diagnostic only: a trace backend that is down must never fail a clean
-    // benchmark (ADR M6-cli §7).
+    // benchmark.
     report_traces(&config, started, finished).await;
 
-    handle_baselines(args, &report).await
+    handle_baselines(args, &report, &reporters).await
 }
 
-/// The live view is for a human watching an interactive terminal — never for a
-/// pipe or a CI log, where it would emit escape sequences into the transcript.
-///
-/// The Haskell keyed this off `stdin` being a TTY, which is the wrong handle:
-/// `gauntlet benchmark < /dev/null` disabled the UI even at an interactive
-/// terminal.
+/// Whether to run the live view: a human at an interactive terminal, keyed off
+/// **stdout**. See the crate root.
 fn use_tui(args: &BenchmarkArgs) -> bool {
     use std::io::IsTerminal;
 
@@ -115,13 +112,14 @@ async fn report_traces(config: &BenchmarkConfig, start: SystemTime, end: SystemT
     }
 }
 
-/// Save and/or compare baselines, one per target.
-///
-/// With more than one target the names are qualified `<name>--<target>`, since
-/// a run's targets are different systems and must not overwrite each other's
-/// baseline. A single-target run keeps the bare name — the common case gets no
-/// suffix noise.
-async fn handle_baselines(args: &BenchmarkArgs, report: &BenchmarkReport) -> Result<RunOutcome> {
+/// Save and/or compare baselines, one per target. Multi-target runs qualify the
+/// name as `<name>--<target>`, so different systems cannot overwrite each
+/// other's; a single-target run keeps the bare name.
+async fn handle_baselines(
+    args: &BenchmarkArgs,
+    report: &BenchmarkReport,
+    reporters: &MultiReporter,
+) -> Result<RunOutcome> {
     let mode = args.baseline_mode();
     if mode == BaselineMode::None {
         return Ok(RunOutcome::Success);
@@ -170,7 +168,7 @@ async fn handle_baselines(args: &BenchmarkArgs, report: &BenchmarkReport) -> Res
     }
 
     let combined = combine(regressions);
-    TerminalReporter::auto().on_regression(&combined).await?;
+    reporters.on_regression(&combined).await?;
     Ok(RunOutcome::from_regression(combined))
 }
 
@@ -290,6 +288,17 @@ pub async fn validate(config_path: &Path, check_endpoints: bool) -> Result<RunOu
     };
 
     gauntlet_core::log::set_level(config.settings.log_level);
+
+    // `gauntlet-core` has no regex dependency, so pattern checking is not part
+    // of its validation — but finding config errors without sending requests is
+    // exactly this subcommand's job.
+    if let Err(errors) = gauntlet_engine::validation::check_patterns(&config) {
+        for e in &errors {
+            gauntlet_core::log::error(format!("config error: {e}"));
+        }
+        return Ok(RunOutcome::Error);
+    }
+
     println!("{}", summarize(&config));
 
     if !check_endpoints {
@@ -365,11 +374,7 @@ async fn check_target(client: &reqwest::Client, target: &NamedTarget) -> bool {
 // schema
 // ---------------------------------------------------------------------------
 
-/// Print the derived config schema, or write it to a file.
-///
-/// The Haskell subcommand's help said "print to stdout" but wrote a file; this
-/// does what the help promised, and `--out` covers the other case. The schema
-/// is derived from the config types, so it cannot drift from them.
+/// Print the derived config schema to stdout, or write it to `--out`.
 pub fn schema(out: Option<&PathBuf>) -> Result<RunOutcome> {
     let schema = gauntlet_core::config_schema_string();
 
@@ -389,7 +394,79 @@ pub fn schema(out: Option<&PathBuf>) -> Result<RunOutcome> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
     use super::*;
+
+    /// Counts the calls it receives, standing in for any non-terminal backend.
+    #[derive(Default)]
+    struct Counting(Arc<AtomicUsize>);
+
+    #[async_trait::async_trait]
+    impl Reporter for Counting {
+        async fn on_regression(
+            &self,
+            _result: &RegressionResult,
+        ) -> std::result::Result<(), gauntlet_report::Error> {
+            self.0.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+    }
+
+    /// `handle_baselines` used to build a throwaway `TerminalReporter` for the
+    /// regression pass, which left every other backend's `on_regression` dead —
+    /// no JUnit regression suite, no `gauntlet_regression_passed` series, and the
+    /// whole `CiReporter` (whose only method this is) unreachable in production.
+    #[tokio::test]
+    async fn regressions_reach_every_configured_reporter_not_just_the_terminal() {
+        use crate::cli::{Cli, Command};
+        use clap::Parser;
+
+        let dir = std::env::temp_dir().join(format!("gauntlet-dispatch-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+
+        let stats = BenchmarkStats {
+            mean_ms: 10.0,
+            ..Default::default()
+        };
+        BaselineStore::new(&dir)
+            .save(&Baseline::capture("main", "2026-07-28T00:00:00Z", &stats))
+            .expect("baseline saves");
+
+        let args = match Cli::try_parse_from([
+            "gauntlet",
+            "benchmark",
+            "-c",
+            "cfg.json",
+            "--compare-baseline",
+            "main",
+            "--baseline-dir",
+            dir.to_str().expect("utf-8 temp path"),
+        ])
+        .expect("arguments parse")
+        .command
+        {
+            Command::Benchmark(a) => *a,
+            _ => unreachable!("benchmark subcommand"),
+        };
+
+        let hits = Arc::new(AtomicUsize::new(0));
+        let reporters = MultiReporter::new(vec![Box::new(Counting(hits.clone()))]);
+        let report = BenchmarkReport::single(TargetReport::new("t", stats));
+
+        handle_baselines(&args, &report, &reporters)
+            .await
+            .expect("comparison runs");
+
+        assert_eq!(
+            hits.load(Ordering::Relaxed),
+            1,
+            "the configured reporter set must see the regression result"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn regression(baseline: &str, passed: bool) -> RegressionResult {
         RegressionResult {

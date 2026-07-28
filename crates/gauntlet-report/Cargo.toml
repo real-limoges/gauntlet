@@ -8,7 +8,7 @@ description = "Reporter backends + baselines: markdown, JUnit, Prometheus, HTML,
 
 # Deliberately no `gauntlet-engine` dependency: this crate renders the plain
 # `BenchmarkReport` model, so a change in the measurement loop does not
-# recompile every renderer. See ADR M4-report.
+# recompile every renderer.
 [dependencies]
 gauntlet-core.workspace = true
 gauntlet-stats.workspace = true
@@ -21,3 +21,6 @@ reqwest.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

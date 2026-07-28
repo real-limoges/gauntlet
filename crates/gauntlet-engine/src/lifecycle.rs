@@ -1,6 +1,5 @@
-//! Per-target lifecycle hooks: spawn a setup command, poll a health-check URL
-//! until it's ready, and run a teardown command afterwards. Process spawning is
-//! via `tokio::process`; the shell (`sh -c`) interprets the command string.
+//! Per-target lifecycle hooks: a setup command, a polled health-check URL, and a
+//! teardown command. Commands are interpreted by `sh -c`.
 
 use std::time::{Duration, Instant};
 

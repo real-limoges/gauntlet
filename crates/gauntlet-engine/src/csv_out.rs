@@ -1,9 +1,5 @@
-//! Per-run latency CSV — the dump that reporters and the plot script consume.
-//!
-//! Seven columns, matching the existing format:
+//! Per-run latency CSV, in seven columns:
 //! `target_name,payload_id,url,method,status_code,latency_ms,timestamp_iso`.
-//! `latency_ms = duration_ns / 1e6`; `timestamp_iso` is the request's wall-clock
-//! start as RFC 3339.
 
 use std::path::Path;
 use std::time::SystemTime;
@@ -14,6 +10,7 @@ use gauntlet_core::{ns_to_ms, HttpMethod, TestingResponse};
 use crate::error::{EngineError, Result};
 
 /// One CSV row: an endpoint context joined with a single response.
+#[derive(Debug)]
 pub struct CsvRow<'a> {
     pub target_name: &'a str,
     pub payload_id: &'a str,
@@ -28,6 +25,13 @@ pub struct CsvRow<'a> {
 pub struct CsvSink {
     writer: csv::Writer<std::fs::File>,
     path: std::path::PathBuf,
+}
+
+// `csv::Writer` is not `Debug`; the path is the only identifying part anyway.
+impl std::fmt::Debug for CsvSink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CsvSink").field("path", &self.path).finish()
+    }
 }
 
 impl CsvSink {

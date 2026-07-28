@@ -1,14 +1,12 @@
-//! Bayesian comparison of two targets, ported from `compareBayesian` in
-//! `Stats/Benchmark.hs`. Every edge-case guard is preserved verbatim.
+//! Bayesian comparison of two targets. Each helper below guards its own
+//! degenerate case (empty sample, zero variance) by returning the neutral value
+//! rather than a NaN that would propagate into every report.
 
 use crate::normal::{standard_normal_cdf, standard_normal_pdf, Z95};
 use crate::types::{BayesianComparison, BenchmarkStats, PercentileComparison};
 
-/// Bayesian comparison of two benchmark results.
-///
-/// `emd` is left `None`; the caller attaches Earth Mover's Distance from the raw
-/// duration vectors (see [`crate::earth_movers_distance`]), mirroring how the
-/// Haskell `postAnalysis` attaches it after the fact.
+/// Bayesian comparison of two benchmark results. `emd` is left `None` for the
+/// caller to attach; see the crate docs.
 pub fn compare_bayesian(a: &BenchmarkStats, b: &BenchmarkStats) -> BayesianComparison {
     let mu_a = a.mean_ms;
     let mu_b = b.mean_ms;
@@ -68,8 +66,8 @@ fn prob_faster(mu_diff: f64, var_a: f64, var_b: f64, n_a: f64, n_b: f64) -> f64 
     }
 }
 
-/// One credible-interval bound: muDiff + z·√(varA/nA + varB/nB).
-/// Collapses to `mu_diff` when either sample is empty, matching the Haskell.
+/// One credible-interval bound: `mu_diff + z·√(varA/nA + varB/nB)`, collapsing
+/// to `mu_diff` when either sample is empty.
 fn ci_bound(mu_diff: f64, var_a: f64, var_b: f64, n_a: f64, n_b: f64, z: f64) -> f64 {
     if n_a <= 0.0 || n_b <= 0.0 {
         mu_diff
@@ -158,11 +156,8 @@ fn percentile_se_multiplier(p: f64) -> f64 {
     }
 }
 
-/// Every unordered pair of targets, compared: `N*(N-1)/2` results in index
-/// order, each as `(index_a, index_b, comparison)` where `a < b`.
-///
-/// Indices rather than names keep this crate free of string handling — the
-/// caller already knows what each slot is called and maps them back.
+/// Every unordered pair compared: `N·(N−1)/2` results as `(a, b, comparison)`
+/// with `a < b`. Indices, not names, so this crate stays free of string handling.
 pub fn all_pair_comparisons(stats: &[BenchmarkStats]) -> Vec<(usize, usize, BayesianComparison)> {
     let mut pairs = Vec::with_capacity(stats.len().saturating_sub(1) * stats.len() / 2);
     for (i, a) in stats.iter().enumerate() {

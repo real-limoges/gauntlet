@@ -1,23 +1,5 @@
 //! The Grafana Tempo HTTP client: TraceQL search, trace fetch, OTLP decoding.
-//!
-//! Two endpoints are used, and only two:
-//!
-//! * `GET /api/search?q=<TraceQL>&start=<unix s>&end=<unix s>&limit=<n>` —
-//!   returns lightweight [`TraceMetadata`] for matching traces.
-//! * `GET /api/traces/<id>` — returns the full trace in OTLP JSON.
-//!
-//! Search does not return spans, so a window's analysis costs one search plus
-//! one fetch per trace; the fetches run with bounded concurrency because a busy
-//! window can produce hundreds of them and serializing that (as the Haskell
-//! client did) makes trace analysis dominate the run's wall clock.
-//!
-//! **Decoding is deliberately forgiving.** OTLP JSON encodes 64-bit timestamps
-//! as decimal *strings* (they exceed JSON's safe integer range) but plenty of
-//! producers emit them as numbers anyway; span kind and status code appear as
-//! either enum names or ordinals depending on the ingest path. Anything
-//! unrecognized degrades to a default instead of failing the decode — a trace
-//! backend is not a contract we control, and a diagnostic that refuses to
-//! render because one span had an unfamiliar status is worse than useless.
+//! See the crate docs for the two endpoints and the forgiving-decode rule.
 
 use std::collections::BTreeMap;
 
@@ -47,10 +29,8 @@ pub struct TempoClient {
 }
 
 impl TempoClient {
-    /// Build a client from the `tempo` config section.
-    ///
-    /// The URL is validated here rather than at request time so a typo surfaces
-    /// as `InvalidUrl` naming the offending value, not as a connection error.
+    /// Build a client from the `tempo` config section. The URL is validated here
+    /// so a typo surfaces as `InvalidUrl`, not as a connection error.
     pub fn new(settings: &TempoSettings) -> Result<Self> {
         let base_url = settings.url.trim_end_matches('/').to_string();
         let parsed = reqwest::Url::parse(&base_url).map_err(|e| Error::InvalidUrl {
@@ -76,11 +56,8 @@ impl TempoClient {
         })
     }
 
-    /// Search for traces, then fetch each one in full.
-    ///
-    /// A failure of the *search* aborts — without it there is nothing to
-    /// analyze. A failure of an individual *trace fetch* is dropped: one
-    /// expired or unreadable trace should not discard the other 199.
+    /// Search for traces, then fetch each in full. A failed *search* aborts;
+    /// a failed individual *fetch* is dropped, so one bad trace costs only itself.
     pub async fn fetch_traces_for_window(&self, query: &TraceQuery) -> Result<Vec<Trace>> {
         let found = self.search(query).await?;
 

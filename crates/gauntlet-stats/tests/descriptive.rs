@@ -2,7 +2,7 @@
 //! `expected_shortfall`, `compute_histogram`, and the `common` helpers).
 //!
 //! Anchored on closed forms and textbook quantiles — no Haskell oracle (the port
-//! is a deliberate clean break; see `docs/RUST_PORT.md`).
+//! is a deliberate clean break).
 
 use gauntlet_stats::{
     calculate_stats, compute_histogram, expected_shortfall, mean, percentile, percentile_sorted,

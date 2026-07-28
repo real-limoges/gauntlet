@@ -28,3 +28,6 @@ hyper-util.workspace = true
 http-body-util.workspace = true
 axum.workspace = true
 tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

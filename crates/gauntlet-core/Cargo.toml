@@ -16,3 +16,6 @@ thiserror.workspace = true
 # Only the extraction integration test feeds the numerics crate; core itself
 # does not depend on it.
 gauntlet-stats.workspace = true
+
+[lints]
+workspace = true

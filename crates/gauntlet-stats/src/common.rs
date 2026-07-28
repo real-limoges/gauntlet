@@ -1,9 +1,6 @@
-//! Shared descriptive helpers, ported from `Stats/Common.hs`.
+//! Mean, variance, standard deviation, and percentiles.
 //!
-//! `mean`/`variance`/`std_dev` use the unbiased (n−1) sample estimator, matching
-//! the Haskell `varianceList`. (`calculateStats` on the Haskell side reaches for
-//! the `statistics` package's `mean`/`stdDev`; with the parity oracle dropped we
-//! only need correctness, and the unbiased two-pass formulas here are correct.)
+//! See the crate docs for which estimators these are and why.
 
 /// Arithmetic mean. Empty input → 0.
 pub fn mean(xs: &[f64]) -> f64 {
@@ -37,11 +34,8 @@ pub fn percentile(p: f64, xs: &[f64]) -> f64 {
     percentile_sorted(p, &sorted)
 }
 
-/// Percentile of an already-sorted (ascending) slice, via **R-7** linear
-/// interpolation (the NumPy/R default): `idx = p·(n−1)`, interpolate between the
-/// floor and ceil indices.
-///
-/// Guards: empty → 0, single element → that element.
+/// Percentile of an already-sorted (ascending) slice, via R-7 interpolation.
+/// Empty input → 0; a single element → that element.
 pub fn percentile_sorted(p: f64, sorted: &[f64]) -> f64 {
     match sorted.len() {
         0 => 0.0,

@@ -1,10 +1,7 @@
-//! Result types mirroring the Haskell `Benchmark.Types.Stats` records.
-//!
-//! All numeric fields are milliseconds (`f64`), matching the Haskell side after
-//! its `Milliseconds` newtype is unwrapped. `Default` is derived purely for
-//! ergonomic test construction (`BenchmarkStats { mean_ms, .., ..Default::default() }`).
+//! The result types. Every numeric field is milliseconds; see the crate docs for
+//! the sign convention on [`BayesianComparison::mean_difference`].
 
-/// Descriptive statistics for one target, from `calculateStats`.
+/// Descriptive statistics for one target.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BenchmarkStats {
     pub total_requests: usize,
@@ -32,9 +29,7 @@ pub struct PercentileComparison {
     pub prob_pct_regression: f64,
 }
 
-/// Pairwise Bayesian comparison. Positive `mean_difference` means A is slower
-/// (B is faster). `emd` is attached separately by the caller, since it needs the
-/// raw duration vectors rather than these summary statistics.
+/// Pairwise Bayesian comparison. Positive `mean_difference` means A is slower.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BayesianComparison {
     /// P(mean_B < mean_A), population level (uses σ/√n).
@@ -52,6 +47,6 @@ pub struct BayesianComparison {
     pub relative_effect: f64,
     pub p95_comparison: PercentileComparison,
     pub p99_comparison: PercentileComparison,
-    /// Earth Mover's Distance, attached post-hoc from the raw samples.
+    /// Earth Mover's Distance, attached by the caller from the raw samples.
     pub emd: Option<f64>,
 }

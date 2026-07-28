@@ -1,5 +1,5 @@
 //! Renders every artifact for a synthetic two-target run, so the whole reporter
-//! set can be exercised and eyeballed before the CLI exists (M6).
+//! set can be eyeballed without standing up a server.
 //!
 //! Run: `cargo run -p gauntlet-report --example artifacts -- <out-dir>`
 

@@ -1,17 +1,12 @@
-//! `.env` loading and `${VAR}` interpolation, ported from `Benchmark.Config.Env`.
-//!
-//! Hand-rolled (no `dotenvy`/`subst`) to reproduce the Haskell semantics exactly:
-//! precedence `.env.local` > `.env` > process env; `${VAR}` syntax only (no
-//! `${VAR:-default}`); undefined variable is an error; an unclosed `${` is left
-//! as a literal.
+//! `.env` loading and `${VAR}` interpolation. See the crate docs for the
+//! precedence rules and why this is hand-rolled.
 
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-/// Parse a `.env` file into key/value pairs. Skips blank lines and `#` comments,
-/// strips an optional `export ` prefix, and strips matching surrounding single or
-/// double quotes from values. Mirrors Haskell `parseEnvFile`.
+/// Parse a `.env` file into key/value pairs, skipping blank and `#` lines and
+/// stripping an optional `export ` prefix and matching surrounding quotes.
 pub fn parse_env_file(content: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for line in content.lines() {
@@ -51,9 +46,8 @@ fn strip_quotes(t: &str) -> &str {
     t
 }
 
-/// Load environment variables from process env, `.env`, and `.env.local`.
-/// Precedence (highest wins): `.env.local` > `.env` > process env. Missing files
-/// are silently ignored. Mirrors Haskell `loadEnvVars`.
+/// Merge process env, `.env`, and `.env.local`, highest precedence last. Missing
+/// files are ignored.
 pub fn load_env_vars() -> HashMap<String, String> {
     let mut merged: HashMap<String, String> = std::env::vars().collect();
     // `.env` overrides process env; `.env.local` overrides both.
@@ -69,9 +63,8 @@ fn read_env_file<P: AsRef<Path>>(path: P) -> HashMap<String, String> {
     }
 }
 
-/// Interpolate `${VAR}` patterns in `input` using `env`. On an undefined
-/// reference, returns `Err(var_name)` (the caller owns the message). An unclosed
-/// `${` (no matching `}`) leaves the rest of the string as a literal.
+/// Interpolate `${VAR}` patterns in `input`. An undefined reference returns
+/// `Err(var_name)`, leaving the message to the caller.
 pub fn interpolate_env(env: &HashMap<String, String>, input: &str) -> Result<String, String> {
     let mut out = String::with_capacity(input.len());
     let mut remaining = input;

@@ -1,15 +1,5 @@
-//! HTML rendering, and the reporter that writes it to a file.
-//!
-//! One self-contained document: the charts are inlined as `<svg>` elements and
-//! the stylesheet as an inline `<style>`, so the file renders correctly when it
-//! is opened straight from a file manager over `file://` — browsers refuse to
-//! load subresources there, and a report that needs a web server to look right
-//! is a report nobody looks at.
-//!
-//! There is no templating crate. One template with no user extensibility does
-//! not earn a build-time template step, so the renderers are `format!` calls
-//! (ADR `M4-report` §8) — and every interpolated string goes through
-//! [`html_escape`], which the Haskell original only did for target names.
+//! HTML rendering, and the reporter that writes it to a file. One self-contained
+//! document; every interpolated string goes through [`html_escape`].
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -34,11 +24,8 @@ pub fn document(title: &str, body: &str) -> String {
     )
 }
 
-/// The body markup for a finished benchmark, charts included.
-///
-/// Fallible where the markdown renderer is not: chart rendering can fail, and a
-/// half-drawn SVG should surface as [`crate::Error::Chart`] rather than a silent
-/// gap in the page.
+/// The body markup for a finished benchmark, charts included. Fallible where the
+/// markdown renderer is not, because chart rendering can fail.
 pub fn benchmark_body(report: &BenchmarkReport, charts: &[ChartKind]) -> Result<String> {
     let mut out = String::from("<h1>Benchmark Report</h1>\n");
 
@@ -230,9 +217,8 @@ fn validation_section(report: &BenchmarkReport) -> String {
     }
     out.push_str("</tbody>\n</table>\n");
 
-    // Haskell's terminal summary capped the displayed errors at 10 unique; the
-    // HTML report keeps the same cap so a fully-failing run does not render a
-    // megabyte of identical assertion messages.
+    // Capped so a fully-failing run does not render a megabyte of identical
+    // assertion messages.
     let errors: Vec<String> = report
         .validations()
         .flat_map(|s| s.errors.iter())
@@ -253,7 +239,7 @@ fn validation_section(report: &BenchmarkReport) -> String {
     out
 }
 
-/// Matches the Haskell `printValidationSummary` cap.
+/// Validation errors listed before the page stops enumerating them.
 const MAX_DISPLAYED_ERRORS: usize = 10;
 
 fn ranking_table(report: &BenchmarkReport) -> String {
@@ -345,13 +331,9 @@ figure.chart svg { max-width: 100%; height: auto; }
 </style>
 "#;
 
-/// Writes one self-contained HTML file for the whole run.
-///
-/// Unlike the markdown reporter, this one does **not** append: concatenating a
-/// second `<!DOCTYPE>` onto a finished document — which the Haskell version did
-/// — produces a file no browser parses as one page. Instead the rendered body is
-/// kept and the file is rewritten with the regression section appended, so the
-/// output stays a single valid document however many events arrive.
+/// Writes one self-contained HTML file for the whole run, rewriting rather than
+/// appending on the second event. See the crate docs.
+#[derive(Debug)]
 pub struct HtmlReporter {
     path: PathBuf,
     charts: Vec<ChartKind>,

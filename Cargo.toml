@@ -9,6 +9,54 @@ license = "MIT"
 authors = ["Real Limoges <b.real.limoges@gmail.com>"]
 description = "Statistically rigorous HTTP performance benchmarking"
 
+# Lint policy, shared by every crate via `[lints] workspace = true`.
+#
+# The rule of thumb: deny the lints that catch *bugs*, not the ones that enforce
+# a house style. Blanket `clippy::pedantic` was measured at ~1,200 hits across
+# the workspace, the large majority of them `cast_precision_loss` on the
+# `usize -> f64` conversions that a statistics crate is made of, so adopting it
+# wholesale would have meant ~1,200 `#[allow]`s and no new bugs found.
+#
+# Deliberately NOT denied, with the reason, so nobody re-litigates this blind:
+#   - clippy::indexing_slicing (57 production sites) - almost all are slices of
+#     a just-sorted vector whose bounds are established two lines above. Fixing
+#     them means threading `get()` + `?` through the percentile math and making
+#     the correctness-critical code harder to read, not safer.
+#   - clippy::string_slice (8 sites, all in config/env.rs) - every index comes
+#     from `str::find`, which returns a char boundary, so the panic it warns
+#     about cannot happen here.
+#   - clippy::cast_possible_truncation / cast_sign_loss (44 sites) - a real bug
+#     class worth a dedicated pass, but each site needs an individual judgment
+#     (clamp vs `try_from` vs genuinely-fine), which is not a mechanical change.
+#   - clippy::expect_used (12 sites) - see the per-crate `deny` block below;
+#     `unwrap` is denied, `expect` is not, because an `expect` at least carries
+#     a written justification at the call site.
+[workspace.lints.rust]
+# There is no unsafe in this tree and no reason for any to appear.
+unsafe_code = "forbid"
+future_incompatible = { level = "deny", priority = -1 }
+rust_2018_idioms = { level = "deny", priority = -1 }
+missing_debug_implementations = "deny"
+trivial_numeric_casts = "deny"
+unused_import_braces = "deny"
+unused_lifetimes = "deny"
+unused_qualifications = "deny"
+
+[workspace.lints.clippy]
+# All of these are at zero across the workspace today; denying them is free and
+# keeps them at zero.
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+mem_forget = "deny"
+same_name_method = "deny"
+verbose_file_reads = "deny"
+lossy_float_literal = "deny"
+cast_possible_wrap = "deny"
+# `Instant - Duration` panics when the instant is less than the duration past
+# the monotonic clock's origin. This fired once, in the TUI's frame pacing.
+unchecked_time_subtraction = "deny"
+
 # Shared dependency versions. Crates opt in with `dep.workspace = true`.
 [workspace.dependencies]
 libm = "0.2"
@@ -58,3 +106,12 @@ gauntlet-tui = { path = "crates/gauntlet-tui" }
 # does not cost us minutes of compile time.
 [profile.dev.package.gauntlet-stats]
 opt-level = 2
+
+# Integer overflow panics in dev and wraps silently in release, which means the
+# release binary (the one people actually benchmark with) is the one that would
+# quietly corrupt a latency total rather than say so. Turn the checks back on:
+# the measurement loop is dominated by network I/O, and the numerics run after
+# measurement is over, so neither the reported latencies nor their variance can
+# be affected by the extra branch.
+[profile.release]
+overflow-checks = true

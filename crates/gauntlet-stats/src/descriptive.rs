@@ -1,5 +1,5 @@
-//! Descriptive statistics, ported from `calculateStats`, `expectedShortfall`,
-//! and `computeHistogram` in `Stats/Benchmark.hs`.
+//! Descriptive statistics over a sample of successful latencies. See the crate
+//! docs for the estimators and the histogram binning rule.
 
 use crate::common::{mean, percentile_sorted, std_dev};
 use crate::types::BenchmarkStats;
@@ -7,16 +7,13 @@ use crate::types::BenchmarkStats;
 /// Percentile threshold for Expected Shortfall (ES = E[X | X > p99]).
 const ES_PERCENTILE: f64 = 0.99;
 
-/// Compute descriptive statistics from already-extracted successful durations
-/// (in ms) plus the total number of requests issued.
-///
-/// `durations_ms` holds only the *successful* samples; `count_failure` is the
-/// difference from `total_requests`. (The Haskell `calculateStats` folds the
-/// error filtering and ns→ms conversion in via `getDuration`; that extraction
-/// depends on `TestingResponse` and lands in `gauntlet-core` in M2.)
+/// Descriptive statistics over the *successful* durations (ms), given the total
+/// number of requests issued. `count_failure` is the difference between them.
 pub fn calculate_stats(total_requests: usize, durations_ms: &[f64]) -> BenchmarkStats {
     let count_success = durations_ms.len();
-    let count_failure = total_requests - count_success;
+    // Saturating: a caller whose total came from a different population would
+    // otherwise panic here under the release profile's overflow checks.
+    let count_failure = total_requests.saturating_sub(count_success);
 
     let mut sorted = durations_ms.to_vec();
     sorted.sort_by(f64::total_cmp);
@@ -63,10 +60,8 @@ pub fn calculate_stats(total_requests: usize, durations_ms: &[f64]) -> Benchmark
     }
 }
 
-/// Expected Shortfall: the mean of the worst 1% of observations (E[X | X > p99]).
-///
-/// Input must be sorted ascending. Returns the last value for very small samples,
-/// 0 for empty input.
+/// Expected Shortfall, E[X | X > p99], over an ascending-sorted slice. Very
+/// small samples yield the last value; empty input yields 0.
 pub fn expected_shortfall(sorted: &[f64]) -> f64 {
     let n = sorted.len();
     if n == 0 {
@@ -81,10 +76,8 @@ pub fn expected_shortfall(sorted: &[f64]) -> f64 {
     }
 }
 
-/// Compute a latency histogram from a sorted (ascending) slice.
-///
-/// Bin count follows Sturges' rule clamped to `[8, 20]`. Returns
-/// `(bin_lower_bound, count)` pairs. Guards: empty → `[]`, single → `[(value, 1)]`.
+/// Latency histogram over an ascending-sorted slice, as `(bin_lower_bound,
+/// count)` pairs. Empty input → `[]`; a single element → one bin.
 pub fn compute_histogram(sorted: &[f64]) -> Vec<(f64, usize)> {
     match sorted.len() {
         0 => Vec::new(),

@@ -1,24 +1,18 @@
-//! Normal-distribution helpers, ported from `Stats/Benchmark.hs`.
+//! Normal-distribution helpers. See the crate docs for the accuracy tradeoff
+//! behind [`inverse_normal_cdf`].
 
 use std::f64::consts::{PI, SQRT_2};
 
 /// Z-score for the 95% credible interval (two-tailed).
 pub const Z95: f64 = 1.96;
 
-/// Standard normal CDF: Φ(x) = ½·erfc(−x/√2).
-///
-/// Uses `libm::erfc`, matching the Haskell `Numeric.SpecFunctions.erfc`.
+/// Standard normal CDF: Φ(x) = ½·erfc(−x/√2), exact via `libm::erfc`.
 pub fn standard_normal_cdf(x: f64) -> f64 {
     0.5 * libm::erfc(-(x / SQRT_2))
 }
 
-/// Rational approximation of the inverse normal CDF.
-///
-/// Abramowitz & Stegun, *Handbook of Mathematical Functions* (1964), 26.2.23.
-///
-/// IMPORTANT: this is an **approximation** (≈4.5e-4 max error), not the exact
-/// inverse. The Haskell `inverseNormalCDF` uses exactly this formula, so parity
-/// means reproducing *this*, not a higher-accuracy inverse from `statrs`.
+/// Inverse normal CDF: the Abramowitz & Stegun 26.2.23 rational
+/// **approximation** (max error ≈4.5e-4), not an exact inverse.
 pub fn inverse_normal_cdf(p: f64) -> f64 {
     if p <= 0.0 {
         -10.0

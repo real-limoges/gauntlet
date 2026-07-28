@@ -10,3 +10,6 @@ description = "Pure statistical core: descriptive stats, Bayesian comparison, EM
 # and fastest-to-iterate crate. `libm` only, for a high-accuracy `erfc`.
 [dependencies]
 libm.workspace = true
+
+[lints]
+workspace = true

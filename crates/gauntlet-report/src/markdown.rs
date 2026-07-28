@@ -1,8 +1,6 @@
-//! Markdown rendering, and the reporter that writes it to a file.
-//!
-//! The rendering functions are pure `String` producers so they can be golden
-//! tested and reused: the CI reporter embeds the regression report in a GitHub
-//! Step Summary, and the HTML reporter shares the same section structure.
+//! Markdown rendering, and the reporter that writes it to a file. The renderers
+//! are pure `String` producers, so the CI reporter can reuse them for a GitHub
+//! Step Summary.
 
 use std::path::{Path, PathBuf};
 
@@ -252,6 +250,7 @@ fn bayes_table(a: &str, b: &str, bayes: &BayesianComparison) -> String {
 /// Writes markdown reports to a file. The benchmark report replaces the file's
 /// contents; a subsequent regression report is appended, so one file holds the
 /// whole run.
+#[derive(Debug)]
 pub struct MarkdownReporter {
     path: PathBuf,
 }

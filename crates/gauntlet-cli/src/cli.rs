@@ -1,10 +1,5 @@
-//! Argument parsing.
-//!
-//! The flag surface documented in `README.md` is preserved so existing
-//! invocations and CI scripts keep working. The one deliberate break is
-//! `--charts`, which now parses into [`ChartKind`] instead of accepting free
-//! text — an unknown chart type fails here, with the valid list, rather than
-//! surfacing as a stack trace at report time.
+//! Argument parsing. The flag surface is documented in `README.md`; see the
+//! crate root for the decisions behind `--charts` and the live view.
 
 use std::path::PathBuf;
 
@@ -25,10 +20,8 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Run a benchmark (single- or multi-target, per the config).
-    // Boxed because `BenchmarkArgs` carries every output flag and dwarfs the
-    // other three variants, which would otherwise pad the whole enum. A plain
-    // comment, not a doc comment — clap renders doc comments as user-facing
-    // help, and implementation notes have no business there.
+    // Boxed because `BenchmarkArgs` dwarfs the other variants and would pad the
+    // enum. Not a doc comment: clap renders those as user-facing help.
     Benchmark(Box<BenchmarkArgs>),
 
     /// Compare two saved result files offline, with no requests.
@@ -103,7 +96,7 @@ pub struct BenchmarkArgs {
     /// Charts to render, comma-separated: histogram, cdf, tail, timeline,
     /// rolling_pct, boxplot, throughput, error_rate, status.
     //
-    // This list is spelled out because clap needs a 'static help string, and
+    // Spelled out because clap needs a 'static help string;
     // `the_charts_help_lists_every_kind` fails if it drifts from ChartKind::ALL.
     #[arg(long, value_name = "KINDS", value_delimiter = ',')]
     pub charts: Vec<ChartKind>,
@@ -125,8 +118,8 @@ pub struct BenchmarkArgs {
     pub no_tui: bool,
 }
 
-/// What the baseline flags add up to. The two flags are independently optional
-/// and combine, reproducing the Haskell `BaselineMode`.
+/// What the baseline flags add up to. The two are independently optional and
+/// combine, so one run can save a baseline and compare against another.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BaselineMode {
     None,

@@ -1,5 +1,5 @@
-//! The crate error type. Only the variants M2 actually constructs live here;
-//! the engine, reporters, and tracing extend the error surface as they land.
+//! The config-and-parse error type. The engine, reporters, and tracing each own
+//! their own error surface rather than extending this one.
 
 use std::path::PathBuf;
 

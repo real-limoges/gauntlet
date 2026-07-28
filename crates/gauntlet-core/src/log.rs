@@ -1,19 +1,5 @@
-//! Leveled diagnostic output.
-//!
-//! `settings.log_level` existed in the config and in the schema but nothing
-//! honoured it after the Rust port — the Haskell had a real logger, and the
-//! port replaced it with unconditional `eprintln!`. This restores the field's
-//! meaning without pulling in a logging framework.
-//!
-//! The distinction this module draws: **diagnostics go through here and land on
-//! stderr; program output does not.** A benchmark summary, a printed schema, and
-//! a validation report are the tool's *output* — they go to stdout and are never
-//! filtered, because suppressing them would defeat the command the user ran.
-//! Warnings about a failed baseline write are diagnostics.
-//!
-//! Deliberately not the `tracing` crate: that name already means Grafana Tempo
-//! in this workspace (see `docs/adr/M0-foundation.md`), and this is a handful of
-//! lines.
+//! Leveled diagnostic output on stderr, gated by `settings.log_level`. See the
+//! crate docs for what belongs here versus on stdout.
 
 use std::io::Write;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -57,8 +43,7 @@ fn log(level: LogLevel, prefix: &str, message: &str) {
     if !enabled(level) {
         return;
     }
-    // A failed write to stderr is not worth failing a benchmark over, and
-    // there is nowhere left to report it to.
+    // A failed write to stderr has nowhere left to be reported to.
     let mut stderr = std::io::stderr().lock();
     let _ = writeln!(stderr, "{prefix}: {message}");
 }

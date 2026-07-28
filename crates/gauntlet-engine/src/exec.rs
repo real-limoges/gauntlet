@@ -1,11 +1,6 @@
 //! One request, executed to completion: retry/backoff around [`client::send`],
-//! monotonic latency measurement, and `TestingResponse` construction.
-//!
-//! **Clock:** latency is `Instant::elapsed()` (monotonic), spanning all retry
-//! attempts. This is an intentional improvement over the Haskell, which used the
-//! `Realtime` clock — monotonic is the correct choice for elapsed durations
-//! (immune to wall-clock steps). `requested_at` keeps a wall-clock `SystemTime`
-//! purely for the CSV timestamp.
+//! latency measurement, and `TestingResponse` construction. See the crate docs
+//! for the clock choice.
 
 use std::future::Future;
 use std::time::{Duration, Instant, SystemTime};
@@ -15,9 +10,8 @@ use gauntlet_core::{Endpoint, Nanoseconds, RetrySettings, TestingResponse, Valid
 use crate::client::{self, RawResponse, TransportError};
 use crate::validation;
 
-/// The full outcome of one executed request: the stats-relevant
-/// [`TestingResponse`], the wall-clock start (for CSV), and any validation
-/// errors (empty unless the endpoint had a spec and the request succeeded).
+/// One executed request: the response, the wall-clock start (for the CSV), and
+/// any validation errors.
 #[derive(Clone, Debug)]
 pub struct RequestOutcome {
     pub response: TestingResponse,
@@ -25,17 +19,15 @@ pub struct RequestOutcome {
     pub validation_errors: Vec<ValidationError>,
 }
 
-/// Retry an async operation per `RetrySettings`: retry only when the error is
-/// retryable and retries remain. `max_attempts` is the number of *retries* (0
-/// disables them); the delay starts at `initial_delay_ms` and grows by
-/// `ceil(delay × backoff_multiplier)` each retry.
+/// Retry an async operation per `RetrySettings`. `max_attempts` counts *retries*
+/// (0 disables them) and the delay grows by `backoff_multiplier` each time.
 pub async fn with_retry<F, Fut>(
     retry: &RetrySettings,
     mut op: F,
-) -> std::result::Result<RawResponse, TransportError>
+) -> Result<RawResponse, TransportError>
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = std::result::Result<RawResponse, TransportError>>,
+    Fut: Future<Output = Result<RawResponse, TransportError>>,
 {
     let mut delay = retry.initial_delay_ms.get() as f64;
     let mut retries_left = retry.max_attempts;

@@ -250,7 +250,7 @@
       "additionalProperties": false
     },
     "LoadMode": {
-      "description": "Load control mode for pacing request dispatch. Tagged on `mode`. Positivity of the rate/duration fields is checked in `validate` (floats have no cheap nonzero type).",
+      "description": "Load control mode for pacing request dispatch, tagged on `mode`. Positivity of the float fields is checked in `validate`.",
       "oneOf": [
         {
           "description": "No throttling — fire as fast as concurrency allows.",
@@ -398,13 +398,6 @@
         "url"
       ],
       "properties": {
-        "branch": {
-          "description": "Optional git branch to switch to before benchmarking this target.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "lifecycle": {
           "anyOf": [
             {

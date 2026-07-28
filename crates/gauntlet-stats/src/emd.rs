@@ -1,14 +1,7 @@
-//! Earth Mover's Distance (1-Wasserstein), ported from `earthMoversDistance`
-//! in `Stats/Benchmark.hs`.
+//! Earth Mover's Distance (1-Wasserstein). See the crate docs for the two paths
+//! and the empty-input guard.
 
-/// Earth Mover's Distance between two sample sets.
-///
-/// For equal sample sizes: `mean(|sorted_a − sorted_b|)`.
-/// For unequal sizes: CDF-based integration ([`compute_emd_general`]).
-///
-/// (The empty-input case returns 0 here, where the Haskell equal-size path would
-/// divide by zero and yield NaN — a deliberate hardening, not a behavior the
-/// callers can reach with real benchmark data.)
+/// Earth Mover's Distance between two sample sets. Empty input → 0.
 pub fn earth_movers_distance(a: &[f64], b: &[f64]) -> f64 {
     let mut sa = a.to_vec();
     let mut sb = b.to_vec();
@@ -56,9 +49,8 @@ fn compute_emd_general(sorted_a: &[f64], sorted_b: &[f64]) -> f64 {
         j += 1;
     }
 
-    // Walk the stream, accumulating the area between the two CDFs. At each event
-    // the deltas are applied *before* measuring the width to the next event,
-    // matching the Haskell `integrate`.
+    // Accumulate the area between the two CDFs, applying each event's deltas
+    // before measuring the width to the next one.
     let mut cdf_a = 0.0;
     let mut cdf_b = 0.0;
     let mut area = 0.0;
